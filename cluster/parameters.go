@@ -28,7 +28,7 @@ func (p *Parameters) final() {
 		p.NodeID = randomID()
 	}
 	if p.Interface == "" {
-		ip, err := FindPublicIPv4()
+		ip, err := utils.FindPublicIPv4()
 		p.Interface = ip.String()
 		if err != nil {
 			log.Printf("Unable to get public IP: %v", err)
