@@ -27,8 +27,8 @@ type clatteringCluster struct {
 	mutex        *sync.Mutex
 }
 
-// New returns a new cluster (client)
-func New(params Parameters) Cluster {
+// NewCluster returns a new cluster (client)
+func NewCluster(params Parameters) Cluster {
 	return &clatteringCluster{
 		config: params,
 		tags:   make(map[string]string),

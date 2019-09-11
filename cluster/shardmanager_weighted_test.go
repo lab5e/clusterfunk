@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+// TestNodeData is an internal test
 func TestNodeData(t *testing.T) {
 	nd := newNodeData("node1")
 	nd.AddShard(NewShard(1, 1))
@@ -45,7 +46,14 @@ func TestNodeData(t *testing.T) {
 		t.Fatal("Expected w=0")
 	}
 
+	defer func() {
+		recover()
+	}()
+	nd.RemoveShard(1)
+	t.Fatal("no panic when zero shards left")
 }
+
+// TestWeightedShardManager tests the (default) shard manager
 func TestWeightedShardManager(t *testing.T) {
 	sm := NewShardManager()
 
@@ -57,6 +65,7 @@ func TestWeightedShardManager(t *testing.T) {
 	testShardManager(t, sm, maxShards, weights)
 }
 
+// Benchmark the performance on add and remove node
 func BenchmarkWeightedShardManager(b *testing.B) {
 	sm := NewShardManager()
 	weights := make([]int, benchmarkShardCount)
@@ -76,6 +85,7 @@ func BenchmarkWeightedShardManager(b *testing.B) {
 	}
 }
 
+// Benchmark lookups on node
 func BenchmarkMapToNode(b *testing.B) {
 	sm := NewShardManager()
 	weights := make([]int, benchmarkShardCount)
@@ -94,6 +104,7 @@ func BenchmarkMapToNode(b *testing.B) {
 	}
 }
 
+// Benchmark init function
 func BenchmarkShardInit(b *testing.B) {
 	weights := make([]int, benchmarkShardCount)
 	for i := range weights {
@@ -106,6 +117,7 @@ func BenchmarkShardInit(b *testing.B) {
 	}
 }
 
+// Benchmark shard weight total (it should be *really* quick)
 func BenchmarkShardWeight(b *testing.B) {
 	weights := make([]int, benchmarkShardCount)
 	for i := range weights {

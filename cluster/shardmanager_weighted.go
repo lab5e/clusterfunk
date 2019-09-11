@@ -183,3 +183,11 @@ func (sm *weightedShardManager) TotalWeight() int {
 	defer sm.mutex.Unlock()
 	return sm.totalWeight
 }
+
+func (sm *weightedShardManager) MarshalBinary() ([]byte, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (sm *weightedShardManager) UnmarshalBinary(data []byte) error {
+	return errors.New("not implemented")
+}

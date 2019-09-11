@@ -17,7 +17,7 @@ func main() {
 	flag.BoolVar(&config.Loopback, "loopback", true, "Use loopback adapter")
 	flag.BoolVar(&config.DiskStore, "disk", false, "Use disk store")
 	flag.Parse()
-	c := cluster.New(config)
+	c := cluster.NewCluster(config)
 	defer c.Stop()
 
 	if err := c.Start(); err != nil {

@@ -43,7 +43,7 @@ func verifyShards(t *testing.T, manager ShardManager, maxShards int) {
 	check := make(map[int]int)
 	shards := manager.Shards()
 	if len(shards) != maxShards {
-		t.Fatal("maxShards != shards")
+		t.Fatalf("maxShards != shards (expecting %d but got %d)", maxShards, len(shards))
 	}
 	for i := range shards {
 		check[shards[i].ID()] = 1

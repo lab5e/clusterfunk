@@ -1,5 +1,7 @@
 package cluster
 
+import "encoding"
+
 // Shard represents a partition that a single node is responsible for.
 type Shard interface {
 	// ID is the shard ID. The shard ID is calculated through a shard function
@@ -66,5 +68,12 @@ type ShardManager interface {
 	// its weight.
 	TotalWeight() int
 
+	// The marshaling methods are used to save and restore the shard manager
+	// from the Raft log.
+
+	encoding.BinaryMarshaler
+	encoding.BinaryUnmarshaler
+
 	// TBD: Methods to update shard weights and redistributing shards.
+
 }
