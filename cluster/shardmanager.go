@@ -15,6 +15,9 @@ type Shard interface {
 
 	// NodeID returns the node responsible for the shard.
 	NodeID() string
+
+	// SetNodeID sets the node ID for the shard
+	SetNodeID(nodeID string)
 }
 
 // ShardTransfer is an transfer operation on a shard, ie move from A to B.
@@ -30,8 +33,11 @@ type ShardTransfer struct {
 type ShardManager interface {
 	// Init reinitializes the (shard) manager. This can be called one and only
 	// once. Performance critical since this is part of the node
-	// onboarding process.
-	Init(shards []Shard) error
+	// onboarding process. The weights parameter may be set to nil. In that
+	// case the shards gets a weight of 1. If the weights parameter is specfied
+	// the lenght of the weights parameter must match the maxShards parameter.
+	// Shard IDs are assigned from 0...maxShards-1
+	Init(maxShards int, weights []int) error
 
 	// AddBucket adds a new bucket. The returned shard operations are required
 	// to balance the shards across the buckets in the cluster. If the bucket
@@ -47,7 +53,8 @@ type ShardManager interface {
 	// GetNode returns the node (ID) responsible for the shards. Performance
 	// critical since this will be used in every single call to determine
 	// the home location for mutations.
-	MapToNode(shard int) string
+	// TBD: Panic if the shard ID is > maxShards?
+	MapToNode(shardID int) string
 
 	// Shards returns a copy of all of the shards. Not performance critical. This
 	// is typically used for diagnostics.
