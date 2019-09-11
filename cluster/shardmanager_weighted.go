@@ -31,7 +31,6 @@ func (nd *nodeData) RemoveShard(preferredWeight int) Shard {
 		}
 	}
 	if len(nd.Shards) == 0 {
-		fmt.Printf("Me = %+v\n", nd)
 		panic("no shards remaining")
 	}
 	// This will cause a panic if there's no shards left. That's OK.
@@ -39,8 +38,6 @@ func (nd *nodeData) RemoveShard(preferredWeight int) Shard {
 	ret := nd.Shards[0]
 	if len(nd.Shards) > 1 {
 		nd.Shards = nd.Shards[1:]
-	} else {
-		nd.Shards = []Shard{}
 	}
 	nd.TotalWeights -= ret.Weight()
 	return ret
@@ -161,7 +158,7 @@ func (sm *weightedShardManager) RemoveNode(nodeID string) []ShardTransfer {
 	return ret
 }
 
-func (sm *weightedShardManager) MapToNode(shardID int) string {
+func (sm *weightedShardManager) MapToNode(shardID int) Shard {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 	if shardID > len(sm.shards) || shardID < 0 {
@@ -172,7 +169,7 @@ func (sm *weightedShardManager) MapToNode(shardID int) string {
 		// a panic() from the library.
 		panic(fmt.Sprintf("shard ID is outside range [0-%d]: %d", len(sm.shards), shardID))
 	}
-	return sm.shards[shardID].NodeID()
+	return sm.shards[shardID]
 }
 
 func (sm *weightedShardManager) Shards() []Shard {

@@ -54,7 +54,7 @@ type ShardManager interface {
 	// critical since this will be used in every single call to determine
 	// the home location for mutations.
 	// TBD: Panic if the shard ID is > maxShards?
-	MapToNode(shardID int) string
+	MapToNode(shardID int) Shard
 
 	// Shards returns a copy of all of the shards. Not performance critical. This
 	// is typically used for diagnostics.
