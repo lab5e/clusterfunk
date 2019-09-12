@@ -1,14 +1,14 @@
 package cluster
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"log"
-	"net"
-	"strconv"
+	"strings"
+	"sync"
 	"time"
 
-	"github.com/hashicorp/mdns"
+	"github.com/grandcat/zeroconf"
 )
 
 // This is a zeroconf setup for the cluster. It will register the Serf endpoints
@@ -20,64 +20,93 @@ import (
 // Also this won't work for Kubernetes or AWS/GCP/Azure since they have no
 // support for UDP broadcasts.
 //
-var server *mdns.Server
+// The zeroconf code doesn't work on loopback addresses...yet. It uses the
+// external IP address of the host when registering.
+//
 
-const advertisingString = "_horde._udp"
+// ZeroconfRegistry is the type for a zeroconf registry. It will announce one
+// or more endpoints via mDNS/Zeroconf/Bonjour until Shutdown() is called.
+type ZeroconfRegistry struct {
+	mutex       *sync.Mutex
+	server      *zeroconf.Server
+	ClusterName string
+}
 
-// zeroconfRegister registers a Serf endpoint on the local network.
-func zeroconfRegister(endpoint string) error {
-	info := []string{"Horde Cluster"}
-	host, portStr, err := net.SplitHostPort(endpoint)
-	if err != nil {
-		return err
+// This should really be something registered with IANA if we are doing it
+// The Proper Way but we'll stick with an unofficial name for now.
+const serviceString = "_clattering._udp"
+
+// This is the domain we'll use when announcing the service
+const defaultDomain = "local."
+
+var txtRecords = []string{"txtv=0", "name=Clattering cluster node"}
+
+// NewZeroconfRegistry creates a new zeroconf server
+func NewZeroconfRegistry(clusterName string) *ZeroconfRegistry {
+	return &ZeroconfRegistry{
+		mutex:       &sync.Mutex{},
+		ClusterName: clusterName,
 	}
-	port, err := strconv.ParseInt(portStr, 10, 32)
-	if err != nil {
-		return err
+}
+
+// Register registers a new endpoint. Only one endpoint can be created at a time
+func (zr *ZeroconfRegistry) Register(name string, port int) error {
+	zr.mutex.Lock()
+	defer zr.mutex.Unlock()
+	if zr.server != nil {
+		return errors.New("endpoint already registered")
 	}
-	svc, err := mdns.NewMDNSService(host, advertisingString, "", "", int(port), nil, info)
-	if err != nil {
-		return err
-	}
-	server, err = mdns.NewServer(&mdns.Config{Zone: svc})
+	var err error
+
+	zr.server, err = zeroconf.Register(fmt.Sprintf("%s_%s", zr.ClusterName, name), serviceString, defaultDomain, port, txtRecords, nil)
 	if err != nil {
 		return err
 	}
 
 	return nil
+
 }
 
-// zeroconfLookup does a mDNS query to find Serf nodes on the local
-// network.
-func zeroconfLookup(localEndpoint string) (string, error) {
+// Shutdown shuts down the Zeroconf server.
+func (zr *ZeroconfRegistry) Shutdown() {
+	zr.mutex.Lock()
+	defer zr.mutex.Unlock()
+	if zr.server != nil {
+		zr.server.Shutdown()
+		zr.server = nil
+	}
+}
 
-	found := make(chan string)
-	defer close(found)
-	for i := 0; i < 3; i++ {
-		entries := make(chan *mdns.ServiceEntry, 4)
-		go func(ch chan *mdns.ServiceEntry) {
-			for entry := range ch {
-				serfEP := fmt.Sprintf("%s:%d", entry.AddrV4.String(), entry.Port)
-				if serfEP != localEndpoint {
-					log.Printf("Found host: %s", serfEP)
-					found <- serfEP
+// Resolve looks for another service
+func (zr *ZeroconfRegistry) Resolve(waitTime time.Duration) ([]string, error) {
+
+	resolver, err := zeroconf.NewResolver(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	entries := make(chan *zeroconf.ServiceEntry)
+	go func(entries chan *zeroconf.ServiceEntry) {
+		ctx, cancel := context.WithTimeout(context.Background(), waitTime)
+		defer cancel()
+		err = resolver.Browse(ctx, serviceString, defaultDomain, entries)
+		if err != nil {
+			close(entries)
+			return
+		}
+		<-ctx.Done()
+	}(entries)
+
+	var ret []string
+	clusterPrefix := fmt.Sprintf("%s_", zr.ClusterName)
+	for entry := range entries {
+		if entry.Service == serviceString {
+			if strings.HasPrefix(entry.Instance, clusterPrefix) {
+				for i := range entry.AddrIPv4 {
+					ret = append(ret, fmt.Sprintf("%s:%d", entry.AddrIPv4[i], entry.Port))
 				}
 			}
-		}(entries)
-		mdns.Lookup(advertisingString, entries)
-		select {
-		case h := <-found:
-			return h, nil
-		case <-time.After(5 * time.Second):
-			log.Printf("Retrying query (%d)", i+1)
 		}
 	}
-	return "", errors.New("No hosts found")
-}
-
-// zeroconfShutdown shuts down the running mDNS server. This isn't thread safe.
-func zeroconfShutdown() {
-	if server != nil {
-		server.Shutdown()
-	}
+	return ret, nil
 }

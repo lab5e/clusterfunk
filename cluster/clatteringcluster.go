@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -9,6 +10,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/stalehd/clattering/utils"
 
 	"github.com/hashicorp/go-hclog"
 	raftboltdb "github.com/hashicorp/raft-boltdb"
@@ -25,6 +28,7 @@ type clatteringCluster struct {
 	raftEndpoint string
 	tags         map[string]string
 	mutex        *sync.Mutex
+	registry     *ZeroconfRegistry
 }
 
 // NewCluster returns a new cluster (client)
@@ -38,19 +42,29 @@ func NewCluster(params Parameters) Cluster {
 
 func (hc *clatteringCluster) Start() error {
 	hc.config.final()
+	if hc.config.ClusterName == "" {
+		return errors.New("cluster name not specified")
+	}
 	if hc.config.ZeroConf {
-		log.Printf("Registering Serf in mDNS")
-		if err := zeroconfRegister(hc.config.SerfEndpoint); err != nil {
-			return err
-		}
+		hc.registry = NewZeroconfRegistry(hc.config.ClusterName)
+
 		if !hc.config.Bootstrap && hc.config.Join == "" {
 			log.Printf("Looking for other Serf instances...")
 			var err error
-			hc.config.Join, err = zeroconfLookup(hc.config.SerfEndpoint)
+			addrs, err := hc.registry.Resolve(1 * time.Second)
 			if err != nil {
 				return err
 			}
+			if len(addrs) == 0 {
+				return errors.New("no serf instances found")
+			}
+			hc.config.Join = addrs[0]
 		}
+		log.Printf("Registering Serf endpoint (%s) in zeroconf", hc.config.SerfEndpoint)
+		if err := hc.registry.Register(hc.config.NodeID, utils.PortOfHostPort(hc.config.SerfEndpoint)); err != nil {
+			return err
+		}
+
 	}
 
 	if err := hc.createRaft(); err != nil {
@@ -99,7 +113,6 @@ func (hc *clatteringCluster) shutdownSerf() {
 }
 
 func (hc *clatteringCluster) Stop() {
-	zeroconfShutdown()
 	hc.shutdownRaft()
 	hc.shutdownSerf()
 }

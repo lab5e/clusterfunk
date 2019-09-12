@@ -2,17 +2,26 @@ package cluster
 
 import (
 	"testing"
+	"time"
 )
 
 func TestZeroConf(t *testing.T) {
-	if err := zeroconfRegister("127.0.0.1:1234"); err != nil {
+
+	zr := NewZeroconfRegistry("test-cluster")
+	if err := zr.Register("some-node", 9999); err != nil {
 		t.Fatal(err)
 	}
-	defer zeroconfShutdown()
 
-	str, err := zeroconfLookup("127.0.0.1:4321")
+	if err := zr.Register("another-node", 9998); err == nil {
+		t.Fatal("Should not be able to register two endpoints")
+	}
+	defer zr.Shutdown()
+
+	results, err := zr.Resolve(250 * time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("Found address: %v", str)
+	if len(results) == 0 {
+		t.Fatal("No client found")
+	}
 }

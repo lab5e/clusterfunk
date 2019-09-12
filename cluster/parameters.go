@@ -11,6 +11,7 @@ import (
 // Parameters is the parameters required for the cluster. The defaults are
 // suitable for a development cluster but not for a production cluster.
 type Parameters struct {
+	ClusterName  string `param:"desc=Cluster name;default=clattering"`
 	Loopback     bool   `param:"desc=Use loopback adapter;default=false"`
 	Join         string `param:"desc=Join address and port for Serf cluster"`
 	Interface    string `param:"desc=Interface address for services"`
@@ -51,5 +52,8 @@ func (p *Parameters) final() {
 			port = int((rand.Int31() + 1024) % 32000)
 		}
 		p.SerfEndpoint = fmt.Sprintf("%s:%d", p.Interface, port)
+	}
+	if p.Verbose {
+		log.Printf("Configuration: %+v", p)
 	}
 }
