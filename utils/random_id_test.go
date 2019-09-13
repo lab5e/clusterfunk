@@ -1,9 +1,9 @@
-package cluster
+package utils
 
 import "testing"
 
 func TestNodeID(t *testing.T) {
-	if randomID() == "" {
+	if RandomID() == "" {
 		t.Fatal()
 	}
 }

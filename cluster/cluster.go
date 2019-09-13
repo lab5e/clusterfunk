@@ -117,12 +117,12 @@ type Node interface {
 
 // The following are internal tags and values for nodes
 const (
-	raftEndpoint    = "ep.raft"
-	raftNodeID      = "raft.nodeid"
-	nodeType        = "kind"
-	voterKind       = "member"
-	nonvoterKind    = "nonvoter"
-	cheerleaderKind = "cheerleader" // Cheerleaders are special kind of voters that exists solely to keep the
+	clusterEndpointPrefix = "ep."
+	RaftEndpoint          = "ep.raft"
+	RaftNodeID            = "raft.nodeid"
+	NodeType              = "kind"
+	VoterKind             = "member"
+	NonvoterKind          = "nonvoter"
 )
 
 // The following is a list of well-known endpoints on nodes

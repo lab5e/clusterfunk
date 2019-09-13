@@ -46,7 +46,7 @@ func (p *Parameters) checkAndSetEndpoint(hostport *string) {
 }
 func (p *Parameters) final() {
 	if p.NodeID == "" {
-		p.NodeID = randomID()
+		p.NodeID = utils.RandomID()
 	}
 	if p.Interface == "" {
 		ip, err := utils.FindPublicIPv4()
@@ -71,7 +71,7 @@ func (p *Parameters) final() {
 // NodeType returns the type of node this will be announced as.
 func (p *Parameters) NodeType() string {
 	if p.NonVoting {
-		return nonvoterKind
+		return NonvoterKind
 	}
-	return voterKind
+	return VoterKind
 }

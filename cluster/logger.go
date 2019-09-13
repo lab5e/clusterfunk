@@ -20,3 +20,9 @@ func newClusterLogger(prefix string) *clusterLogger {
 		Logger: log.New(&muteWriter{}, prefix, log.LstdFlags),
 	}
 }
+
+// GetMutedLogger returns a pointer to a log.Logger instance that is logging
+// to the Big Bit Bucket In The Sky...or Cloud
+func GetMutedLogger() *log.Logger {
+	return log.New(&muteWriter{}, "sssh", log.LstdFlags)
+}

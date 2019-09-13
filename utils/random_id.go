@@ -1,4 +1,4 @@
-package cluster
+package utils
 
 import (
 	"crypto/rand"
@@ -7,8 +7,8 @@ import (
 	prand "math/rand"
 )
 
-// randomID returns a random ID
-func randomID() string {
+// RandomID returns a random ID
+func RandomID() string {
 	bytes := make([]byte, 8)
 	_, err := rand.Read(bytes)
 	if err != nil {

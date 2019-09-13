@@ -21,12 +21,15 @@ message ListSerfNodesRequest {
 
 message SerfEndpoint {
     string HostPort = 1;
+    string Name = 2;
 }
 
 // SerfNodeInfo holds info on a single Serf node
 message SerfNodeInfo {
     string Id = 1;
-    repeated SerfEndpoint Endpoints = 2;
+    string Endpoint = 2;
+    string Status = 3;
+    repeated SerfEndpoint ServiceEndpoints = 4;
 
 }
 
@@ -45,6 +48,7 @@ message ListRaftNodesRequest {
 message RaftNodeInfo {
     string Id = 1;
     string RaftState = 2;
+    bool IsLeader = 3;
 };
 
 message ListRaftNodesResponse {

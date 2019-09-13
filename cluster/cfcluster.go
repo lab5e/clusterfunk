@@ -69,6 +69,11 @@ func (cf *clusterfunkCluster) Start() error {
 
 	}
 
+	// Launch node management endpoint
+	if err:= cf.startManagementServices(); err != nil {
+		log.Printf("Error starting management endpoint: %v", err)
+	}
+
 	if err := cf.createRaft(); err != nil {
 		return err
 	}
@@ -84,8 +89,7 @@ func (cf *clusterfunkCluster) Start() error {
 		}
 	}
 
-	// Launch node management endpoint
-	cf.startManagementServices()
+
 	// Launch leader management endpoint
 	return nil
 }
@@ -294,7 +298,7 @@ func (cf *clusterfunkCluster) serfEventHandler(events chan serf.Event) {
 				continue
 			}
 			for _, v := range e.Members {
-				if err := cf.joinRaftCluster(v.Tags[raftEndpoint], v.Tags[raftNodeID]); err != nil {
+				if err := cf.joinRaftCluster(v.Tags[RaftEndpoint], v.Tags[RaftNodeID]); err != nil {
 					log.Printf("Error adding member: %+v", v)
 				}
 			}
@@ -304,7 +308,7 @@ func (cf *clusterfunkCluster) serfEventHandler(events chan serf.Event) {
 				continue
 			}
 			for _, v := range e.Members {
-				cf.leaveRaftCluster(v.Tags[raftEndpoint], v.Tags[raftNodeID])
+				cf.leaveRaftCluster(v.Tags[RaftEndpoint], v.Tags[RaftNodeID])
 			}
 		case serf.EventMemberReap:
 		case serf.EventMemberUpdate:
@@ -354,10 +358,11 @@ func (cf *clusterfunkCluster) createSerf() error {
 	}
 
 	// Assign tags and default endpoint
-	cf.setTag(nodeType, cf.config.NodeType())
-	cf.setTag(raftNodeID, cf.config.NodeID)
-	cf.setTag(raftEndpoint, cf.raftEndpoint)
+	cf.setTag(NodeType, cf.config.NodeType())
+	cf.setTag(RaftNodeID, cf.config.NodeID)
+	cf.setTag(RaftEndpoint, cf.raftEndpoint)
 	cf.mutex.Lock()
+	log.Printf("Setting serf tags= %+v", cf.tags)
 	config.Tags = cf.tags
 	cf.mutex.Unlock()
 
