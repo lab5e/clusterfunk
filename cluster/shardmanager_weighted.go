@@ -1,8 +1,11 @@
 package cluster
 
 import (
+	"bytes"
+	"encoding/gob"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 )
 
@@ -184,10 +187,59 @@ func (sm *weightedShardManager) TotalWeight() int {
 	return sm.totalWeight
 }
 
+// This is the wire type for the gob encoder
+type shardWire struct {
+	ID     int
+	Weight int
+	NodeID string
+}
+
 func (sm *weightedShardManager) MarshalBinary() ([]byte, error) {
-	return nil, errors.New("not implemented")
+	sm.mutex.Lock()
+	defer sm.mutex.Unlock()
+
+	var ret bytes.Buffer
+	encoder := gob.NewEncoder(&ret)
+	for _, v := range sm.shards {
+		s := shardWire{v.ID(), v.Weight(), v.NodeID()}
+		if err := encoder.Encode(&s); err != nil {
+			return nil, err
+		}
+	}
+	return ret.Bytes(), nil
 }
 
 func (sm *weightedShardManager) UnmarshalBinary(data []byte) error {
-	return errors.New("not implemented")
+	sm.mutex.Lock()
+	defer sm.mutex.Unlock()
+
+	sm.totalWeight = 0
+	sm.nodes = make(map[string]*nodeData)
+	sm.shards = make([]Shard, 0)
+
+	buf := bytes.NewBuffer(data)
+	decoder := gob.NewDecoder(buf)
+	for {
+		s := shardWire{}
+		if err := decoder.Decode(&s); err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+		newShard := NewShard(s.ID, s.Weight)
+		newShard.SetNodeID(s.NodeID)
+		nodeToUpdate, exists := sm.nodes[s.NodeID]
+		if !exists {
+			nodeToUpdate = &nodeData{
+				NodeID:       s.NodeID,
+				TotalWeights: 0,
+				Shards:       make([]Shard, 0),
+			}
+			sm.nodes[s.NodeID] = nodeToUpdate
+		}
+		nodeToUpdate.AddShard(newShard)
+		sm.shards = append(sm.shards, newShard)
+		sm.totalWeight += newShard.Weight()
+	}
 }

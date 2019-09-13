@@ -129,3 +129,82 @@ func BenchmarkShardWeight(b *testing.B) {
 		sm.TotalWeight()
 	}
 }
+
+func TestMarshalUnmarshalBinary(t *testing.T) {
+	weights := make([]int, benchmarkShardCount)
+	for i := range weights {
+		weights[i] = int(rand.Int31n(100)) + 1
+	}
+	sm := NewShardManager()
+	sm.Init(benchmarkShardCount, weights)
+	for i := 0; i < benchmarkNodeCount; i++ {
+		sm.AddNode(fmt.Sprintf("Node%04d", i))
+	}
+
+	buf, err := sm.MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newManager := NewShardManager()
+	if err := newManager.UnmarshalBinary(buf); err != nil {
+		t.Fatal(err)
+	}
+
+	if newManager.TotalWeight() != sm.TotalWeight() {
+		t.Fatalf("Total weight is different")
+	}
+	if len(newManager.Shards()) != len(sm.Shards()) {
+		t.Fatalf("Number of shards is different: %d != %d", len(newManager.Shards()), len(sm.Shards()))
+	}
+	for i := 0; i < benchmarkShardCount; i++ {
+		old := sm.MapToNode(i)
+		new := newManager.MapToNode(i)
+		if new.NodeID() != old.NodeID() {
+			t.Fatalf("Shard %d is in a different place (%s/%s)", i, new.NodeID(), old.NodeID())
+		}
+		if new.Weight() != old.Weight() {
+			t.Fatalf("Shard %d has different weight", i)
+		}
+		if new.ID() != old.ID() {
+			t.Fatalf("Shard %d has different ID", i)
+		}
+	}
+}
+
+func BenchmarkMarshalManager(b *testing.B) {
+	weights := make([]int, benchmarkShardCount)
+	for i := range weights {
+		weights[i] = int(rand.Int31n(100)) + 1
+	}
+	sm := NewShardManager()
+	sm.Init(benchmarkShardCount, weights)
+	for i := 0; i < benchmarkNodeCount; i++ {
+		sm.AddNode(fmt.Sprintf("Node%04d", i))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		sm.MarshalBinary()
+	}
+}
+
+func BenchmarkUnmarshalManager(b *testing.B) {
+	weights := make([]int, benchmarkShardCount)
+	for i := range weights {
+		weights[i] = int(rand.Int31n(100)) + 1
+	}
+	sm := NewShardManager()
+	sm.Init(benchmarkShardCount, weights)
+	for i := 0; i < benchmarkNodeCount; i++ {
+		sm.AddNode(fmt.Sprintf("Node%04d", i))
+	}
+
+	buf, _ := sm.MarshalBinary()
+
+	newManager := NewShardManager()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		newManager.UnmarshalBinary(buf)
+	}
+}
