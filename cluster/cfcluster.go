@@ -70,7 +70,7 @@ func (cf *clusterfunkCluster) Start() error {
 	}
 
 	// Launch node management endpoint
-	if err:= cf.startManagementServices(); err != nil {
+	if err := cf.startManagementServices(); err != nil {
 		log.Printf("Error starting management endpoint: %v", err)
 	}
 
@@ -88,7 +88,6 @@ func (cf *clusterfunkCluster) Start() error {
 			return err
 		}
 	}
-
 
 	// Launch leader management endpoint
 	return nil
@@ -334,6 +333,13 @@ func (cf *clusterfunkCluster) createSerf() error {
 	if err != nil {
 		return err
 	}
+
+	// Lower the default reap and tombstone intervals
+	// The tombstone timeout is for nodes that leave
+	// gracefully.
+	config.ReapInterval = time.Minute * 5
+	config.TombstoneTimeout = time.Minute * 10
+
 	config.MemberlistConfig.BindAddr = host
 	config.MemberlistConfig.BindPort = int(port)
 
