@@ -23,15 +23,14 @@ import (
 
 // hordeCluster implements the Cluster interface
 type clusterfunkCluster struct {
-	se               *serf.Serf
-	ra               *raft.Raft
-	config           Parameters
-	raftEndpoint     string
-	tags             map[string]string
-	mutex            *sync.Mutex
-	registry         *ZeroconfRegistry
-	nodeMgmtServer   *grpc.Server
-	leaderMgmtServer *grpc.Server
+	se           *serf.Serf
+	ra           *raft.Raft
+	config       Parameters
+	raftEndpoint string
+	tags         map[string]string
+	mutex        *sync.Mutex
+	registry     *ZeroconfRegistry
+	mgmtServer   *grpc.Server
 }
 
 // NewCluster returns a new cluster (client)

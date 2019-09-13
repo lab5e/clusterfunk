@@ -2,6 +2,42 @@ syntax = "proto3";
 
 package clustermgmt;
 
+message GetStateRequest {
+
+};
+
+message GetStateResponse {
+    string NodeId = 1;
+    string RaftState= 2;
+    int32 RaftNodeCount = 3;
+    int32 SerfNodeCount = 4;
+};
+
+
+
+message ListSerfNodesRequest {
+
+};
+
+message SerfEndpoint {
+    string HostPort = 1;
+}
+
+// SerfNodeInfo holds info on a single Serf node
+message SerfNodeInfo {
+    string Id = 1;
+    repeated SerfEndpoint Endpoints = 2;
+
+}
+
+//ListSerfNodesResponse is the response to a ListSerfNodes call. The number of
+// Serf nodes will initially be quite small so we won't need a stream response
+// here.
+message ListSerfNodesResponse {
+    string NodeId = 1;
+    repeated SerfNodeInfo Swarm = 2;
+};
+
 message ListRaftNodesRequest {
 
 };
@@ -56,7 +92,18 @@ message ListShardsResponse {
 
 // LeaderManagement service is responsible for node management. Management
 // operations must happen on the leader in the cluster.
-service LeaderManagement {
+service ClusterManagement {
+    // GetState returns the node's internal state. Actual content is WIP.
+    rpc GetState(GetStateRequest) returns (GetStateResponse);
+
+
+    // ListSerfNodes lists the known Serf nodes from this node's point of
+    // view. Technically this is not something we need since the management
+    // tools can join the Serf cluster themselves but it's always nice to not
+    // disturbe the Force when inspecting state. This also works as a nice
+    // map to the other leader nodes.
+    rpc ListSerfNodes(ListSerfNodesRequest) returns (ListSerfNodesResponse);
+
     // ListNodes lists the nodes in the cluster. This will also include
     // information present in the Serf cluster.
     rpc ListRaftNodes(ListRaftNodesRequest) returns (ListRaftNodesResponse);

@@ -30,39 +30,21 @@ func (cf *clusterfunkCluster) getGRPCOpts(config GRPCServerParameters) ([]grpc.S
 }
 
 func (cf *clusterfunkCluster) startManagementServices() error {
-	opts, err := cf.getGRPCOpts(cf.config.NodeManagement)
+	opts, err := cf.getGRPCOpts(cf.config.Management)
 	if err != nil {
 		return err
 	}
-	cf.nodeMgmtServer = grpc.NewServer(opts...)
+	cf.mgmtServer = grpc.NewServer(opts...)
 
-	clustermgmt.RegisterNodeManagementServer(cf.nodeMgmtServer, cf)
+	clustermgmt.RegisterClusterManagementServer(cf.mgmtServer, cf)
 
-	nodeListener, err := net.Listen("tcp", cf.config.NodeManagement.Endpoint)
+	listener, err := net.Listen("tcp", cf.config.Management.Endpoint)
 	if err != nil {
 		return err
 	}
 
-	if err := cf.nodeMgmtServer.Serve(nodeListener); err != nil {
+	if err := cf.mgmtServer.Serve(listener); err != nil {
 		log.Printf("Unable to launch node management gRPC server: %v", err)
-		return err
-	}
-
-	opts, err = cf.getGRPCOpts(cf.config.LeaderManagement)
-	if err != nil {
-		return err
-	}
-	cf.leaderMgmtServer = grpc.NewServer(opts...)
-
-	clustermgmt.RegisterLeaderManagementServer(cf.leaderMgmtServer, cf)
-
-	leaderListener, err := net.Listen("tcp", cf.config.LeaderManagement.Endpoint)
-	if err != nil {
-		return err
-	}
-
-	if err := cf.leaderMgmtServer.Serve(leaderListener); err != nil {
-		log.Printf("Unable to launch leader management gRPC server: %v", err)
 		return err
 	}
 
