@@ -136,5 +136,5 @@ const (
 	// To simplify local development clusters we use mDNS to auto-discover clusters.
 	// If the join parameter is set that will be used. Multiple development clusters
 	// on the same subnet won't be possible but that's OK.
-	mDNSBootstrap = "clattering.local"
+	mDNSBootstrap = "clusterfunk.local"
 )

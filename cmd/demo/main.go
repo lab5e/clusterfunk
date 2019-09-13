@@ -6,7 +6,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/stalehd/clattering/cluster"
+	"github.com/stalehd/clusterfunk/cluster"
 )
 
 func main() {

@@ -1,2 +1,2 @@
-// Package clattering is the root package for the clattering library.
-package clattering
+// Package clusterfunk is the root package for the clusterfunk library.
+package clusterfunk

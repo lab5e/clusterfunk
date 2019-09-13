@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/stalehd/clattering/cluster"
+	"github.com/stalehd/clusterfunk/cluster"
 )
 
 func waitForTermination() {

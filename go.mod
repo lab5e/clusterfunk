@@ -1,4 +1,4 @@
-module github.com/stalehd/clattering
+module github.com/stalehd/clusterfunk
 
 go 1.12
 

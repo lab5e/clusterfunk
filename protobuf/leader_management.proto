@@ -2,23 +2,20 @@ syntax = "proto3";
 
 package clustermgmt;
 
-// Messages for the ListRaftNode method
-message ListRaftNodeRequest {
+message ListRaftNodesRequest {
 
 };
 
-message ListRaftNodeResponse {
-
+message RaftNodeInfo {
+    string Id = 1;
+    string RaftState = 2;
 };
 
-// Messages for the ListSerfNode method
-message ListSerfNodeRequest {
-
+message ListRaftNodesResponse {
+    string NodeId = 1;
+    repeated RaftNodeInfo Members = 2;
 };
 
-message ListSerfNodeResponse {
-
-};
 /*
 // Messages for the RetireNode method
 message RetireNodeRequest {
@@ -62,11 +59,8 @@ message ListShardsResponse {
 service LeaderManagement {
     // ListNodes lists the nodes in the cluster. This will also include
     // information present in the Serf cluster.
-    rpc ListRaftNodes(ListRaftNodeRequest) returns (ListRaftNodeResponse);
+    rpc ListRaftNodes(ListRaftNodesRequest) returns (ListRaftNodesResponse);
 
-    // ListSerfNodes lists the Serf nodes in the cluster. This includes the
-    // status and tags on each node.
-    rpc ListSerfNodes(ListSerfNodeRequest) returns (ListSerfNodeResponse);
 
     /*
     // RetireNode will mark a node as retired and it will be removed the next

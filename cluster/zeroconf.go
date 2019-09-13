@@ -34,12 +34,12 @@ type ZeroconfRegistry struct {
 
 // This should really be something registered with IANA if we are doing it
 // The Proper Way but we'll stick with an unofficial name for now.
-const serviceString = "_clattering._udp"
+const serviceString = "_clusterfunk._udp"
 
 // This is the domain we'll use when announcing the service
 const defaultDomain = "local."
 
-var txtRecords = []string{"txtv=0", "name=Clattering cluster node"}
+var txtRecords = []string{"txtv=0", "name=clusterfunk cluster node"}
 
 // NewZeroconfRegistry creates a new zeroconf server
 func NewZeroconfRegistry(clusterName string) *ZeroconfRegistry {
