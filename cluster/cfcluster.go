@@ -182,7 +182,18 @@ func (cf *clusterfunkCluster) createRaft() error {
 	if err != nil {
 		return err
 	}
-	//TODO(stalehd): Check timeouts
+
+	/* These are the defaults:
+	HeartbeatTimeout:   1000 * time.Millisecond,
+	ElectionTimeout:    1000 * time.Millisecond,
+	CommitTimeout:      50 * time.Millisecond,
+	SnapshotInterval:   120 * time.Second,
+	LeaderLeaseTimeout: 500 * time.Millisecond,
+	*/
+	config.HeartbeatTimeout = 100 * time.Millisecond
+	config.ElectionTimeout = 100 * time.Millisecond
+	config.LeaderLeaseTimeout = 50 * time.Millisecond
+
 	transport, err := raft.NewTCPTransport(addr.String(), addr, 3, 5*time.Second, os.Stderr)
 	cf.raftEndpoint = string(transport.LocalAddr())
 	if err != nil {
@@ -240,13 +251,27 @@ func (cf *clusterfunkCluster) createRaft() error {
 	}
 	observerChan := make(chan raft.Observation)
 	go func(ch chan raft.Observation) {
+		printTime := func(start time.Time, end time.Time) {
+			d := float64(end.Sub(start)) / float64(time.Millisecond)
+			log.Printf("%f milliseconds for election", d)
+		}
+		var candidateTime = time.Now()
 		for k := range ch {
 			switch v := k.Data.(type) {
 			case raft.PeerObservation:
 				log.Printf("Peer observation: Removed: %t Peer: %s", v.Removed, v.Peer.ID)
 			case raft.LeaderObservation:
+
 				log.Printf("**** Leader observation: %+v. Last index = %d", v, cf.ra.LastIndex())
 			case raft.RaftState:
+				switch v {
+				case raft.Candidate:
+					candidateTime = time.Now()
+				case raft.Follower:
+					printTime(candidateTime, time.Now())
+				case raft.Leader:
+					printTime(candidateTime, time.Now())
+				}
 				log.Printf("Raft state: %s", v.String())
 			case *raft.RequestVoteRequest:
 				log.Printf("Request vote: %+v", *v)
