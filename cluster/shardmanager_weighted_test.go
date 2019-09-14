@@ -145,7 +145,7 @@ func TestMarshalUnmarshalBinary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	t.Logf("%d shards = %d bytes", benchmarkShardCount, len(buf))
 	newManager := NewShardManager()
 	if err := newManager.UnmarshalBinary(buf); err != nil {
 		t.Fatal(err)

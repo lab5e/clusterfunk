@@ -1,12 +1,13 @@
 package cluster
 
 import (
-	"bytes"
-	"encoding/gob"
 	"errors"
 	"fmt"
-	"io"
 	"sync"
+
+	"github.com/stalehd/clusterfunk/cluster/clustercomms"
+
+	"github.com/golang/protobuf/proto"
 )
 
 type nodeData struct {
@@ -198,48 +199,56 @@ func (sm *weightedShardManager) MarshalBinary() ([]byte, error) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
-	var ret bytes.Buffer
-	encoder := gob.NewEncoder(&ret)
-	for _, v := range sm.shards {
-		s := shardWire{v.ID(), v.Weight(), v.NodeID()}
-		if err := encoder.Encode(&s); err != nil {
-			return nil, err
-		}
+	msg := &clustercomms.ShardDistribution{}
+	nodeMap := make(map[string]int32)
+	n := int32(0)
+	for _, v := range sm.nodes {
+		msg.Nodes = append(msg.Nodes, &clustercomms.WireNodes{
+			NodeId:   n,
+			NodeName: v.NodeID,
+		})
+		nodeMap[v.NodeID] = n
+		n++
 	}
-	return ret.Bytes(), nil
+
+	for _, shard := range sm.shards {
+		msg.Shards = append(msg.Shards, &clustercomms.WireShard{
+			Id:     int32(shard.ID()),
+			Weight: int32(shard.Weight()),
+			NodeId: nodeMap[shard.NodeID()],
+		})
+	}
+	buf, err := proto.Marshal(msg)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf, nil
 }
 
-func (sm *weightedShardManager) UnmarshalBinary(data []byte) error {
+func (sm *weightedShardManager) UnmarshalBinary(buf []byte) error {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
+
+	msg := &clustercomms.ShardDistribution{}
+	if err := proto.Unmarshal(buf, msg); err != nil {
+		return err
+	}
 
 	sm.totalWeight = 0
 	sm.nodes = make(map[string]*nodeData)
 	sm.shards = make([]Shard, 0)
 
-	buf := bytes.NewBuffer(data)
-	decoder := gob.NewDecoder(buf)
-	for {
-		s := shardWire{}
-		if err := decoder.Decode(&s); err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			return err
-		}
-		newShard := NewShard(s.ID, s.Weight)
-		newShard.SetNodeID(s.NodeID)
-		nodeToUpdate, exists := sm.nodes[s.NodeID]
-		if !exists {
-			nodeToUpdate = &nodeData{
-				NodeID:       s.NodeID,
-				TotalWeights: 0,
-				Shards:       make([]Shard, 0),
-			}
-			sm.nodes[s.NodeID] = nodeToUpdate
-		}
-		nodeToUpdate.AddShard(newShard)
-		sm.shards = append(sm.shards, newShard)
-		sm.totalWeight += newShard.Weight()
+	nodeMap := make(map[int32]string)
+	for _, v := range msg.Nodes {
+		nodeMap[v.NodeId] = v.NodeName
+		sm.nodes[v.NodeName] = newNodeData(v.NodeName)
 	}
+	for _, v := range msg.Shards {
+		newShard := NewShard(int(v.Id), int(v.Weight))
+		sm.nodes[nodeMap[v.NodeId]].AddShard(newShard)
+		sm.totalWeight += int(v.Weight)
+		sm.shards = append(sm.shards, newShard)
+	}
+	return nil
 }

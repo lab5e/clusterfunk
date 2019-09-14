@@ -13,8 +13,6 @@ message GetStateResponse {
     int32 SerfNodeCount = 4;
 };
 
-
-
 message ListSerfNodesRequest {
 
 };
