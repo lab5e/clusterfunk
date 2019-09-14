@@ -89,7 +89,25 @@ func (cf *clusterfunkCluster) Start() error {
 		}
 	}
 
-	// Launch leader management endpoint
+	go func() {
+		for {
+			time.Sleep(5 * time.Second)
+			// note: needs a mutex when raft cluster shuts down. If a panic
+			// is raised when everything is going down the cluster will be
+			// up s**t creek
+			if cf.ra.VerifyLeader().Error() == nil {
+				l := raft.Log{Data: make([]byte, 98999)}
+				start := time.Now()
+				if err := cf.ra.ApplyLog(l, time.Second*5).Error(); err != nil {
+					log.Printf("Error writing log entry: %v", err)
+					continue
+				}
+				end := time.Now()
+				diff := end.Sub(start)
+				log.Printf("Time to apply log: %f ms", float64(diff)/float64(time.Millisecond))
+			}
+		}
+	}()
 	return nil
 }
 

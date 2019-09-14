@@ -23,6 +23,7 @@ A silver bullet.
 
 ## TODOs
 
+* mutex when accessing the Raft instance (panics are not great when shutting down)
 * Proper FSM and log
 * Replicate logs with SQLite
 * Turn off auto-join/leave for Serf in production clusters
