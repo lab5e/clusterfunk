@@ -21,7 +21,7 @@ import (
 	"github.com/hashicorp/serf/serf"
 )
 
-// hordeCluster implements the Cluster interface
+// clusterfunkClusterß implements the Cluster interface
 type clusterfunkCluster struct {
 	se           *serf.Serf
 	ra           *raft.Raft
@@ -96,9 +96,8 @@ func (cf *clusterfunkCluster) Start() error {
 			// is raised when everything is going down the cluster will be
 			// up s**t creek
 			if cf.ra.VerifyLeader().Error() == nil {
-				l := raft.Log{Data: make([]byte, 98999)}
 				start := time.Now()
-				if err := cf.ra.ApplyLog(l, time.Second*5).Error(); err != nil {
+				if err := cf.ra.Apply(make([]byte, 98999), time.Second*5).Error(); err != nil {
 					log.Printf("Error writing log entry: %v", err)
 					continue
 				}
