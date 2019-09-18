@@ -19,6 +19,7 @@ type GRPCServerParameters struct {
 // Parameters is the parameters required for the cluster. The defaults are
 // suitable for a development cluster but not for a production cluster.
 type Parameters struct {
+	AutoJoin     bool   `param:"desc=Auto join via SerfEvents;default=true"`
 	ClusterName  string `param:"desc=Cluster name;default=clusterfunk"`
 	Loopback     bool   `param:"desc=Use loopback adapter;default=false"`
 	Join         string `param:"desc=Join address and port for Serf cluster"`

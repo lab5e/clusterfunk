@@ -3,6 +3,10 @@ package cluster
 // Cluster is a wrapper for the Serf and Raft libraries. It will handle typical
 // cluster operations.
 type Cluster interface {
+
+	// Name returns the cluster's name
+	Name() string
+
 	// Start launches the cluster, ie joins a Serf cluster and announces its
 	// presence
 	Start() error
@@ -76,7 +80,8 @@ type NodeState int
 //            | End  |
 //            +------+
 const (
-	ReadyToJoin NodeState = iota
+	Initializing NodeState = iota
+	ReadyToJoin
 	Empty
 	Allocated
 	Serving
@@ -108,6 +113,9 @@ type Node interface {
 	// Leader returns true if the node is the leader of the cluster
 	Leader() bool
 
+	// Endpoints returns a list of endpoints
+	Endpoints() []string
+
 	// GetEndpoint returns the named endpoint for the node
 	GetEndpoint(name string) (string, error)
 
@@ -118,23 +126,19 @@ type Node interface {
 // The following are internal tags and values for nodes
 const (
 	clusterEndpointPrefix = "ep."
-	RaftEndpoint          = "ep.raft"
 	RaftNodeID            = "raft.nodeid"
 	NodeType              = "kind"
 	VoterKind             = "member"
 	NonvoterKind          = "nonvoter"
+	NodeRaftState         = "raft.state"
 )
 
 // The following is a list of well-known endpoints on nodes
 const (
-	MetricsEndpoint    = "ep.metrics"    // MetricsEndpoint is the metrics endpoint
-	HTTPEndpoint       = "ep.http"       // HTTPEndpoint is the HTTP endpoint
+	//These are
+	//MetricsEndpoint    = "ep.metrics"    // MetricsEndpoint is the metrics endpoint
+	//HTTPEndpoint       = "ep.http"       // HTTPEndpoint is the HTTP endpoint
+	SerfEndpoint       = "ep.serf"
+	RaftEndpoint       = "ep.raft"
 	ManagementEndpoint = "ep.management" // ManagementEndpoint is gRPC endpoint for management
-)
-
-const (
-	// To simplify local development clusters we use mDNS to auto-discover clusters.
-	// If the join parameter is set that will be used. Multiple development clusters
-	// on the same subnet won't be possible but that's OK.
-	mDNSBootstrap = "clusterfunk.local"
 )

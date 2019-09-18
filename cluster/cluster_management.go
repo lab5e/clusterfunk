@@ -1,13 +1,12 @@
 package cluster
 
 import (
-	"time"
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/stalehd/clusterfunk/cluster/clustermgmt"
 
@@ -55,12 +54,12 @@ func (cf *clusterfunkCluster) startManagementServices() error {
 	}(fail)
 
 	select {
-	case err:=<-fail:
+	case err := <-fail:
 		return err
 	case <-time.After(250 * time.Millisecond):
 		// ok
 	}
-	cf.setTag(ManagementEndpoint, listener.Addr().String())
+	cf.AddLocalEndpoint(ManagementEndpoint, listener.Addr().String())
 	return nil
 }
 
@@ -68,6 +67,8 @@ func (cf *clusterfunkCluster) startManagementServices() error {
 // -----------------------------------------------------------------------------
 
 func (cf *clusterfunkCluster) GetState(context.Context, *clustermgmt.GetStateRequest) (*clustermgmt.GetStateResponse, error) {
+	cf.mutex.RLock()
+	defer cf.mutex.RUnlock()
 	ret := &clustermgmt.GetStateResponse{
 		NodeId:    cf.config.NodeID,
 		RaftState: cf.ra.State().String(),
@@ -77,27 +78,32 @@ func (cf *clusterfunkCluster) GetState(context.Context, *clustermgmt.GetStateReq
 		return nil, cfg.Error()
 	}
 	ret.RaftNodeCount = int32(len(cfg.Configuration().Servers))
-	ret.SerfNodeCount = int32(len(cf.se.Members()))
+	ret.SerfNodeCount = int32(cf.serfNode.MemberCount())
 	return ret, nil
 }
 
 func (cf *clusterfunkCluster) ListSerfNodes(context.Context, *clustermgmt.ListSerfNodesRequest) (*clustermgmt.ListSerfNodesResponse, error) {
+	cf.mutex.RLock()
+	defer cf.mutex.RUnlock()
+
 	ret := &clustermgmt.ListSerfNodesResponse{
 		NodeId: cf.config.NodeID,
 	}
-	members := cf.se.Members()
+	members := cf.serfNode.Members()
 	ret.Swarm = make([]*clustermgmt.SerfNodeInfo, len(members))
 
 	for i, v := range members {
 		ret.Swarm[i] = &clustermgmt.SerfNodeInfo{
-			Id:       v.Name,
-			Endpoint: fmt.Sprintf("%s:%d", v.Addr.String(), v.Port),
-			Status:   v.Status.String(),
+			Id:       v.NodeID,
+			Endpoint: v.Tags[SerfEndpoint],
+			Status:   v.Status,
 		}
 		for k, v := range v.Tags {
 			if strings.HasPrefix(k, clusterEndpointPrefix) {
 				ret.Swarm[i].ServiceEndpoints = append(ret.Swarm[i].ServiceEndpoints, &clustermgmt.SerfEndpoint{Name: k, HostPort: v})
+				continue
 			}
+			ret.Swarm[i].Attributes = append(ret.Swarm[i].Attributes, &clustermgmt.ServiceAttribute{Name: k, Value: v})
 		}
 	}
 	return ret, nil
@@ -106,6 +112,9 @@ func (cf *clusterfunkCluster) ListSerfNodes(context.Context, *clustermgmt.ListSe
 // Leader management implementation, ie all Raft-related functions not covered by the node management implementation
 // -----------------------------------------------------------------------------
 func (cf *clusterfunkCluster) ListRaftNodes(context.Context, *clustermgmt.ListRaftNodesRequest) (*clustermgmt.ListRaftNodesResponse, error) {
+	cf.mutex.RLock()
+	defer cf.mutex.RUnlock()
+
 	ret := &clustermgmt.ListRaftNodesResponse{
 		NodeId: cf.config.NodeID,
 	}

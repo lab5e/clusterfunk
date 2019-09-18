@@ -22,12 +22,18 @@ message SerfEndpoint {
     string Name = 2;
 }
 
+message ServiceAttribute {
+    string Name = 1;
+    string Value = 2;
+}
+
 // SerfNodeInfo holds info on a single Serf node
 message SerfNodeInfo {
     string Id = 1;
     string Endpoint = 2;
     string Status = 3;
     repeated SerfEndpoint ServiceEndpoints = 4;
+    repeated ServiceAttribute Attributes = 5;
 
 }
 

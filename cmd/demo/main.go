@@ -18,6 +18,7 @@ func main() {
 	flag.BoolVar(&config.Verbose, "verbose", false, "Verbose logging")
 	flag.BoolVar(&config.ZeroConf, "zeroconf", true, "Use zeroconf (mDNS) to discover nodes")
 	flag.StringVar(&config.ClusterName, "name", "demo", "Name of cluster")
+	flag.BoolVar(&config.AutoJoin, "autojoin", true, "Autojoin via Serf Events")
 	flag.Parse()
 	c := cluster.NewCluster(config)
 	defer c.Stop()

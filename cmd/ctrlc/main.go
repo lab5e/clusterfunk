@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
-	"google.golang.org/grpc"
 	"errors"
 	"flag"
 	"fmt"
 	"time"
+
+	"google.golang.org/grpc"
 
 	"github.com/hashicorp/serf/serf"
 	"github.com/stalehd/clusterfunk/cluster"
@@ -20,7 +21,7 @@ type parameters struct {
 	Zeroconf      bool   `param:"desc=Use zeroconf discovery for Serf;default=true"`
 	ConnectLeader bool   `param:"desc=Attempt to connect to the leader node in the Raft cluster;default=false"`
 	Command       string `param:"desc=Command to execute;option=get-state,list-serf-list-raft"`
-	ShowInactive bool `param:"desc=Show inactive nodes;default=false"`
+	ShowInactive  bool   `param:"desc=Show inactive nodes;default=false"`
 	GRPCClient    utils.GRPCClientParam
 }
 
@@ -169,7 +170,7 @@ func connectToRaftNode(config utils.GRPCClientParam) (clustermgmt.ClusterManagem
 }
 
 func getState(client clustermgmt.ClusterManagementClient, config parameters) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 2)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
 
 	res, err := client.GetState(ctx, &clustermgmt.GetStateRequest{})
@@ -187,7 +188,7 @@ func getState(client clustermgmt.ClusterManagementClient, config parameters) {
 }
 
 func listRaft(client clustermgmt.ClusterManagementClient, config parameters) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 2)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
 
 	res, err := client.ListRaftNodes(ctx, &clustermgmt.ListRaftNodesRequest{})
@@ -206,7 +207,7 @@ func listRaft(client clustermgmt.ClusterManagementClient, config parameters) {
 }
 
 func listSerf(client clustermgmt.ClusterManagementClient, config parameters) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 2)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
 
 	res, err := client.ListSerfNodes(ctx, &clustermgmt.ListSerfNodesRequest{})
@@ -228,6 +229,11 @@ func listSerf(client clustermgmt.ClusterManagementClient, config parameters) {
 		for _, e := range v.ServiceEndpoints {
 			// this is just padding
 			fmt.Printf("%60s%-20s%s\n", "", e.Name, e.HostPort)
+		}
+		fmt.Printf("%-80s%s\n", "", "Attributes")
+		for _, e := range v.Attributes {
+			// this is just padding
+			fmt.Printf("%60s%-20s: %s\n", "", e.Name, e.Value)
 		}
 	}
 }
