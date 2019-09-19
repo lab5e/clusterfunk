@@ -9,7 +9,6 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/hashicorp/serf/serf"
 	"github.com/stalehd/clusterfunk/cluster"
 	"github.com/stalehd/clusterfunk/cluster/clustermgmt"
 	"github.com/stalehd/clusterfunk/utils"
@@ -108,50 +107,26 @@ func findSerfNode(clusterName string) (string, error) {
 	return nodes[0], nil
 }
 
-// findRaftNode uses the serf endpoint to find a raft node
-func findRaftNode(serfEndpoint string) (string, error) {
-	// Join Serf cluster, get tags for nodes
-	config := serf.DefaultConfig()
-	config.NodeName = utils.RandomID()
+func randomHostPort() string {
 	addr, err := utils.FindPublicIPv4()
 	if err != nil {
-		return "", err
+		return ":0"
 	}
-	port, err := utils.FreeUDPPort()
-	if err != nil {
-		return "", err
-	}
+	port, _ := utils.FreeUDPPort()
+	return fmt.Sprintf("%s:%d", addr, port)
+}
 
-	config.MemberlistConfig.BindAddr = addr.String()
-	config.MemberlistConfig.BindPort = port
-	config.MemberlistConfig.AdvertiseAddr = addr.String()
-	config.MemberlistConfig.AdvertisePort = port
-	config.Logger = cluster.GetMutedLogger()
-	config.MemberlistConfig.Logger = cluster.GetMutedLogger()
+// findRaftNode uses the serf endpoint to find a raft node
+func findRaftNode(joinEndpoint string) (string, error) {
 
-	config.SnapshotPath = ""
-	config.Init()
-	tags := map[string]string{
-		cluster.NodeType: cluster.NonvoterKind,
-	}
-	config.Tags = tags
-
-	se, err := serf.Create(config)
-	if err != nil {
+	serfNode := cluster.NewSerfNode()
+	serfNode.SetTag(cluster.NodeType, cluster.NonvoterKind)
+	if err := serfNode.Start(utils.RandomID(), false, randomHostPort(), false, joinEndpoint); err != nil {
 		return "", err
 	}
-	joined, err := se.Join([]string{serfEndpoint}, true)
-	if err != nil {
-		return "", err
-	}
-	if joined == 0 {
-		return "", errors.New("No nodes in Serf swarm")
-	}
-	defer func() {
-		se.Leave()
-		se.Shutdown()
-	}()
-	for _, v := range se.Members() {
+	defer serfNode.Stop()
+
+	for _, v := range serfNode.Members() {
 		if ep, exists := v.Tags[cluster.ManagementEndpoint]; exists {
 			return ep, nil
 		}
