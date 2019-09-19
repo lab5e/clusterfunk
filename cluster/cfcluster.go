@@ -3,35 +3,27 @@ package cluster
 import (
 	"errors"
 	"log"
-	"sync"
 	"time"
 
 	"github.com/stalehd/clusterfunk/utils"
 	"google.golang.org/grpc"
-
-	"github.com/hashicorp/raft"
 )
 
 // clusterfunkClusterß implements the Cluster interface
 type clusterfunkCluster struct {
-	serfNode     *SerfNode
-	ra           *raft.Raft
-	config       Parameters
-	raftEndpoint string
-	tags         map[string]string
-	mutex        *sync.RWMutex
-	registry     *ZeroconfRegistry
-	name         string
-	mgmtServer   *grpc.Server
-	state        NodeState
+	serfNode   *SerfNode
+	raftNode   *RaftNode
+	config     Parameters
+	registry   *ZeroconfRegistry
+	name       string
+	mgmtServer *grpc.Server
+	state      NodeState
 }
 
 // NewCluster returns a new cluster (client)
 func NewCluster(params Parameters) Cluster {
 	return &clusterfunkCluster{
 		config: params,
-		tags:   make(map[string]string),
-		mutex:  &sync.RWMutex{},
 		name:   params.ClusterName,
 		state:  Initializing,
 	}
@@ -54,7 +46,7 @@ func (cf *clusterfunkCluster) Start() error {
 	if cf.config.ZeroConf {
 		cf.registry = NewZeroconfRegistry(cf.config.ClusterName)
 
-		if !cf.config.Bootstrap && cf.config.Join == "" {
+		if !cf.config.Raft.Bootstrap && cf.config.Join == "" {
 			log.Printf("Looking for other Serf instances...")
 			var err error
 			addrs, err := cf.registry.Resolve(1 * time.Second)
@@ -73,7 +65,8 @@ func (cf *clusterfunkCluster) Start() error {
 
 	}
 
-	if err := cf.createRaft(); err != nil {
+	cf.raftNode = NewRaftNode(cf.serfNode)
+	if err := cf.raftNode.Start(cf.config.NodeID, cf.config.Raft); err != nil {
 		return err
 	}
 
@@ -81,26 +74,26 @@ func (cf *clusterfunkCluster) Start() error {
 
 	cf.serfNode.SetTag(NodeType, cf.config.NodeType())
 	cf.serfNode.SetTag(RaftNodeID, cf.config.NodeID)
-	cf.serfNode.SetTag(RaftEndpoint, cf.raftEndpoint)
+	cf.serfNode.SetTag(RaftEndpoint, cf.raftNode.Endpoint())
 	cf.serfNode.SetTag(SerfEndpoint, cf.config.SerfEndpoint)
 
 	if cf.config.AutoJoin {
 		go func(ch <-chan NodeEvent) {
 			for ev := range ch {
 				if ev.Joined {
-					if err := cf.addNodeToRaftCluster(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
+					if err := cf.raftNode.AddMember(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
 						log.Printf("Error adding member: %+v", ev)
 					}
 					continue
 				}
-				cf.removeNodeFromRaftCluster(ev.NodeID, ev.Tags[RaftEndpoint])
+				cf.raftNode.RemoveMember(ev.NodeID, ev.Tags[RaftEndpoint])
 				log.Printf("Removing member: %+v", ev)
 			}
 		}(cf.serfNode.Events())
 
 	}
 
-	if err := cf.serfNode.Start(cf.config.NodeID, cf.config.Verbose, cf.config.SerfEndpoint, cf.config.Bootstrap, cf.config.Join); err != nil {
+	if err := cf.serfNode.Start(cf.config.NodeID, cf.config.Verbose, cf.config.SerfEndpoint, cf.config.Raft.Bootstrap, cf.config.Join); err != nil {
 		return err
 	}
 
@@ -110,9 +103,9 @@ func (cf *clusterfunkCluster) Start() error {
 			// note: needs a mutex when raft cluster shuts down. If a panic
 			// is raised when everything is going down the cluster will be
 			// up s**t creek
-			if cf.ra.VerifyLeader().Error() == nil {
+			if cf.raftNode.Leader() {
 				start := time.Now()
-				if err := cf.ra.Apply(make([]byte, 98999), time.Second*5).Error(); err != nil {
+				if err := cf.raftNode.AppendLogEntry(make([]byte, 89999)); err != nil {
 					log.Printf("Error writing log entry: %v", err)
 					continue
 				}
@@ -126,7 +119,7 @@ func (cf *clusterfunkCluster) Start() error {
 }
 
 func (cf *clusterfunkCluster) Stop() {
-	cf.shutdownRaft()
+	cf.raftNode.Stop()
 	cf.serfNode.Stop()
 }
 
@@ -146,3 +139,40 @@ func (cf *clusterfunkCluster) LocalNode() Node {
 func (cf *clusterfunkCluster) AddLocalEndpoint(name, endpoint string) {
 	cf.serfNode.SetTag(name, endpoint)
 }
+
+/*
+type clusterNode struct {
+}
+
+func newClusterNode() Node {
+	return &clusterNode{}
+}
+
+func (cn *clusterNode) ID() string {
+	return cn.nodeID
+}
+
+func (cn *clusterNode) Shards() []Shard {
+	return cn.shards
+}
+
+func (cn *clusterNode) Voter() bool {
+	return cn.voter
+}
+
+func (cn *clusterNode) Leader() bool {
+	return cn.leader
+}
+
+func (cn *clusterNode) Endpoints() []string {
+
+}
+
+func (cn *clusterNode) GetEndpoint(name string) (string, error) {
+
+}
+
+func (cn *clusterNode) State() NodeState {
+
+}
+*/

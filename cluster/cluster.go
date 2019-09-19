@@ -99,13 +99,6 @@ type Node interface {
 	// ownership might change at any time.
 	Shards() []Shard
 
-	// SerfEndpoint returns the node's Serf endpoint
-	SerfEndpoint() string
-
-	// RaftEndpoint returns the node's Raft endpoint. If the node isn't a
-	// member of the Raft cluster the string is empty
-	RaftEndpoint() string
-
 	// Voter returns true if this is a voting member of the cluster. If the
 	// node isn't a member of the Raft cluster the string is empty
 	Voter() bool

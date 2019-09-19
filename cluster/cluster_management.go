@@ -67,24 +67,17 @@ func (cf *clusterfunkCluster) startManagementServices() error {
 // -----------------------------------------------------------------------------
 
 func (cf *clusterfunkCluster) GetState(context.Context, *clustermgmt.GetStateRequest) (*clustermgmt.GetStateResponse, error) {
-	cf.mutex.RLock()
-	defer cf.mutex.RUnlock()
 	ret := &clustermgmt.GetStateResponse{
 		NodeId:    cf.config.NodeID,
-		RaftState: cf.ra.State().String(),
+		RaftState: cf.raftNode.State(),
 	}
-	cfg := cf.ra.GetConfiguration()
-	if cfg.Error() != nil {
-		return nil, cfg.Error()
-	}
-	ret.RaftNodeCount = int32(len(cfg.Configuration().Servers))
+
+	ret.RaftNodeCount = int32(cf.raftNode.MemberCount())
 	ret.SerfNodeCount = int32(cf.serfNode.MemberCount())
 	return ret, nil
 }
 
 func (cf *clusterfunkCluster) ListSerfNodes(context.Context, *clustermgmt.ListSerfNodesRequest) (*clustermgmt.ListSerfNodesResponse, error) {
-	cf.mutex.RLock()
-	defer cf.mutex.RUnlock()
 
 	ret := &clustermgmt.ListSerfNodesResponse{
 		NodeId: cf.config.NodeID,
@@ -112,26 +105,21 @@ func (cf *clusterfunkCluster) ListSerfNodes(context.Context, *clustermgmt.ListSe
 // Leader management implementation, ie all Raft-related functions not covered by the node management implementation
 // -----------------------------------------------------------------------------
 func (cf *clusterfunkCluster) ListRaftNodes(context.Context, *clustermgmt.ListRaftNodesRequest) (*clustermgmt.ListRaftNodesResponse, error) {
-	cf.mutex.RLock()
-	defer cf.mutex.RUnlock()
 
 	ret := &clustermgmt.ListRaftNodesResponse{
 		NodeId: cf.config.NodeID,
 	}
-	config := cf.ra.GetConfiguration()
-	if err := config.Error(); err != nil {
+
+	list, err := cf.raftNode.MemberList()
+	if err != nil {
 		return nil, err
 	}
-	leader := cf.ra.Leader()
-
-	members := config.Configuration().Servers
-	ret.Members = make([]*clustermgmt.RaftNodeInfo, len(members))
-	for i, v := range members {
-		ret.Members[i] = &clustermgmt.RaftNodeInfo{
-			Id:        string(v.ID),
-			RaftState: v.Suffrage.String(),
-			IsLeader:  (v.Address == leader),
-		}
+	for _, v := range list {
+		ret.Members = append(ret.Members, &clustermgmt.RaftNodeInfo{
+			Id:        v.ID,
+			RaftState: v.State,
+			IsLeader:  v.Leader,
+		})
 	}
 	return ret, nil
 }

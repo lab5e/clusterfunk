@@ -12,55 +12,6 @@ import (
 	"github.com/hashicorp/serf/serf"
 )
 
-func (s *SerfNode) sendEvent(ev NodeEvent) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	for _, v := range s.notifications {
-		select {
-		case v <- ev:
-		default:
-		}
-	}
-}
-
-func (s *SerfNode) serfEventHandler(events chan serf.Event) {
-	for ev := range events {
-		switch ev.EventType() {
-		case serf.EventMemberJoin:
-			e, ok := ev.(serf.MemberEvent)
-			if !ok {
-				continue
-			}
-			for _, v := range e.Members {
-				s.sendEvent(NodeEvent{
-					NodeID: v.Name,
-					Tags:   v.Tags,
-					Joined: true,
-				})
-			}
-		case serf.EventMemberLeave:
-			e, ok := ev.(serf.MemberEvent)
-			if !ok {
-				continue
-			}
-			for _, v := range e.Members {
-				s.sendEvent(NodeEvent{
-					NodeID: v.Name,
-					Tags:   v.Tags,
-					Joined: false,
-				})
-			}
-		case serf.EventMemberReap:
-		case serf.EventMemberUpdate:
-		case serf.EventUser:
-		case serf.EventQuery:
-
-		default:
-			log.Printf("Unknown event: %+v", ev)
-		}
-	}
-}
-
 // NodeEvent is used for channel notifications
 type NodeEvent struct {
 	NodeID string
@@ -70,16 +21,17 @@ type NodeEvent struct {
 
 // SerfNode is a wrapper around the Serf library
 type SerfNode struct {
-	mutex         *sync.Mutex
+	mutex         *sync.RWMutex
 	se            *serf.Serf
 	tags          map[string]string
+	changedTags   bool // Keeps track of changes in tags.
 	notifications []chan NodeEvent
 }
 
 // NewSerfNode creates a new SerfNode instance
 func NewSerfNode() *SerfNode {
 	ret := &SerfNode{
-		mutex:         &sync.Mutex{},
+		mutex:         &sync.RWMutex{},
 		tags:          make(map[string]string),
 		notifications: make([]chan NodeEvent, 0),
 	}
@@ -90,6 +42,10 @@ func NewSerfNode() *SerfNode {
 func (s *SerfNode) Start(nodeID string, verboseLogging bool, endpoint string, bootstrap bool, joinAddress string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+
+	if s.se != nil {
+		return errors.New("serf node is already started")
+	}
 
 	log.Printf("Binding Serf client to %s", endpoint)
 
@@ -178,18 +134,24 @@ func (s *SerfNode) SetTag(name, value string) {
 		delete(s.tags, name)
 		return
 	}
-	s.tags[name] = value
+	if s.tags[name] != value {
+		s.tags[name] = value
+		s.changedTags = true
+	}
 }
 
 // PublishTags publishes the tags to the other members of the cluster
 func (s *SerfNode) PublishTags() error {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
 
 	if s.se == nil {
 		return errors.New("serf node not created")
 	}
-
+	if !s.changedTags {
+		return nil
+	}
+	s.changedTags = false
 	return s.se.SetTags(s.tags)
 }
 
@@ -204,10 +166,17 @@ func (s *SerfNode) Events() <-chan NodeEvent {
 	return newChan
 }
 
+// ----------------------------------------------------------------------------
+// Possible keep this internal. It is nice to have a view into the Serf and
+// raft internals but maybe not for a management tools since it operates on
+// a slighlty higher level. Methods below are TBD
+//
+
+//
 // MemberCount is a temporary method until we've made a layer on top of Raft and Serf.
 func (s *SerfNode) MemberCount() int {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
 	return len(s.se.Members())
 }
 
@@ -220,8 +189,8 @@ type SerfMemberInfo struct {
 
 // Members lists the members in
 func (s *SerfNode) Members() []SerfMemberInfo {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
 
 	ret := make([]SerfMemberInfo, 0)
 	for _, v := range s.se.Members() {
@@ -232,4 +201,61 @@ func (s *SerfNode) Members() []SerfMemberInfo {
 		})
 	}
 	return ret
+}
+
+func (s *SerfNode) sendEvent(ev NodeEvent) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	for _, v := range s.notifications {
+		select {
+		case v <- ev:
+		default:
+		}
+	}
+}
+
+func (s *SerfNode) serfEventHandler(events chan serf.Event) {
+	for ev := range events {
+		switch ev.EventType() {
+		case serf.EventMemberJoin:
+			e, ok := ev.(serf.MemberEvent)
+			if !ok {
+				continue
+			}
+			for _, v := range e.Members {
+				s.sendEvent(NodeEvent{
+					NodeID: v.Name,
+					Tags:   v.Tags,
+					Joined: true,
+				})
+			}
+		case serf.EventMemberLeave:
+			e, ok := ev.(serf.MemberEvent)
+			if !ok {
+				continue
+			}
+			for _, v := range e.Members {
+				s.sendEvent(NodeEvent{
+					NodeID: v.Name,
+					Tags:   v.Tags,
+					Joined: false,
+				})
+			}
+		case serf.EventMemberReap:
+		case serf.EventMemberUpdate:
+			// No need to process member updates
+			e, ok := ev.(serf.MemberEvent)
+			if !ok {
+				continue
+			}
+			for _, v := range e.Members {
+				log.Printf("MemberUpdate: %s", v.Name)
+			}
+		case serf.EventUser:
+		case serf.EventQuery:
+
+		default:
+			log.Printf("Unknown event: %+v", ev)
+		}
+	}
 }
