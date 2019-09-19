@@ -121,7 +121,10 @@ func findRaftNode(joinEndpoint string) (string, error) {
 
 	serfNode := cluster.NewSerfNode()
 	serfNode.SetTag(cluster.NodeType, cluster.NonvoterKind)
-	if err := serfNode.Start(utils.RandomID(), false, randomHostPort(), false, joinEndpoint); err != nil {
+	if err := serfNode.Start(utils.RandomID(), false, cluster.SerfParameters{
+		Endpoint:    randomHostPort(),
+		JoinAddress: joinEndpoint,
+	}); err != nil {
 		return "", err
 	}
 	defer serfNode.Stop()

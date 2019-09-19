@@ -46,7 +46,7 @@ func (cf *clusterfunkCluster) Start() error {
 	if cf.config.ZeroConf {
 		cf.registry = NewZeroconfRegistry(cf.config.ClusterName)
 
-		if !cf.config.Raft.Bootstrap && cf.config.Join == "" {
+		if !cf.config.Raft.Bootstrap && cf.config.Serf.JoinAddress == "" {
 			log.Printf("Looking for other Serf instances...")
 			var err error
 			addrs, err := cf.registry.Resolve(1 * time.Second)
@@ -56,17 +56,17 @@ func (cf *clusterfunkCluster) Start() error {
 			if len(addrs) == 0 {
 				return errors.New("no serf instances found")
 			}
-			cf.config.Join = addrs[0]
+			cf.config.Serf.JoinAddress = addrs[0]
 		}
-		log.Printf("Registering Serf endpoint (%s) in zeroconf", cf.config.SerfEndpoint)
-		if err := cf.registry.Register(cf.config.NodeID, utils.PortOfHostPort(cf.config.SerfEndpoint)); err != nil {
+		log.Printf("Registering Serf endpoint (%s) in zeroconf", cf.config.Serf.Endpoint)
+		if err := cf.registry.Register(cf.config.NodeID, utils.PortOfHostPort(cf.config.Serf.Endpoint)); err != nil {
 			return err
 		}
 
 	}
 
 	cf.raftNode = NewRaftNode(cf.serfNode)
-	if err := cf.raftNode.Start(cf.config.NodeID, cf.config.Raft); err != nil {
+	if err := cf.raftNode.Start(cf.config.NodeID, cf.config.Verbose, cf.config.Raft); err != nil {
 		return err
 	}
 
@@ -75,7 +75,7 @@ func (cf *clusterfunkCluster) Start() error {
 	cf.serfNode.SetTag(NodeType, cf.config.NodeType())
 	cf.serfNode.SetTag(RaftNodeID, cf.config.NodeID)
 	cf.serfNode.SetTag(RaftEndpoint, cf.raftNode.Endpoint())
-	cf.serfNode.SetTag(SerfEndpoint, cf.config.SerfEndpoint)
+	cf.serfNode.SetTag(SerfEndpoint, cf.config.Serf.Endpoint)
 
 	if cf.config.AutoJoin {
 		go func(ch <-chan NodeEvent) {
@@ -93,7 +93,7 @@ func (cf *clusterfunkCluster) Start() error {
 
 	}
 
-	if err := cf.serfNode.Start(cf.config.NodeID, cf.config.Verbose, cf.config.SerfEndpoint, cf.config.Raft.Bootstrap, cf.config.Join); err != nil {
+	if err := cf.serfNode.Start(cf.config.NodeID, cf.config.Verbose, cf.config.Serf); err != nil {
 		return err
 	}
 

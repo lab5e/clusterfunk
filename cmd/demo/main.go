@@ -11,9 +11,8 @@ import (
 
 func main() {
 	var config cluster.Parameters
-	flag.StringVar(&config.Join, "join", "", "Join address for cluster")
+	flag.StringVar(&config.Serf.JoinAddress, "join", "", "Join address for cluster")
 	flag.BoolVar(&config.Raft.Bootstrap, "bootstrap", false, "Bootstrap a new cluster")
-	flag.BoolVar(&config.Loopback, "loopback", false, "Use loopback adapter")
 	flag.BoolVar(&config.Raft.DiskStore, "disk", false, "Use disk store")
 	flag.BoolVar(&config.Verbose, "verbose", false, "Verbose logging")
 	flag.BoolVar(&config.ZeroConf, "zeroconf", true, "Use zeroconf (mDNS) to discover nodes")

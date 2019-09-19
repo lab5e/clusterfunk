@@ -38,8 +38,14 @@ func NewSerfNode() *SerfNode {
 	return ret
 }
 
+// SerfParameters holds parameters for the Serf client
+type SerfParameters struct {
+	Endpoint    string `param:"desc=Endpoint for Serf;default="`
+	JoinAddress string `param:"desc=Join address and port for Serf cluster"`
+}
+
 // Start launches the serf node
-func (s *SerfNode) Start(nodeID string, verboseLogging bool, endpoint string, bootstrap bool, joinAddress string) error {
+func (s *SerfNode) Start(nodeID string, verboseLogging bool, cfg SerfParameters) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -47,11 +53,11 @@ func (s *SerfNode) Start(nodeID string, verboseLogging bool, endpoint string, bo
 		return errors.New("serf node is already started")
 	}
 
-	log.Printf("Binding Serf client to %s", endpoint)
+	log.Printf("Binding Serf client to %s", cfg.Endpoint)
 
 	config := serf.DefaultConfig()
 	config.NodeName = nodeID
-	host, portStr, err := net.SplitHostPort(endpoint)
+	host, portStr, err := net.SplitHostPort(cfg.Endpoint)
 	if err != nil {
 		return err
 	}
@@ -99,8 +105,8 @@ func (s *SerfNode) Start(nodeID string, verboseLogging bool, endpoint string, bo
 		return err
 	}
 
-	if !bootstrap {
-		joined, err := s.se.Join([]string{joinAddress}, true)
+	if cfg.JoinAddress != "" {
+		joined, err := s.se.Join([]string{cfg.JoinAddress}, true)
 		if err != nil {
 			return err
 		}

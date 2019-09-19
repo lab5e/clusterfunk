@@ -37,14 +37,13 @@ func NewRaftNode(localSerfNode *SerfNode) *RaftNode {
 
 // RaftParameters is the configuration for the Raft cluster
 type RaftParameters struct {
-	Verbose      bool   `param:"desc=Verbose logging;default=false"`
 	RaftEndpoint string `param:"desc=Endpoint for Raft;default="`
 	DiskStore    bool   `param:"desc=Disk-based store;default=false"`
 	Bootstrap    bool   `param:"desc=Bootstrap a new Raft cluster;default=false"`
 }
 
 // Start launches the node
-func (r *RaftNode) Start(nodeID string, cfg RaftParameters) error {
+func (r *RaftNode) Start(nodeID string, verboseLog bool, cfg RaftParameters) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -55,7 +54,7 @@ func (r *RaftNode) Start(nodeID string, cfg RaftParameters) error {
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(nodeID)
 
-	if cfg.Verbose {
+	if verboseLog {
 		config.LogLevel = "DEBUG"
 	} else {
 		config.Logger = hclog.NewNullLogger()
