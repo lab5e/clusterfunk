@@ -8,56 +8,56 @@ message GetStateRequest {
 
 message GetStateResponse {
     string NodeId = 1;
-    string RaftState= 2;
-    int32 RaftNodeCount = 3;
-    int32 SerfNodeCount = 4;
+    enum ClusterState {
+        OK = 0;
+        VOTING = 1;
+    };
+    ClusterState State = 2;
+    int32 NodeCount = 3;
+    int32 VoterCount = 4;
 };
 
-message ListSerfNodesRequest {
-
-};
-
-message SerfEndpoint {
-    string HostPort = 1;
-    string Name = 2;
-}
-
-message ServiceAttribute {
+message EndpointInfo {
     string Name = 1;
-    string Value = 2;
+    string HostPort = 2;
 }
 
-// SerfNodeInfo holds info on a single Serf node
-message SerfNodeInfo {
-    string Id = 1;
-    string Endpoint = 2;
-    string Status = 3;
-    repeated SerfEndpoint ServiceEndpoints = 4;
-    repeated ServiceAttribute Attributes = 5;
+// NodeInfo contains information on a single node in the cluster/swarm
+message NodeInfo {
+    // NodeId is the node's identifier.
+    string NodeId = 1;
 
+    enum NodeKind {
+        LEADER = 0;
+        VOTER = 1;
+        NONVOTER = 2;
+        NONMEMBER = 3;
+    };
+    NodeKind Kind = 2;
+
+    // NodeState is the state of nodes. See godoc comments for a description
+    enum NodeState {
+        INITIALIZED = 0;
+        READY = 1;
+        SERVING = 2;
+        REORGANIZING = 3;
+        DRAINING = 4;
+        TERMINATING = 5;
+    };
+    NodeState State = 3;
+    repeated EndpointInfo Endpoints = 4;
 }
 
 //ListSerfNodesResponse is the response to a ListSerfNodes call. The number of
 // Serf nodes will initially be quite small so we won't need a stream response
 // here.
-message ListSerfNodesResponse {
+message ListNodesResponse {
     string NodeId = 1;
-    repeated SerfNodeInfo Swarm = 2;
+    repeated NodeInfo Nodes = 2;
 };
 
-message ListRaftNodesRequest {
+message ListNodesRequest {
 
-};
-
-message RaftNodeInfo {
-    string Id = 1;
-    string RaftState = 2;
-    bool IsLeader = 3;
-};
-
-message ListRaftNodesResponse {
-    string NodeId = 1;
-    repeated RaftNodeInfo Members = 2;
 };
 
 /*
@@ -105,16 +105,9 @@ service ClusterManagement {
     rpc GetState(GetStateRequest) returns (GetStateResponse);
 
 
-    // ListSerfNodes lists the known Serf nodes from this node's point of
-    // view. Technically this is not something we need since the management
-    // tools can join the Serf cluster themselves but it's always nice to not
-    // disturbe the Force when inspecting state. This also works as a nice
-    // map to the other leader nodes.
-    rpc ListSerfNodes(ListSerfNodesRequest) returns (ListSerfNodesResponse);
-
-    // ListNodes lists the nodes in the cluster. This will also include
-    // information present in the Serf cluster.
-    rpc ListRaftNodes(ListRaftNodesRequest) returns (ListRaftNodesResponse);
+    // ListNodes lists the known nodes in the cluster, both voters, non-voters and
+    // bystanders (ie those that are member of the Serf swarm but not the Raft cluster)
+    rpc ListNodes(ListNodesRequest) returns (ListNodesResponse);
 
 
     /*

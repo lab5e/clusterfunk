@@ -28,65 +28,57 @@ type Cluster interface {
 // NodeState is the enumeration of different states a node can be in.
 type NodeState int
 
-// This the node states. The
-// initial state is ReadyToJoin, ie the node is ready to join the Raft cluster
-// and is waiting for the leader to add it to the cluster. When joined its state
-// is set to Empty once it has built the shard map locally, ie it can proxy
-// requests to other nodes but have no shards on their own. Nodes that are
-// non-voters will will stay in the Empty state.
-// the other nodes allocated shards. When the node is in the Allocated state
-// it has allocated a set of shards but isn't serving. When in Serving state
-// it is serving requests for its allocated shards. When the node is in the
-// Retiring state it is still serving requests but is preparing to be drained
-// and stopped once the leader removes the shards from it. When in Draining mode
-// it will no longer accept any new requests and serve the remaining requests
-// before stopping. The leader will remove the node from the Raft cluster and
-// the node will remove all of its endpoint information before it goes into
-// Draining mode. When it has finished draining it may shut down whenever
-// ready.
-//
-//            +-------+
-//            | Start |
-//            +---|---+
-//                |
-//                |
-//                |
-//                |
-//       +-----------------+           +----------------+
-//       |   ReadyToJoin   -------------    Empty       |
-//       +-----------------+           +--------|-------+
-//                                              |
-//                                              |
-//                                              |
-//       +-----------------+           +--------|-------+
-//       |  Serving        -------------  Allocated     |
-//       +--------|--------+           +----------------+
-//                |
-//                |
-//                |
-//       +--------|--------+
-//       |  Retiring       |
-//       +--------|--------+
-//                |
-//                |
-//                |
-//       +--------|--------+
-//       | Draining        |
-//       +--------|--------+
-//                |
-//                |
-//                |
-//            +---|--+
-//            | End  |
-//            +------+
 const (
+	// Initializing is the initial state of nodes. At this point the nodes
+	// are starting up. Possible states after this: Ready or Terminating
 	Initializing NodeState = iota
-	ReadyToJoin
+	// Ready is the ready states for nodes when they have finished initializing
+	// and is ready to join the cluster. Posslbe states after this: Empty or Terminating
+	Ready
+	// Empty is the initial state for nodes in the cluster when they join. At
+	// this point the nodes have joined the cluster but have no shards allocated
+	// to them. Possible states after this: Reorganizing or Terminating
 	Empty
+
+	// Reorganizing is the state the nodes enter when they are receiving shard
+	// allocations from the leader node. Requests are halted until they have
+	// received a new set of shards from the leader and acknowledged the shards
+	// Possible states after this: Allocated or Terminating
+	Reorganizing
+
+	// Allocated state is the state following Reorganizing when the nodes have
+	// allocated shards, acknowledged and is waiting for the go-head signal from
+	// the leader. Possible states: Reorganizing, Terminating or Serving
 	Allocated
+
+	// Serving state is the ordinary operational state for nodes. They have a set
+	// of shards they handle and are serving requests. Possible states after this
+	// is Reorganizing, Draining
 	Serving
-	Retiring
+
+	// Draining state is when the node will stop serving requests. The Draining state
+	// will be set when the leader is reorganizing the shards. Once the cluster
+	// has finished distributing shards the drainging node will send the remaining
+	// requests to the other members of the cluster and then enter the Terminating state.
 	Draining
+
+	// Terminating is the final state for nodes. After the Draining phase
+	Terminating
+)
+
+// NodeKind is the different kinds of nodes
+type NodeKind int
+
+const (
+	// Leader is the leader of the cluster and the winner of the last leader election.
+	Leader NodeKind = iota
+	// Voter is the regular voting node in the cluster. It can participate in leader
+	// elections and may even be a *leader* one day.
+	Voter
+	// Nonvoter is a cluster member that won't participate in leader elections.
+	Nonvoter
+	// Nonmember is a node that isn't a part of the cluster itself, just the swarm.
+	Nonmember
 )
 
 // Node is one of the processes in the cluster. Note that this might be

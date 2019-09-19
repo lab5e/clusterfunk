@@ -70,8 +70,6 @@ func (cf *clusterfunkCluster) Start() error {
 		return err
 	}
 
-	cf.state = ReadyToJoin
-
 	cf.serfNode.SetTag(NodeType, cf.config.NodeType())
 	cf.serfNode.SetTag(RaftNodeID, cf.config.NodeID)
 	cf.serfNode.SetTag(RaftEndpoint, cf.raftNode.Endpoint())
@@ -115,6 +113,8 @@ func (cf *clusterfunkCluster) Start() error {
 			}
 		}
 	}()
+
+	cf.state = Empty
 	return nil
 }
 

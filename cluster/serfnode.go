@@ -71,7 +71,6 @@ func (s *SerfNode) Start(nodeID string, verboseLogging bool, cfg SerfParameters)
 	// gracefully.
 	config.ReapInterval = time.Minute * 5
 	config.TombstoneTimeout = time.Minute * 10
-
 	config.MemberlistConfig.BindAddr = host
 	config.MemberlistConfig.BindPort = int(port)
 

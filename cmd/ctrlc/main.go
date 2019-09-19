@@ -19,21 +19,19 @@ type parameters struct {
 	SerfNode      string `param:"desc=Serf node to attach to;default="`
 	Zeroconf      bool   `param:"desc=Use zeroconf discovery for Serf;default=true"`
 	ConnectLeader bool   `param:"desc=Attempt to connect to the leader node in the Raft cluster;default=false"`
-	Command       string `param:"desc=Command to execute;option=get-state,list-serf-list-raft"`
+	Command       string `param:"desc=Command to execute;option=get-state,list-ndoes"`
 	ShowInactive  bool   `param:"desc=Show inactive nodes;default=false"`
 	GRPCClient    utils.GRPCClientParam
 }
 
 const (
-	cmdGetState = "get-state"
-	cmdListSerf = "list-serf"
-	cmdListRaft = "list-raft"
+	cmdGetState  = "get-state"
+	cmdListNodes = "list-nodes"
 )
 
 type commandRunner func(clustermgmt.ClusterManagementClient, parameters)
 
 func main() {
-
 	var config parameters
 	flag.StringVar(&config.ClusterName, "cluster-name", "demo", "Name of cluster to connect with")
 	flag.BoolVar(&config.Zeroconf, "zeroconf", true, "Use Zeroconf discovery")
@@ -54,6 +52,7 @@ func main() {
 	}
 	var err error
 
+	start := time.Now()
 	if config.Zeroconf && config.SerfNode == "" {
 		config.SerfNode, err = findSerfNode(config.ClusterName)
 		if err != nil {
@@ -61,6 +60,10 @@ func main() {
 			return
 		}
 	}
+	end := time.Now()
+	fmt.Printf("%f ms to look up\n", float64(end.Sub(start))/float64(time.Millisecond))
+
+	start = time.Now()
 	if config.SerfNode != "" && config.GRPCClient.ServerEndpoint == "" {
 		config.GRPCClient.ServerEndpoint, err = findRaftNode(config.SerfNode)
 		if err != nil {
@@ -68,21 +71,23 @@ func main() {
 			return
 		}
 	}
-
+	end = time.Now()
+	fmt.Printf("%f ms to set up\n", float64(end.Sub(start))/float64(time.Millisecond))
 	var runCommand commandRunner
 	switch config.Command {
 	case cmdGetState:
 		runCommand = getState
-	case cmdListRaft:
-		runCommand = listRaft
-	case cmdListSerf:
-		runCommand = listSerf
+	case cmdListNodes:
+		runCommand = listNodes
 	default:
 		fmt.Printf("Unknown command: %s\n", config.Command)
 		return
 	}
 
+	start = time.Now()
 	client, err := connectToRaftNode(config.GRPCClient)
+	end = time.Now()
+	fmt.Printf("%f ms to connect\n", float64(end.Sub(start))/float64(time.Millisecond))
 	if err != nil {
 		fmt.Printf("Unable to connect to the raft node at %s: %v\n", config.GRPCClient.ServerEndpoint, err)
 		return
@@ -91,20 +96,22 @@ func main() {
 	if client == nil {
 		return
 	}
-
+	start = time.Now()
 	runCommand(client, config)
+	end = time.Now()
+	fmt.Printf("%f ms to execute\n", float64(end.Sub(start))/float64(time.Millisecond))
 }
 
 func findSerfNode(clusterName string) (string, error) {
 	zr := cluster.NewZeroconfRegistry(clusterName)
-	nodes, err := zr.Resolve(1 * time.Second)
+	nodes, err := zr.ResolveFirst(1 * time.Second)
 	if err != nil {
 		return "", err
 	}
 	if len(nodes) == 0 {
 		return "", errors.New("No Serf nodes found")
 	}
-	return nodes[0], nil
+	return nodes, nil
 }
 
 func randomHostPort() string {
@@ -159,59 +166,19 @@ func getState(client clustermgmt.ClusterManagementClient, config parameters) {
 
 	fmt.Println("------------------------------------------------------------------------------")
 	fmt.Printf("Node ID:    %s\n", res.NodeId)
-	fmt.Printf("Raft state: %s\n", res.RaftState)
-	fmt.Printf("Raft nodes: %d\n", res.RaftNodeCount)
-	fmt.Printf("Serf nodes: %d\n", res.SerfNodeCount)
+	fmt.Printf("State: %s\n", res.State.String())
+	fmt.Printf("Nodes: %d\n", res.NodeCount)
 	fmt.Println("------------------------------------------------------------------------------")
 }
 
-func listRaft(client clustermgmt.ClusterManagementClient, config parameters) {
+func listNodes(client clustermgmt.ClusterManagementClient, config parameters) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
 
-	res, err := client.ListRaftNodes(ctx, &clustermgmt.ListRaftNodesRequest{})
+	_, err := client.ListNodes(ctx, &clustermgmt.ListNodesRequest{})
 	if err != nil {
-		fmt.Printf("Error callling ListRaftNodes on node: %v\n", err)
+		fmt.Printf("Error callling ListNodes on node: %v\n", err)
 		return
 	}
 
-	fmt.Println("------------------------------------------------------------------------------")
-	fmt.Printf("Node ID:    %s\n", res.NodeId)
-	fmt.Printf("%20s%15s%20s\n", "ID", "Raft state", "Is leader")
-	for _, v := range res.Members {
-		fmt.Printf("%20s%15s%20t\n", v.Id, v.RaftState, v.IsLeader)
-	}
-	fmt.Println("------------------------------------------------------------------------------")
-}
-
-func listSerf(client clustermgmt.ClusterManagementClient, config parameters) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
-	defer cancel()
-
-	res, err := client.ListSerfNodes(ctx, &clustermgmt.ListSerfNodesRequest{})
-	if err != nil {
-		fmt.Printf("Error callling ListSerfNodes on node: %v\n", err)
-		return
-	}
-
-	fmt.Println("------------------------------------------------------------------------------")
-	fmt.Printf("Node ID:    %s\n", res.NodeId)
-	fmt.Printf("%-20s%-25s%-15s%-20s%s\n", "ID", "Endpoint", "Status", "Name", "Host/port")
-	for _, v := range res.Swarm {
-		if !config.ShowInactive {
-			if v.Status == "left" {
-				continue
-			}
-		}
-		fmt.Printf("%-20s%-25s%-15s\n", v.Id, v.Endpoint, v.Status)
-		for _, e := range v.ServiceEndpoints {
-			// this is just padding
-			fmt.Printf("%60s%-20s%s\n", "", e.Name, e.HostPort)
-		}
-		fmt.Printf("%-80s%s\n", "", "Attributes")
-		for _, e := range v.Attributes {
-			// this is just padding
-			fmt.Printf("%60s%-20s: %s\n", "", e.Name, e.Value)
-		}
-	}
 }

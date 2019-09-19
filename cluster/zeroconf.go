@@ -110,3 +110,40 @@ func (zr *ZeroconfRegistry) Resolve(waitTime time.Duration) ([]string, error) {
 	}
 	return ret, nil
 }
+
+// ResolveFirst looks for another service and returns only the first matching element
+func (zr *ZeroconfRegistry) ResolveFirst(waitTime time.Duration) (string, error) {
+
+	resolver, err := zeroconf.NewResolver(nil)
+	if err != nil {
+		return "", err
+	}
+
+	entries := make(chan *zeroconf.ServiceEntry)
+	go func(entries chan *zeroconf.ServiceEntry) {
+		ctx, cancel := context.WithTimeout(context.Background(), waitTime)
+		defer cancel()
+		err = resolver.Browse(ctx, serviceString, defaultDomain, entries)
+		if err != nil {
+			close(entries)
+			return
+		}
+		<-ctx.Done()
+	}(entries)
+
+	clusterPrefix := fmt.Sprintf("%s_", zr.ClusterName)
+	for {
+		select {
+		case entry := <-entries:
+			if entry.Service == serviceString {
+				if strings.HasPrefix(entry.Instance, clusterPrefix) {
+					for i := range entry.AddrIPv4 {
+						return fmt.Sprintf("%s:%d", entry.AddrIPv4[i], entry.Port), nil
+					}
+				}
+			}
+		case <-time.After(waitTime):
+			return "", errors.New("timed out")
+		}
+	}
+}
