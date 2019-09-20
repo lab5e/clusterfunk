@@ -86,9 +86,9 @@ func (s *SerfNode) Start(nodeID string, verboseLogging bool, cfg SerfParameters)
 	if verboseLogging {
 		config.Logger = log.New(os.Stderr, "serf", log.LstdFlags)
 	} else {
-		serfLogger := newClusterLogger("serf")
-		config.Logger = serfLogger.Logger
-		config.MemberlistConfig.Logger = serfLogger.Logger
+		mutedLogger := newMutedLogger()
+		config.Logger = mutedLogger
+		config.MemberlistConfig.Logger = mutedLogger
 	}
 
 	// Assign tags and default endpoint
@@ -251,4 +251,17 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 			log.Printf("Unknown event: %+v", ev)
 		}
 	}
+}
+
+type muteWriter struct {
+}
+
+func (m *muteWriter) Write(buf []byte) (int, error) {
+	return len(buf), nil
+}
+
+// GetMutedLogger returns a pointer to a log.Logger instance that is logging
+// to the Big Bit Bucket In The Sky...or Cloud
+func newMutedLogger() *log.Logger {
+	return log.New(&muteWriter{}, "sssh", log.LstdFlags)
 }
