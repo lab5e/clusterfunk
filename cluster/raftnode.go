@@ -159,6 +159,14 @@ func (r *RaftNode) Start(nodeID string, verboseLog bool, cfg RaftParameters) err
 	return nil
 }
 
+func (r *RaftNode) sendEvent(e RaftEvent) {
+	select {
+	case r.events <- e:
+	default:
+		log.Printf("Nobody's listening to me! ev = %+v", e)
+	}
+}
+
 func (r *RaftNode) observerFunc(ch chan raft.Observation) {
 	printTime := func(start time.Time, end time.Time) {
 		d := float64(end.Sub(start)) / float64(time.Millisecond)
@@ -169,38 +177,37 @@ func (r *RaftNode) observerFunc(ch chan raft.Observation) {
 		switch v := k.Data.(type) {
 		case raft.PeerObservation:
 			if v.Removed {
-				r.events <- RaftEvent{
+				r.sendEvent(RaftEvent{
 					Type:   RaftNodeRemoved,
 					NodeID: string(v.Peer.ID),
-				}
-				continue
+				})
 			}
-			r.events <- RaftEvent{
+			r.sendEvent(RaftEvent{
 				Type:   RaftNodeAdded,
 				NodeID: string(v.Peer.ID),
-			}
+			})
 		case raft.LeaderObservation:
 			// No need for this. The RaftLeaderElected and RaftBecameLeader covers
 			// this event.
 		case raft.RaftState:
 			switch v {
 			case raft.Candidate:
-				r.events <- RaftEvent{
+				r.sendEvent(RaftEvent{
 					Type:   RaftLeaderLost,
 					NodeID: "",
-				}
+				})
 				candidateTime = time.Now()
 			case raft.Follower:
-				r.events <- RaftEvent{
+				r.sendEvent(RaftEvent{
 					Type:   RaftBecameFollower,
 					NodeID: r.localNodeID,
-				}
+				})
 				printTime(candidateTime, time.Now())
 			case raft.Leader:
-				r.events <- RaftEvent{
+				r.sendEvent(RaftEvent{
 					Type:   RaftBecameLeader,
 					NodeID: r.localNodeID,
-				}
+				})
 				printTime(candidateTime, time.Now())
 			}
 		case *raft.RequestVoteRequest:
