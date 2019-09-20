@@ -24,7 +24,7 @@ func newStateMachine() *raftFsm {
 // method was called on the same Raft node as the FSM.
 
 func (r *raftFsm) Apply(l *raft.Log) interface{} {
-	log.Printf("FSM: Apply, index = %d, term = %d", l.Index, l.Term)
+	//log.Printf("FSM: Apply, index = %d, term = %d", l.Index, l.Term)
 	return nil
 }
 
