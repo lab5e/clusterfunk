@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/stalehd/clusterfunk/cluster/clustercomms"
-
 	"github.com/golang/protobuf/proto"
+	"github.com/stalehd/clusterfunk/cluster/sharding/shardpb"
 )
 
 type nodeData struct {
@@ -199,11 +198,11 @@ func (sm *weightedShardManager) MarshalBinary() ([]byte, error) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
-	msg := &clustercomms.ShardDistribution{}
+	msg := &shardpb.ShardDistribution{}
 	nodeMap := make(map[string]int32)
 	n := int32(0)
 	for _, v := range sm.nodes {
-		msg.Nodes = append(msg.Nodes, &clustercomms.WireNodes{
+		msg.Nodes = append(msg.Nodes, &shardpb.WireNodes{
 			NodeId:   n,
 			NodeName: v.NodeID,
 		})
@@ -212,7 +211,7 @@ func (sm *weightedShardManager) MarshalBinary() ([]byte, error) {
 	}
 
 	for _, shard := range sm.shards {
-		msg.Shards = append(msg.Shards, &clustercomms.WireShard{
+		msg.Shards = append(msg.Shards, &shardpb.WireShard{
 			Id:     int32(shard.ID()),
 			Weight: int32(shard.Weight()),
 			NodeId: nodeMap[shard.NodeID()],
@@ -230,7 +229,7 @@ func (sm *weightedShardManager) UnmarshalBinary(buf []byte) error {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
-	msg := &clustercomms.ShardDistribution{}
+	msg := &shardpb.ShardDistribution{}
 	if err := proto.Unmarshal(buf, msg); err != nil {
 		return err
 	}

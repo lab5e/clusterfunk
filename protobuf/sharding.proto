@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package clustercomms;
+package shardpb;
 
 message WireNodes {
     int32 NodeId = 1;
