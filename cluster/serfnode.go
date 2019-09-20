@@ -53,8 +53,6 @@ func (s *SerfNode) Start(nodeID string, verboseLogging bool, cfg SerfParameters)
 		return errors.New("serf node is already started")
 	}
 
-	log.Printf("Binding Serf client to %s", cfg.Endpoint)
-
 	config := serf.DefaultConfig()
 	config.NodeName = nodeID
 	host, portStr, err := net.SplitHostPort(cfg.Endpoint)
@@ -88,7 +86,6 @@ func (s *SerfNode) Start(nodeID string, verboseLogging bool, cfg SerfParameters)
 	if verboseLogging {
 		config.Logger = log.New(os.Stderr, "serf", log.LstdFlags)
 	} else {
-		log.Printf("Muting Serf events")
 		serfLogger := newClusterLogger("serf")
 		config.Logger = serfLogger.Logger
 		config.MemberlistConfig.Logger = serfLogger.Logger
@@ -97,7 +94,6 @@ func (s *SerfNode) Start(nodeID string, verboseLogging bool, cfg SerfParameters)
 	// Assign tags and default endpoint
 	config.Tags = s.tags
 
-	log.Printf("Tags = %+v", s.tags)
 	go s.serfEventHandler(eventCh)
 
 	if s.se, err = serf.Create(config); err != nil {
@@ -105,11 +101,10 @@ func (s *SerfNode) Start(nodeID string, verboseLogging bool, cfg SerfParameters)
 	}
 
 	if cfg.JoinAddress != "" {
-		joined, err := s.se.Join([]string{cfg.JoinAddress}, true)
+		_, err := s.se.Join([]string{cfg.JoinAddress}, true)
 		if err != nil {
 			return err
 		}
-		log.Printf("Joined %d nodes\n", joined)
 	}
 	return nil
 
@@ -249,13 +244,6 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 		case serf.EventMemberReap:
 		case serf.EventMemberUpdate:
 			// No need to process member updates
-			e, ok := ev.(serf.MemberEvent)
-			if !ok {
-				continue
-			}
-			for _, v := range e.Members {
-				log.Printf("MemberUpdate: %s", v.Name)
-			}
 		case serf.EventUser:
 		case serf.EventQuery:
 

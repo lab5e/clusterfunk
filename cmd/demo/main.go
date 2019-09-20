@@ -19,6 +19,7 @@ func main() {
 	flag.StringVar(&config.ClusterName, "name", "demo", "Name of cluster")
 	flag.BoolVar(&config.AutoJoin, "autojoin", true, "Autojoin via Serf Events")
 	flag.Parse()
+
 	c := cluster.NewCluster(config)
 	defer c.Stop()
 

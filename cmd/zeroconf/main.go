@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/stalehd/clusterfunk/cluster"
+	"github.com/stalehd/clusterfunk/utils"
 )
 
 func waitForTermination() {
@@ -24,7 +24,7 @@ func waitForTermination() {
 }
 func registerService(name string) {
 	log.Println("Registering service")
-	reg := cluster.NewZeroconfRegistry(name)
+	reg := utils.NewZeroconfRegistry(name)
 
 	nodeName := fmt.Sprintf("node_%08x", rand.Int())
 	if err := reg.Register(nodeName, int(rand.Int31n(31000))+1001); err != nil {
@@ -38,7 +38,7 @@ func registerService(name string) {
 
 func browseService(name string) {
 	log.Println("Browse service")
-	reg := cluster.NewZeroconfRegistry(name)
+	reg := utils.NewZeroconfRegistry(name)
 	results, err := reg.Resolve(2 * time.Second)
 	if err != nil {
 		log.Printf("Error browsing for zeroconf: %v", err)

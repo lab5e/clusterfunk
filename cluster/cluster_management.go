@@ -16,7 +16,7 @@ import (
 // This is the cluster management service implementations
 
 // getGRPCOpts returns gRPC server options for the configuration
-func (cf *clusterfunkCluster) getGRPCOpts(config GRPCServerParameters) ([]grpc.ServerOption, error) {
+func (c *clusterfunkCluster) getGRPCOpts(config GRPCServerParameters) ([]grpc.ServerOption, error) {
 	if !config.TLS {
 		return []grpc.ServerOption{}, nil
 	}
@@ -30,23 +30,23 @@ func (cf *clusterfunkCluster) getGRPCOpts(config GRPCServerParameters) ([]grpc.S
 	return []grpc.ServerOption{grpc.Creds(creds)}, nil
 }
 
-func (cf *clusterfunkCluster) startManagementServices() error {
-	opts, err := cf.getGRPCOpts(cf.config.Management)
+func (c *clusterfunkCluster) startManagementServices() error {
+	opts, err := c.getGRPCOpts(c.config.Management)
 	if err != nil {
 		return err
 	}
-	cf.mgmtServer = grpc.NewServer(opts...)
+	c.mgmtServer = grpc.NewServer(opts...)
 
-	clustermgmt.RegisterClusterManagementServer(cf.mgmtServer, cf)
+	clustermgmt.RegisterClusterManagementServer(c.mgmtServer, c)
 
-	listener, err := net.Listen("tcp", cf.config.Management.Endpoint)
+	listener, err := net.Listen("tcp", c.config.Management.Endpoint)
 	if err != nil {
 		return err
 	}
 
 	fail := make(chan error)
 	go func(ch chan error) {
-		if err := cf.mgmtServer.Serve(listener); err != nil {
+		if err := c.mgmtServer.Serve(listener); err != nil {
 			log.Printf("Unable to launch node management gRPC server: %v", err)
 			ch <- err
 		}
@@ -58,24 +58,24 @@ func (cf *clusterfunkCluster) startManagementServices() error {
 	case <-time.After(250 * time.Millisecond):
 		// ok
 	}
-	cf.AddLocalEndpoint(ManagementEndpoint, listener.Addr().String())
+	c.AddLocalEndpoint(ManagementEndpoint, listener.Addr().String())
 	return nil
 }
 
 // Node management implementation
 // -----------------------------------------------------------------------------
 
-func (cf *clusterfunkCluster) GetState(context.Context, *clustermgmt.GetStateRequest) (*clustermgmt.GetStateResponse, error) {
+func (c *clusterfunkCluster) GetState(context.Context, *clustermgmt.GetStateRequest) (*clustermgmt.GetStateResponse, error) {
 	ret := &clustermgmt.GetStateResponse{
-		NodeId: cf.config.NodeID,
+		NodeId: c.config.NodeID,
 		State:  clustermgmt.GetStateResponse_OK,
 	}
 
-	ret.NodeCount = int32(cf.serfNode.MemberCount())
+	ret.NodeCount = int32(c.serfNode.MemberCount())
 	return ret, nil
 }
 
-func (cf *clusterfunkCluster) ListNodes(context.Context, *clustermgmt.ListNodesRequest) (*clustermgmt.ListNodesResponse, error) {
+func (c *clusterfunkCluster) ListNodes(context.Context, *clustermgmt.ListNodesRequest) (*clustermgmt.ListNodesResponse, error) {
 
 	return nil, errors.New("not implemented")
 }

@@ -1,5 +1,10 @@
 package cluster
 
+import (
+	"encoding"
+	"time"
+)
+
 // EventType is the event type for cluster events
 type EventType int
 
@@ -34,6 +39,26 @@ type Event interface {
 // shards across nodes. The cluster client must implement this.
 type RedistributeFunc func(addedNodes []Node, removedNodes []Node) []byte
 
+// State is the current state of the cluster.
+type State int
+
+const (
+	// Operational is the ordinary state for the cluster. Nodes are serving and
+	// requests are (probably) processed as they should.
+	Operational State = iota
+	// Startup is the initial state of the cluster. This is the default
+	// state for new cluster instances before the Raft cluster is boostrapped
+	// and/or joined.
+	Startup
+	// Unavailable is a state the cluster is in while there's a leader election
+	// ongoing. The cluster might stay in this state for a very long time if
+	// there's no quorum.
+	Unavailable
+	// Resharding is a state where the leader is currently resharding and
+	// distributing the results to the nodes.
+	Resharding
+)
+
 // Cluster is a wrapper for the Serf and Raft libraries. It will handle typical
 // cluster operations.
 type Cluster interface {
@@ -48,6 +73,14 @@ type Cluster interface {
 	// Stop stops the cluster
 	Stop()
 
+	// State is the current cluster state
+	State() State
+
+	// WaitForState blocks until the cluster reaches the desired state. If the
+	// timeout is set to 0 the call wil block forever. If the desired state isn't
+	// reached within the timeout an error is returned.
+	WaitForState(state State, timeout time.Duration) error
+
 	// Nodes return a list of the active nodes in the cluster
 	Nodes() []Node
 
@@ -61,11 +94,6 @@ type Cluster interface {
 	// Events returns an event channel for the cluster. The channel will
 	// be closed when the cluster is stopped. Events are for information only
 	Events() <-chan Event
-
-	// The callback is called synchronously when the shards should be
-	// redistributed across the nodes. This callback can be set only once. If
-	// there's more than one shard manager used in the cluster
-	RedistributeShardsCallback(cb RedistributeFunc)
 }
 
 // NodeState is the enumeration of different states a node can be in.
@@ -130,10 +158,6 @@ type Node interface {
 	// ID returns the node ID. This is an unique string in the cluster
 	ID() string
 
-	// Shards returns the shards the node is currently owning. Note that the
-	// ownership might change at any time.
-	Shards() []Shard
-
 	// Voter returns true if this is a voting member of the cluster. If the
 	// node isn't a member of the Raft cluster the string is empty
 	Voter() bool
@@ -179,3 +203,21 @@ const (
 	// StateNone is the state reported when the node is in an unknown (raft) state
 	StateNone = "none"
 )
+
+// ShardMapper is the cluster's view of the Shard Manager type. It only concerns itself with
+// adding and removing nodes plus
+type ShardMapper interface {
+
+	// AddNode adds a new bucket. The returned shard operations are required
+	// to balance the shards across the buckets in the cluster. If the bucket
+	// already exists nil is returned. Performance critical since this is
+	// used when nodes join or leave the cluster.
+	AddNode(nodeID string) error
+
+	// RemoveNode removes a bucket from the cluster. The returned shard operations
+	// are required to balance the shards across the buckets in the cluster.
+	// Performance critical since this is used when nodes join or leave the cluster.
+	RemoveNode(nodeID string) error
+
+	encoding.BinaryMarshaler
+}

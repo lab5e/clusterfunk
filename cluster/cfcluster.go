@@ -3,6 +3,7 @@ package cluster
 import (
 	"errors"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/stalehd/clusterfunk/utils"
@@ -14,11 +15,13 @@ type clusterfunkCluster struct {
 	serfNode      *SerfNode
 	raftNode      *RaftNode
 	config        Parameters
-	registry      *ZeroconfRegistry
+	registry      *utils.ZeroconfRegistry
 	name          string
 	mgmtServer    *grpc.Server
-	state         NodeState
+	nodeState     NodeState
+	clusterState  State
 	eventChannels []chan Event
+	mutex         *sync.RWMutex
 }
 
 // NewCluster returns a new cluster (client)
@@ -27,96 +30,116 @@ func NewCluster(params Parameters) Cluster {
 	return &clusterfunkCluster{
 		config:        params,
 		name:          params.ClusterName,
-		state:         Initializing,
+		nodeState:     Initializing,
+		clusterState:  Startup,
 		eventChannels: make([]chan Event, 0),
+		mutex:         &sync.RWMutex{},
 	}
 }
 
-func (cf *clusterfunkCluster) Start() error {
-	cf.config.final()
-	if cf.config.ClusterName == "" {
+func (c *clusterfunkCluster) Start() error {
+	c.config.final()
+	if c.config.ClusterName == "" {
 		return errors.New("cluster name not specified")
 	}
-	log.Printf("Launch config: %+v", cf.config)
+	log.Printf("Launch config: %+v", c.config)
 
-	cf.serfNode = NewSerfNode()
+	c.serfNode = NewSerfNode()
 
 	// Launch node management endpoint
-	if err := cf.startManagementServices(); err != nil {
+	if err := c.startManagementServices(); err != nil {
 		log.Printf("Error starting management endpoint: %v", err)
 	}
 
-	if cf.config.ZeroConf {
-		cf.registry = NewZeroconfRegistry(cf.config.ClusterName)
+	if c.config.ZeroConf {
+		c.registry = utils.NewZeroconfRegistry(c.config.ClusterName)
 
-		if !cf.config.Raft.Bootstrap && cf.config.Serf.JoinAddress == "" {
+		if !c.config.Raft.Bootstrap && c.config.Serf.JoinAddress == "" {
 			log.Printf("Looking for other Serf instances...")
 			var err error
-			addrs, err := cf.registry.Resolve(1 * time.Second)
+			addrs, err := c.registry.Resolve(1 * time.Second)
 			if err != nil {
 				return err
 			}
 			if len(addrs) == 0 {
 				return errors.New("no serf instances found")
 			}
-			cf.config.Serf.JoinAddress = addrs[0]
+			c.config.Serf.JoinAddress = addrs[0]
 		}
-		log.Printf("Registering Serf endpoint (%s) in zeroconf", cf.config.Serf.Endpoint)
-		if err := cf.registry.Register(cf.config.NodeID, utils.PortOfHostPort(cf.config.Serf.Endpoint)); err != nil {
+		log.Printf("Registering Serf endpoint (%s) in zeroconf", c.config.Serf.Endpoint)
+		if err := c.registry.Register(c.config.NodeID, utils.PortOfHostPort(c.config.Serf.Endpoint)); err != nil {
 			return err
 		}
 
 	}
 	// Set state to none here before it's updated by the
-	cf.serfNode.SetTag(NodeRaftState, StateNone)
+	c.serfNode.SetTag(NodeRaftState, StateNone)
 
-	cf.raftNode = NewRaftNode()
+	c.raftNode = NewRaftNode()
 
 	go func(ch <-chan RaftEvent) {
-		// TODO: Handle all the events
 		for e := range ch {
 			switch e.Type {
 			case RaftNodeAdded:
+				log.Printf("EVENT: Node %s added", e.NodeID)
+				// TODO: Update shard map
+				// There's a new node in the cluster - redistribute shards
+				c.startRedistribution()
 			case RaftNodeRemoved:
+				log.Printf("EVENT: Node %s removed", e.NodeID)
+				// TODO: Update shard map
+				c.startRedistribution()
 			case RaftLeaderLost:
+				log.Printf("EVENT: Leader lost")
+				// Leader is lost - set cluster to unavailable
+				c.setState(Unavailable)
 			case RaftBecameLeader:
-				cf.serfNode.SetTag(NodeRaftState, StateLeader)
-				cf.serfNode.PublishTags()
+				log.Printf("EVENT: Became leader")
+				// I'm the leader. Start resharding
+				c.startRedistribution()
+				c.serfNode.SetTag(NodeRaftState, StateLeader)
+				c.serfNode.PublishTags()
 			case RaftBecameFollower:
-				cf.serfNode.SetTag(NodeRaftState, StateFollower)
-				cf.serfNode.PublishTags()
+				// Wait for the leader to redistribute the shards since it's the new leader
+				c.setState(Resharding)
+				log.Printf("EVENT: Became follower")
+				c.serfNode.SetTag(NodeRaftState, StateFollower)
+				c.serfNode.PublishTags()
 			}
 		}
-	}(cf.raftNode.Events())
+	}(c.raftNode.Events())
 
-	if err := cf.raftNode.Start(cf.config.NodeID, cf.config.Verbose, cf.config.Raft); err != nil {
+	if err := c.raftNode.Start(c.config.NodeID, c.config.Verbose, c.config.Raft); err != nil {
 		return err
 	}
 
-	cf.serfNode.SetTag(NodeType, cf.config.NodeType())
-	cf.serfNode.SetTag(RaftNodeID, cf.config.NodeID)
-	cf.serfNode.SetTag(RaftEndpoint, cf.raftNode.Endpoint())
-	cf.serfNode.SetTag(SerfEndpoint, cf.config.Serf.Endpoint)
+	c.serfNode.SetTag(NodeType, c.config.NodeType())
+	c.serfNode.SetTag(RaftNodeID, c.config.NodeID)
+	c.serfNode.SetTag(RaftEndpoint, c.raftNode.Endpoint())
+	c.serfNode.SetTag(SerfEndpoint, c.config.Serf.Endpoint)
 
-	if cf.config.AutoJoin {
+	if c.config.AutoJoin {
 		go func(ch <-chan NodeEvent) {
 			for ev := range ch {
 				if ev.Joined {
-					if cf.raftNode.Leader() {
-						if err := cf.raftNode.AddMember(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
+					if c.raftNode.Leader() {
+						if err := c.raftNode.AddMember(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
 							log.Printf("Error adding member: %v - %+v", err, ev)
 						}
 					}
 					continue
 				}
-				cf.raftNode.RemoveMember(ev.NodeID, ev.Tags[RaftEndpoint])
-				log.Printf("Removing member: %+v", ev)
+				if c.raftNode.Leader() {
+					if err := c.raftNode.RemoveMember(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
+						log.Printf("Error removing member: %v - %+v", err, ev)
+					}
+				}
 			}
-		}(cf.serfNode.Events())
+		}(c.serfNode.Events())
 
 	}
 
-	if err := cf.serfNode.Start(cf.config.NodeID, cf.config.Verbose, cf.config.Serf); err != nil {
+	if err := c.serfNode.Start(c.config.NodeID, c.config.Verbose, c.config.Serf); err != nil {
 		return err
 	}
 
@@ -126,9 +149,9 @@ func (cf *clusterfunkCluster) Start() error {
 			// note: needs a mutex when raft cluster shuts down. If a panic
 			// is raised when everything is going down the cluster will be
 			// up s**t creek
-			if cf.raftNode.Leader() {
+			if c.raftNode.Leader() {
 				start := time.Now()
-				if err := cf.raftNode.AppendLogEntry(make([]byte, 89999)); err != nil {
+				if err := c.raftNode.AppendLogEntry(make([]byte, 89999)); err != nil {
 					log.Printf("Error writing log entry: %v", err)
 					continue
 				}
@@ -139,40 +162,81 @@ func (cf *clusterfunkCluster) Start() error {
 		}
 	}()
 
-	cf.state = Empty
+	c.nodeState = Empty
 	return nil
 }
 
-func (cf *clusterfunkCluster) Stop() {
-	cf.raftNode.Stop()
-	cf.serfNode.Stop()
+func (c *clusterfunkCluster) Stop() {
+	c.raftNode.Stop()
+	c.serfNode.Stop()
 }
 
-func (cf *clusterfunkCluster) Name() string {
-	return cf.name
+func (c *clusterfunkCluster) Name() string {
+	return c.name
 }
 
-func (cf *clusterfunkCluster) Nodes() []Node {
+func (c *clusterfunkCluster) Nodes() []Node {
 
 	return nil
 }
 
-func (cf *clusterfunkCluster) LocalNode() Node {
+func (c *clusterfunkCluster) LocalNode() Node {
 	return nil
 }
 
-func (cf *clusterfunkCluster) AddLocalEndpoint(name, endpoint string) {
-	cf.serfNode.SetTag(name, endpoint)
+func (c *clusterfunkCluster) AddLocalEndpoint(name, endpoint string) {
+	c.serfNode.SetTag(name, endpoint)
 }
 
-func (cf *clusterfunkCluster) Events() <-chan Event {
+func (c *clusterfunkCluster) Events() <-chan Event {
 	ret := make(chan Event)
-	cf.eventChannels = append(cf.eventChannels, ret)
+	c.eventChannels = append(c.eventChannels, ret)
 	return ret
 }
 
-func (cf *clusterfunkCluster) RedistributeShardsCallback(cb RedistributeFunc) {
-	// TODO
+func (c *clusterfunkCluster) startRedistribution() {
+	c.setState(Resharding)
+	log.Printf(" **** Starting redistribution of shards ")
+
+	c.setState(Operational)
+
+}
+
+func (c *clusterfunkCluster) setState(state State) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	c.clusterState = state
+}
+
+func (c *clusterfunkCluster) State() State {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	return c.clusterState
+}
+
+func (c *clusterfunkCluster) WaitForState(state State, timeout time.Duration) error {
+	var timeoutch <-chan time.Time
+	if timeout == 0 {
+		timeoutch = make(chan time.Time)
+	} else {
+		timeoutch = time.After(timeout)
+
+	}
+	for {
+		select {
+		case <-timeoutch:
+			return errors.New("timed out waiting for cluster state")
+		default:
+			c.mutex.RLock()
+			s := c.clusterState
+			c.mutex.RUnlock()
+			if s == state {
+				return nil
+			}
+			time.Sleep(1 * time.Millisecond)
+		}
+
+	}
 }
 
 /*
