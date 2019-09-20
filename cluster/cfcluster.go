@@ -11,21 +11,24 @@ import (
 
 // clusterfunkClusterß implements the Cluster interface
 type clusterfunkCluster struct {
-	serfNode   *SerfNode
-	raftNode   *RaftNode
-	config     Parameters
-	registry   *ZeroconfRegistry
-	name       string
-	mgmtServer *grpc.Server
-	state      NodeState
+	serfNode      *SerfNode
+	raftNode      *RaftNode
+	config        Parameters
+	registry      *ZeroconfRegistry
+	name          string
+	mgmtServer    *grpc.Server
+	state         NodeState
+	eventChannels []chan Event
 }
 
 // NewCluster returns a new cluster (client)
 func NewCluster(params Parameters) Cluster {
+
 	return &clusterfunkCluster{
-		config: params,
-		name:   params.ClusterName,
-		state:  Initializing,
+		config:        params,
+		name:          params.ClusterName,
+		state:         Initializing,
+		eventChannels: make([]chan Event, 0),
 	}
 }
 
@@ -64,8 +67,28 @@ func (cf *clusterfunkCluster) Start() error {
 		}
 
 	}
+	// Set state to none here before it's updated by the
+	cf.serfNode.SetTag(NodeRaftState, StateNone)
 
-	cf.raftNode = NewRaftNode(cf.serfNode)
+	cf.raftNode = NewRaftNode()
+
+	go func(ch <-chan RaftEvent) {
+		// TODO: Handle all the events
+		for e := range ch {
+			switch e.Type {
+			case RaftNodeAdded:
+			case RaftNodeRemoved:
+			case RaftLeaderLost:
+			case RaftBecameLeader:
+				cf.serfNode.SetTag(NodeRaftState, StateLeader)
+				cf.serfNode.PublishTags()
+			case RaftBecameFollower:
+				cf.serfNode.SetTag(NodeRaftState, StateFollower)
+				cf.serfNode.PublishTags()
+			}
+		}
+	}(cf.raftNode.Events())
+
 	if err := cf.raftNode.Start(cf.config.NodeID, cf.config.Verbose, cf.config.Raft); err != nil {
 		return err
 	}
@@ -138,6 +161,16 @@ func (cf *clusterfunkCluster) LocalNode() Node {
 
 func (cf *clusterfunkCluster) AddLocalEndpoint(name, endpoint string) {
 	cf.serfNode.SetTag(name, endpoint)
+}
+
+func (cf *clusterfunkCluster) Events() <-chan Event {
+	ret := make(chan Event)
+	cf.eventChannels = append(cf.eventChannels, ret)
+	return ret
+}
+
+func (cf *clusterfunkCluster) RedistributeShardsCallback(cb RedistributeFunc) {
+	// TODO
 }
 
 /*

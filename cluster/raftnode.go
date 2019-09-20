@@ -15,23 +15,42 @@ import (
 	raftboltdb "github.com/hashicorp/raft-boltdb"
 )
 
-// TODO(stalehd): Dependency on SerfNode isn't kosher (and probably useless)
+// RaftEventType is the event type for events emitted by the RaftNode type
+type RaftEventType int
+
+const (
+	//RaftNodeAdded is emitted when a new node is added
+	RaftNodeAdded RaftEventType = iota
+	// RaftNodeRemoved is emitted when a node is removed
+	RaftNodeRemoved
+	// RaftLeaderLost is emitted when the leader is lost, ie the node enters the candidate state
+	RaftLeaderLost
+	// RaftBecameLeader is emitted when the leader becomes the leader
+	RaftBecameLeader
+	// RaftBecameFollower is emitted when the node becomes a follower
+	RaftBecameFollower
+)
+
+// RaftEvent is an event emitted by the RaftNode type
+type RaftEvent struct {
+	Type   RaftEventType
+	NodeID string
+}
 
 // RaftNode is a wrapper for the Raft library
 type RaftNode struct {
-	mutex         *sync.RWMutex
-	localNodeID   string
-	localSerfNode *SerfNode
-	raftEndpoint  string
-	ra            *raft.Raft
+	mutex        *sync.RWMutex
+	localNodeID  string
+	raftEndpoint string
+	ra           *raft.Raft
+	events       chan RaftEvent
 }
 
 // NewRaftNode creates a new RaftNode instance
-func NewRaftNode(localSerfNode *SerfNode) *RaftNode {
+func NewRaftNode() *RaftNode {
 	return &RaftNode{
-		localNodeID:   "",
-		mutex:         &sync.RWMutex{},
-		localSerfNode: localSerfNode,
+		localNodeID: "",
+		mutex:       &sync.RWMutex{},
 	}
 }
 
@@ -149,26 +168,42 @@ func (r *RaftNode) observerFunc(ch chan raft.Observation) {
 	for k := range ch {
 		switch v := k.Data.(type) {
 		case raft.PeerObservation:
-			log.Printf("Peer observation: Removed: %t Peer: %s", v.Removed, v.Peer.ID)
+			if v.Removed {
+				r.events <- RaftEvent{
+					Type:   RaftNodeRemoved,
+					NodeID: string(v.Peer.ID),
+				}
+				continue
+			}
+			r.events <- RaftEvent{
+				Type:   RaftNodeAdded,
+				NodeID: string(v.Peer.ID),
+			}
 		case raft.LeaderObservation:
-			log.Printf("**** Leader observation: %+v", v)
+			// No need for this. The RaftLeaderElected and RaftBecameLeader covers
+			// this event.
 		case raft.RaftState:
 			switch v {
 			case raft.Candidate:
+				r.events <- RaftEvent{
+					Type:   RaftLeaderLost,
+					NodeID: "",
+				}
 				candidateTime = time.Now()
 			case raft.Follower:
+				r.events <- RaftEvent{
+					Type:   RaftBecameFollower,
+					NodeID: r.localNodeID,
+				}
 				printTime(candidateTime, time.Now())
-				log.Printf("Raft state: %s", v.String())
-				r.localSerfNode.SetTag(NodeRaftState, v.String())
-				r.localSerfNode.PublishTags()
 			case raft.Leader:
+				r.events <- RaftEvent{
+					Type:   RaftBecameLeader,
+					NodeID: r.localNodeID,
+				}
 				printTime(candidateTime, time.Now())
-				log.Printf("Raft state: %s", v.String())
-				r.localSerfNode.SetTag(NodeRaftState, v.String())
-				r.localSerfNode.PublishTags()
 			}
 		case *raft.RequestVoteRequest:
-			log.Printf("Request vote: %+v", *v)
 		}
 	}
 }
@@ -311,6 +346,14 @@ func (r *RaftNode) State() string {
 		return ""
 	}
 	return r.ra.State().String()
+}
+
+// Events returns the event channel. There is only one
+// event channel so use multiple listeners at your own peril.
+// You will get NodeAdded, NodeRemoved, LeaderLost and LeaderChanged
+// events on this channel.
+func (r *RaftNode) Events() <-chan RaftEvent {
+	return r.events
 }
 
 // RaftNodeTemp is ... a temp struct

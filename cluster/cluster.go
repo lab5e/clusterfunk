@@ -1,5 +1,39 @@
 package cluster
 
+// EventType is the event type for cluster events
+type EventType int
+
+const (
+	// NodeAdded events are triggered when one or more nodes are added to the
+	// cluster
+	NodeAdded EventType = iota
+	// NodeRemoved events are triggered when one or more nodes are removed from
+	// the cluster
+	NodeRemoved
+	// NodeRetired events are trieggered when one or more nodes are retired from
+	// the cluster
+	NodeRetired
+	// LocalNodeStopped is triggered right after the cluster is stopped. Event
+	// channels will be closed and the current node will shut down.
+	LocalNodeStopped
+	// LeaderLost is triggered when the current leader goes away
+	LeaderLost
+	// LeaderChanged is triggered when a new leader is elected
+	LeaderChanged
+)
+
+// Event is the interface for cluster events that are triggered
+type Event interface {
+	// Type is the type of cluster event
+	Type() EventType
+	// Nodes returns the nodes affected by the event.
+	Nodes() []Node
+}
+
+// RedistributeFunc is the callback function to redistribute the
+// shards across nodes. The cluster client must implement this.
+type RedistributeFunc func(addedNodes []Node, removedNodes []Node) []byte
+
 // Cluster is a wrapper for the Serf and Raft libraries. It will handle typical
 // cluster operations.
 type Cluster interface {
@@ -23,6 +57,15 @@ type Cluster interface {
 	// AddEndpoint adds a local endpoint. The endpoints will be distributed
 	// to the other nodes in the cluster.
 	AddLocalEndpoint(name, endpoint string)
+
+	// Events returns an event channel for the cluster. The channel will
+	// be closed when the cluster is stopped. Events are for information only
+	Events() <-chan Event
+
+	// The callback is called synchronously when the shards should be
+	// redistributed across the nodes. This callback can be set only once. If
+	// there's more than one shard manager used in the cluster
+	RedistributeShardsCallback(cb RedistributeFunc)
 }
 
 // NodeState is the enumeration of different states a node can be in.
@@ -126,4 +169,13 @@ const (
 	SerfEndpoint       = "ep.serf"
 	RaftEndpoint       = "ep.raft"
 	ManagementEndpoint = "ep.management" // ManagementEndpoint is gRPC endpoint for management
+)
+
+const (
+	// StateLeader is the state reported in the Serf cluster tags
+	StateLeader = "leader"
+	// StateFollower is the state reported when the node is in the follower state
+	StateFollower = "follower"
+	// StateNone is the state reported when the node is in an unknown (raft) state
+	StateNone = "none"
 )
