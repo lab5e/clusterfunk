@@ -102,8 +102,10 @@ func (cf *clusterfunkCluster) Start() error {
 		go func(ch <-chan NodeEvent) {
 			for ev := range ch {
 				if ev.Joined {
-					if err := cf.raftNode.AddMember(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
-						log.Printf("Error adding member: %+v", ev)
+					if cf.raftNode.Leader() {
+						if err := cf.raftNode.AddMember(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
+							log.Printf("Error adding member: %v - %+v", err, ev)
+						}
 					}
 					continue
 				}
