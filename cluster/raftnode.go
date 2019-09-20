@@ -3,6 +3,7 @@ package cluster
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -10,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/raft"
 	raftboltdb "github.com/hashicorp/raft-boltdb"
 )
@@ -77,7 +77,7 @@ func (r *RaftNode) Start(nodeID string, verboseLog bool, cfg RaftParameters) err
 	if verboseLog {
 		config.LogLevel = "DEBUG"
 	} else {
-		config.Logger = hclog.NewNullLogger()
+		config.LogOutput = newMutedLogger().Writer()
 	}
 
 	addr, err := net.ResolveTCPAddr("tcp", cfg.RaftEndpoint)
@@ -96,7 +96,12 @@ func (r *RaftNode) Start(nodeID string, verboseLog bool, cfg RaftParameters) err
 	config.ElectionTimeout = 100 * time.Millisecond
 	config.LeaderLeaseTimeout = 50 * time.Millisecond
 
-	transport, err := raft.NewTCPTransport(addr.String(), addr, 3, 5*time.Second, os.Stderr)
+	// The transport logging is separate form the configuration transport. Obviously.
+	logger := io.Writer(os.Stderr)
+	if !verboseLog {
+		logger = newMutedLogger().Writer()
+	}
+	transport, err := raft.NewTCPTransport(addr.String(), addr, 3, 5*time.Second, logger)
 	if err != nil {
 		return err
 	}

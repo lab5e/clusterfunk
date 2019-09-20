@@ -162,8 +162,12 @@ func (c *clusterfunkCluster) Start() error {
 }
 
 func (c *clusterfunkCluster) Stop() {
-	c.raftNode.Stop()
-	c.serfNode.Stop()
+	if c.raftNode != nil {
+		c.raftNode.Stop()
+	}
+	if c.serfNode != nil {
+		c.serfNode.Stop()
+	}
 }
 
 func (c *clusterfunkCluster) Name() string {
