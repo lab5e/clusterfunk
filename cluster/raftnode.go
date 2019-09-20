@@ -51,6 +51,7 @@ func NewRaftNode() *RaftNode {
 	return &RaftNode{
 		localNodeID: "",
 		mutex:       &sync.RWMutex{},
+		events:      make(chan RaftEvent),
 	}
 }
 
