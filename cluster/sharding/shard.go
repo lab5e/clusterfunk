@@ -1,4 +1,4 @@
-package cluster
+package sharding
 
 type weightedShard struct {
 	id     int

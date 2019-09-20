@@ -1,4 +1,4 @@
-package cluster
+package sharding
 
 import "hash/crc64"
 
