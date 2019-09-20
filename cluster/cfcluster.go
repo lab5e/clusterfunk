@@ -84,24 +84,19 @@ func (c *clusterfunkCluster) Start() error {
 				log.Printf("EVENT: Node %s added", e.NodeID)
 				// TODO: Update shard map
 				// There's a new node in the cluster - redistribute shards
-				c.startRedistribution()
 			case RaftNodeRemoved:
 				log.Printf("EVENT: Node %s removed", e.NodeID)
 				// TODO: Update shard map
-				c.startRedistribution()
 			case RaftLeaderLost:
 				log.Printf("EVENT: Leader lost")
 				// Leader is lost - set cluster to unavailable
-				c.setState(Unavailable)
 			case RaftBecameLeader:
 				log.Printf("EVENT: Became leader")
 				// I'm the leader. Start resharding
-				c.startRedistribution()
 				c.serfNode.SetTag(NodeRaftState, StateLeader)
 				c.serfNode.PublishTags()
 			case RaftBecameFollower:
 				// Wait for the leader to redistribute the shards since it's the new leader
-				c.setState(Resharding)
 				log.Printf("EVENT: Became follower")
 				c.serfNode.SetTag(NodeRaftState, StateFollower)
 				c.serfNode.PublishTags()
@@ -194,13 +189,7 @@ func (c *clusterfunkCluster) Events() <-chan Event {
 	return ret
 }
 
-func (c *clusterfunkCluster) startRedistribution() {
-	c.setState(Resharding)
-	log.Printf(" **** Starting redistribution of shards ")
-
-	c.setState(Operational)
-
-}
+// State functions for cluster.
 
 func (c *clusterfunkCluster) setState(state State) {
 	c.mutex.Lock()
