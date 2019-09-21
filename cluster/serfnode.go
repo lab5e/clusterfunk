@@ -16,6 +16,7 @@ import (
 type NodeEvent struct {
 	NodeID string
 	Joined bool
+	Update bool
 	Tags   map[string]string
 }
 
@@ -134,10 +135,8 @@ func (s *SerfNode) SetTag(name, value string) {
 		delete(s.tags, name)
 		return
 	}
-	if s.tags[name] != value {
-		s.tags[name] = value
-		s.changedTags = true
-	}
+	s.tags[name] = value
+	s.changedTags = true
 }
 
 // PublishTags publishes the tags to the other members of the cluster
@@ -227,6 +226,7 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 					NodeID: v.Name,
 					Tags:   v.Tags,
 					Joined: true,
+					Update: false,
 				})
 			}
 		case serf.EventMemberLeave:
@@ -239,11 +239,24 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 					NodeID: v.Name,
 					Tags:   v.Tags,
 					Joined: false,
+					Update: false,
 				})
 			}
 		case serf.EventMemberReap:
 		case serf.EventMemberUpdate:
 			// No need to process member updates
+			e, ok := ev.(serf.MemberEvent)
+			if !ok {
+				continue
+			}
+			for _, v := range e.Members {
+				s.sendEvent(NodeEvent{
+					NodeID: v.Name,
+					Tags:   v.Tags,
+					Joined: false,
+					Update: true,
+				})
+			}
 		case serf.EventUser:
 		case serf.EventQuery:
 

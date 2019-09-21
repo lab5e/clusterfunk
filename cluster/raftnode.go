@@ -51,7 +51,7 @@ func NewRaftNode() *RaftNode {
 	return &RaftNode{
 		localNodeID: "",
 		mutex:       &sync.RWMutex{},
-		events:      make(chan RaftEvent),
+		events:      make(chan RaftEvent, 2), // tiny buffer here to make multiple events feasable.
 	}
 }
 
@@ -169,16 +169,11 @@ func (r *RaftNode) sendEvent(e RaftEvent) {
 	select {
 	case r.events <- e:
 	default:
-		log.Printf("Nobody's listening to me! ev = %+v", e)
+		log.Printf("**** Nobody's listening to me! ev = %+v", e)
 	}
 }
 
 func (r *RaftNode) observerFunc(ch chan raft.Observation) {
-	printTime := func(start time.Time, end time.Time) {
-		d := float64(end.Sub(start)) / float64(time.Millisecond)
-		log.Printf("%f milliseconds for election", d)
-	}
-	var candidateTime = time.Now()
 	for k := range ch {
 		switch v := k.Data.(type) {
 		case raft.PeerObservation:
@@ -187,6 +182,7 @@ func (r *RaftNode) observerFunc(ch chan raft.Observation) {
 					Type:   RaftNodeRemoved,
 					NodeID: string(v.Peer.ID),
 				})
+				continue
 			}
 			r.sendEvent(RaftEvent{
 				Type:   RaftNodeAdded,
@@ -202,19 +198,16 @@ func (r *RaftNode) observerFunc(ch chan raft.Observation) {
 					Type:   RaftLeaderLost,
 					NodeID: "",
 				})
-				candidateTime = time.Now()
 			case raft.Follower:
 				r.sendEvent(RaftEvent{
 					Type:   RaftBecameFollower,
 					NodeID: r.localNodeID,
 				})
-				printTime(candidateTime, time.Now())
 			case raft.Leader:
 				r.sendEvent(RaftEvent{
 					Type:   RaftBecameLeader,
 					NodeID: r.localNodeID,
 				})
-				printTime(candidateTime, time.Now())
 			}
 		case *raft.RequestVoteRequest:
 		}
@@ -243,6 +236,13 @@ func (r *RaftNode) Stop() error {
 	r.localNodeID = ""
 	r.raftEndpoint = ""
 	return nil
+}
+
+// LocalNodeID returns the local NodeID
+func (r *RaftNode) LocalNodeID() string {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	return r.localNodeID
 }
 
 // AddMember adds a new node to the cluster
@@ -332,6 +332,26 @@ func (r *RaftNode) AppendLogEntry(data []byte) error {
 		return errors.New("raft node not started")
 	}
 	return r.ra.Apply(data, time.Second*2).Error()
+}
+
+// Members returns a list of the node IDs that are a member of the cluster
+func (r *RaftNode) Members() []string {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	if r.ra == nil {
+		return []string{}
+	}
+	config := r.ra.GetConfiguration()
+	if err := config.Error(); err != nil {
+		panic(fmt.Sprintf("Unable to read member list from Raft: %v", err))
+	}
+
+	members := config.Configuration().Servers
+	ret := make([]string, len(members))
+	for i, v := range members {
+		ret[i] = string(v.ID)
+	}
+	return ret
 }
 
 // -----------------------------------------------------------------------------

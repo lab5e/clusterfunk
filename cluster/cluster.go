@@ -84,16 +84,13 @@ type Cluster interface {
 	// Nodes return a list of the active nodes in the cluster
 	Nodes() []Node
 
-	// LocalNode returns the local node
-	LocalNode() Node
-
-	// AddEndpoint adds a local endpoint. The endpoints will be distributed
-	// to the other nodes in the cluster.
-	AddLocalEndpoint(name, endpoint string)
-
 	// Events returns an event channel for the cluster. The channel will
 	// be closed when the cluster is stopped. Events are for information only
 	Events() <-chan Event
+
+	// AddLocalEndpoint registers an endpoint on the local node
+	// TOOD(stalehd) add LocalNode() + AddEndpoint method to node
+	AddLocalEndpoint(name, endpoint string)
 }
 
 // NodeState is the enumeration of different states a node can be in.
@@ -136,44 +133,6 @@ const (
 	// Terminating is the final state for nodes. After the Draining phase
 	Terminating
 )
-
-// NodeKind is the different kinds of nodes
-type NodeKind int
-
-const (
-	// Leader is the leader of the cluster and the winner of the last leader election.
-	Leader NodeKind = iota
-	// Voter is the regular voting node in the cluster. It can participate in leader
-	// elections and may even be a *leader* one day.
-	Voter
-	// Nonvoter is a cluster member that won't participate in leader elections.
-	Nonvoter
-	// Nonmember is a node that isn't a part of the cluster itself, just the swarm.
-	Nonmember
-)
-
-// Node is one of the processes in the cluster. Note that this might be
-// a process.
-type Node interface {
-	// ID returns the node ID. This is an unique string in the cluster
-	ID() string
-
-	// Voter returns true if this is a voting member of the cluster. If the
-	// node isn't a member of the Raft cluster the string is empty
-	Voter() bool
-
-	// Leader returns true if the node is the leader of the cluster
-	Leader() bool
-
-	// Endpoints returns a list of endpoints
-	Endpoints() []string
-
-	// GetEndpoint returns the named endpoint for the node
-	GetEndpoint(name string) (string, error)
-
-	// State returns the state of the node
-	State() NodeState
-}
 
 // The following are internal tags and values for nodes
 const (

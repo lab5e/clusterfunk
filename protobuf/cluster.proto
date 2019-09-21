@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package clusterpb;
+
+// ConfirmShardMapRequest is sent by followers to the leader to signal readyness
+// with the new shard map
+message ConfirmShardMapRequest {
+    int64 LogIndex = 1;
+    string NodeID = 2;
+};
+
+// ConfirmShardMapResponse is sent as a response from the leader to the
+// followers.
+message ConfirmShardMapResponse {
+    bool Success = 1;
+};
+
+service ClusterLeaderService {
+    rpc ConfirmShardMap(ConfirmShardMapRequest) returns (ConfirmShardMapResponse);
+}
+

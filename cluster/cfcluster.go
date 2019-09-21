@@ -22,19 +22,23 @@ type clusterfunkCluster struct {
 	clusterState  State
 	eventChannels []chan Event
 	mutex         *sync.RWMutex
+	stateChannel  chan fsmEvent
 }
 
 // NewCluster returns a new cluster (client)
 func NewCluster(params Parameters) Cluster {
 
-	return &clusterfunkCluster{
+	ret := &clusterfunkCluster{
 		config:        params,
 		name:          params.ClusterName,
 		nodeState:     Initializing,
 		clusterState:  Startup,
 		eventChannels: make([]chan Event, 0),
 		mutex:         &sync.RWMutex{},
+		stateChannel:  make(chan fsmEvent, 5),
 	}
+	go ret.clusterStateMachine()
+	return ret
 }
 
 func (c *clusterfunkCluster) Start() error {
@@ -77,32 +81,7 @@ func (c *clusterfunkCluster) Start() error {
 
 	c.raftNode = NewRaftNode()
 
-	go func(ch <-chan RaftEvent) {
-		for e := range ch {
-			switch e.Type {
-			case RaftNodeAdded:
-				log.Printf("EVENT: Node %s added", e.NodeID)
-				// TODO: Update shard map
-				// There's a new node in the cluster - redistribute shards
-			case RaftNodeRemoved:
-				log.Printf("EVENT: Node %s removed", e.NodeID)
-				// TODO: Update shard map
-			case RaftLeaderLost:
-				log.Printf("EVENT: Leader lost")
-				// Leader is lost - set cluster to unavailable
-			case RaftBecameLeader:
-				log.Printf("EVENT: Became leader")
-				// I'm the leader. Start resharding
-				c.serfNode.SetTag(NodeRaftState, StateLeader)
-				c.serfNode.PublishTags()
-			case RaftBecameFollower:
-				// Wait for the leader to redistribute the shards since it's the new leader
-				log.Printf("EVENT: Became follower")
-				c.serfNode.SetTag(NodeRaftState, StateFollower)
-				c.serfNode.PublishTags()
-			}
-		}
-	}(c.raftNode.Events())
+	go c.raftEvents(c.raftNode.Events())
 
 	if err := c.raftNode.Start(c.config.NodeID, c.config.Verbose, c.config.Raft); err != nil {
 		return err
@@ -113,30 +92,12 @@ func (c *clusterfunkCluster) Start() error {
 	c.serfNode.SetTag(RaftEndpoint, c.raftNode.Endpoint())
 	c.serfNode.SetTag(SerfEndpoint, c.config.Serf.Endpoint)
 
-	if c.config.AutoJoin {
-		go func(ch <-chan NodeEvent) {
-			for ev := range ch {
-				if ev.Joined {
-					if c.raftNode.Leader() {
-						if err := c.raftNode.AddMember(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
-							log.Printf("Error adding member: %v - %+v", err, ev)
-						}
-					}
-					continue
-				}
-				if c.raftNode.Leader() {
-					if err := c.raftNode.RemoveMember(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
-						log.Printf("Error removing member: %v - %+v", err, ev)
-					}
-				}
-			}
-		}(c.serfNode.Events())
-
-	}
+	go c.serfEvents(c.serfNode.Events())
 
 	if err := c.serfNode.Start(c.config.NodeID, c.config.Verbose, c.config.Serf); err != nil {
 		return err
 	}
+	// Populate local node list with list from Serf
 
 	go func() {
 		for {
@@ -145,20 +106,85 @@ func (c *clusterfunkCluster) Start() error {
 			// is raised when everything is going down the cluster will be
 			// up s**t creek
 			if c.raftNode.Leader() {
-				start := time.Now()
-				if err := c.raftNode.AppendLogEntry(make([]byte, 89999)); err != nil {
-					log.Printf("Error writing log entry: %v", err)
-					continue
-				}
-				end := time.Now()
-				diff := end.Sub(start)
-				log.Printf("Time to apply log: %f ms", float64(diff)/float64(time.Millisecond))
+				timeCall(func() {
+					if err := c.raftNode.AppendLogEntry(make([]byte, 89999)); err != nil {
+						log.Printf("Error writing log entry: %v", err)
+					}
+				}, "apply log")
 			}
 		}
 	}()
 
 	c.nodeState = Empty
 	return nil
+}
+
+func (c *clusterfunkCluster) raftEvents(ch <-chan RaftEvent) {
+	for e := range ch {
+		switch e.Type {
+		case RaftNodeAdded:
+			log.Printf("EVENT: Node %s added", e.NodeID)
+			c.setFSMState(clusterSizeChanged, e.NodeID)
+
+		case RaftNodeRemoved:
+			log.Printf("EVENT: Node %s removed", e.NodeID)
+			c.setFSMState(clusterSizeChanged, e.NodeID)
+
+		case RaftLeaderLost:
+			log.Printf("EVENT: Leader lost")
+			c.setFSMState(leaderLost, "")
+
+		case RaftBecameLeader:
+			log.Printf("EVENT: Became leader")
+			c.setFSMState(assumeLeadership, "")
+			go func() {
+				// I'm the leader. Start resharding
+				c.serfNode.SetTag(NodeRaftState, StateLeader)
+				c.serfNode.PublishTags()
+			}()
+		case RaftBecameFollower:
+			// Wait for the leader to redistribute the shards since it's the new leader
+			log.Printf("EVENT: Became follower")
+			c.setFSMState(assumeFollower, "")
+			go func() {
+				c.serfNode.SetTag(NodeRaftState, StateFollower)
+				c.serfNode.PublishTags()
+			}()
+		}
+	}
+}
+
+func (c *clusterfunkCluster) serfEvents(ch <-chan NodeEvent) {
+	if c.config.AutoJoin {
+		go func(ch <-chan NodeEvent) {
+			for ev := range ch {
+				if ev.Update {
+					// Update node list
+					c.updateNode(ev.NodeID, ev.Tags)
+					c.DumpNodes()
+					continue
+				}
+				if ev.Joined {
+					// add node to list
+					c.addNode(ev.NodeID, ev.Tags)
+					c.DumpNodes()
+					if c.config.AutoJoin && c.raftNode.Leader() {
+						if err := c.raftNode.AddMember(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
+							log.Printf("Error adding member: %v - %+v", err, ev)
+						}
+					}
+					continue
+				}
+				c.removeNode(ev.NodeID)
+				c.DumpNodes()
+				if c.config.AutoJoin && c.raftNode.Leader() {
+					if err := c.raftNode.RemoveMember(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
+						log.Printf("Error removing member: %v - %+v", err, ev)
+					}
+				}
+			}
+		}(c.serfNode.Events())
+	}
 }
 
 func (c *clusterfunkCluster) Stop() {
@@ -175,7 +201,8 @@ func (c *clusterfunkCluster) Name() string {
 }
 
 func (c *clusterfunkCluster) Nodes() []Node {
-
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
 	return nil
 }
 
@@ -184,6 +211,11 @@ func (c *clusterfunkCluster) LocalNode() Node {
 }
 
 func (c *clusterfunkCluster) AddLocalEndpoint(name, endpoint string) {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	if c.serfNode == nil {
+		return
+	}
 	c.serfNode.SetTag(name, endpoint)
 }
 
@@ -232,39 +264,180 @@ func (c *clusterfunkCluster) WaitForState(state State, timeout time.Duration) er
 	}
 }
 
-/*
-type clusterNode struct {
+// Cluster mutations -- this is best expressed as a state machine. The state
+// machine runs independently of the rest of the code. Mostly.
+
+type internalFSMState int
+
+// The FSM even is used to set the state with an optional node parameter
+type fsmEvent struct {
+	State  internalFSMState
+	NodeID string
 }
 
-func newClusterNode() Node {
-	return &clusterNode{}
+// These are the internal states. See implementation for a description. Most of these
+// operations can be interrupted if there's a leader change midway in the process.
+const (
+	clusterSizeChanged internalFSMState = iota
+	waitForLeader
+	assumeLeadership
+	assumeFollower
+	ackShardMap
+	ackReceived
+	ackCompleted
+	reshardCluster
+	waitForCommitLog
+	commitLogReceived
+	updateRaftNodeList
+	newShardMapReceived
+	leaderLost
+)
+
+// Sets the new state unless a different state is waiting.
+func (c *clusterfunkCluster) setFSMState(newState internalFSMState, nodeID string) {
+	select {
+	case c.stateChannel <- fsmEvent{State: newState, NodeID: nodeID}:
+	default:
+		panic("Unable to set cluster state")
+		// channel is already full - skip
+	}
 }
 
-func (cn *clusterNode) ID() string {
-	return cn.nodeID
+// clusterStateMachine is the FSM for
+func (c *clusterfunkCluster) clusterStateMachine() {
+	log.Printf("STATE: Launching")
+	var unacknowledgedNodes []string
+	clusterNodes := newNodeCollection()
+	for newState := range c.stateChannel {
+		switch newState.State {
+
+		case assumeLeadership:
+			log.Printf("STATE: assume leader")
+			// start with updating the node list
+			c.setFSMState(updateRaftNodeList, "")
+
+		case clusterSizeChanged:
+			log.Printf("STATE: Cluster size changed")
+			c.setFSMState(updateRaftNodeList, "")
+
+		case updateRaftNodeList:
+			log.Printf("STATE: update node list")
+			// list is updated. Start resharding.
+
+			needReshard := clusterNodes.Sync(c.raftNode.Members()...)
+			if needReshard {
+				log.Printf("Have nodes %+v (I'm %s)", clusterNodes, c.raftNode.LocalNodeID())
+				log.Printf("Need resharding")
+				c.setFSMState(reshardCluster, "")
+			}
+
+		case reshardCluster:
+			// reshard cluster, distribute via replicated log.
+
+			// Reset the list of acked nodes.
+			log.Printf("STATE: reshardCluster")
+
+			// TODO: build list of unacked nodes
+			unacknowledgedNodes = make([]string, clusterNodes.Size())
+			//			unacknowledgedNodes = append(unacknowledgedNodes, clusterNodes.IDs()...)
+			// TOD(stalehd): Remove self from list.
+
+			// Replicate via log
+
+			// Next messages will be ackReceived when the changes has replicated
+			// out to the other nodes.
+			// No new state here - wait for a series of ackReceived states
+			// from the nodes.
+
+		case ackReceived:
+			log.Printf("STATE: ack received from %s", newState.NodeID)
+
+			// when a new ack message is received the ack is noted for the node and
+			// until all nodes have acked the state will stay the same.
+
+			// Timeouts are handled when calling the other nodes via gRPC
+			allNodesHaveAcked := false
+			if len(unacknowledgedNodes) == 0 {
+				allNodesHaveAcked = true
+			}
+
+			if allNodesHaveAcked {
+				c.setFSMState(ackCompleted, "")
+			}
+			continue
+
+		case ackCompleted:
+			log.Printf("STATE: ack complete. operational leader.")
+
+			// ack is completed. Enable the new shard map for the cluster by
+			// sending a commit log message
+
+			// no further processing required
+			continue
+
+		case waitForLeader:
+			// wait for the leader to announce something. This is do-nothing state
+			continue
+
+		case assumeFollower:
+			log.Printf("STATE: follower")
+			// wait for a log message with a new shard map. Busy wait.
+			continue
+
+		case newShardMapReceived:
+			log.Printf("STATE: shardmap received")
+			// update internal map and ack map via gRPC
+			c.setFSMState(ackShardMap, "")
+
+		case waitForCommitLog:
+			log.Printf("STATE: wait for commit log message")
+			// nothing to do here
+			continue
+
+		case commitLogReceived:
+			log.Printf("STATE: commit log received. Operational follower")
+			// commit log received, set state operational and resume normal
+			// operations
+			continue
+
+		case ackShardMap:
+			log.Printf("STATE: ack shardmap")
+			// Ack the shard map to the leader and wait for commit log
+			c.setFSMState(waitForCommitLog, "")
+			continue
+
+		case leaderLost:
+			log.Printf("STATE: leader lost")
+			continue
+		}
+	}
 }
 
-func (cn *clusterNode) Shards() []Shard {
-	return cn.shards
-}
+// -----------------------------------------------------------------------------
+// Node operations -- initiated by Serf events
 
-func (cn *clusterNode) Voter() bool {
-	return cn.voter
-}
-
-func (cn *clusterNode) Leader() bool {
-	return cn.leader
-}
-
-func (cn *clusterNode) Endpoints() []string {
+// updateNode updates the node with new tags
+func (c *clusterfunkCluster) updateNode(nodeID string, tags map[string]string) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
 }
 
-func (cn *clusterNode) GetEndpoint(name string) (string, error) {
+// addNode adds a new node
+func (c *clusterfunkCluster) addNode(nodeID string, tags map[string]string) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
 }
 
-func (cn *clusterNode) State() NodeState {
+// removeNode removes the node
+func (c *clusterfunkCluster) removeNode(nodeID string) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
 }
-*/
+
+func (c *clusterfunkCluster) DumpNodes() {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+}
