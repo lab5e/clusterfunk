@@ -338,7 +338,10 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 			log.Printf("STATE: reshardCluster")
 
 			// TODO: build list of unacked nodes
-			unacknowledgedNodes = make([]string, clusterNodes.Size())
+			// Note that this might include the local node as well, which
+			// is OK. The client part will behave like all other parts.
+			unacknowledgedNodes = append([]string{}, clusterNodes.Nodes...)
+
 			//			unacknowledgedNodes = append(unacknowledgedNodes, clusterNodes.IDs()...)
 			// TOD(stalehd): Remove self from list.
 
