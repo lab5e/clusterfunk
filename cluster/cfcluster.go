@@ -279,17 +279,14 @@ type fsmEvent struct {
 // operations can be interrupted if there's a leader change midway in the process.
 const (
 	clusterSizeChanged internalFSMState = iota
-	waitForLeader
 	assumeLeadership
 	assumeFollower
-	ackShardMap
 	ackReceived
 	ackCompleted
 	reshardCluster
-	waitForCommitLog
-	commitLogReceived
 	updateRaftNodeList
 	newShardMapReceived
+	commitLogReceived
 	leaderLost
 )
 
@@ -308,6 +305,8 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 	log.Printf("STATE: Launching")
 	var unacknowledgedNodes []string
 	clusterNodes := newNodeCollection()
+	var shardMap ShardMapper
+
 	for newState := range c.stateChannel {
 		switch newState.State {
 
@@ -336,16 +335,25 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 
 			// Reset the list of acked nodes.
 			log.Printf("STATE: reshardCluster")
+			// TODO: ShardManager needs a rewrite
+			//shardMap.AddNodes(newNodes...)
+			//shardMap.RemoveNodes(oldNodes...)
 
-			// TODO: build list of unacked nodes
+			buf, err := shardMap.MarshalBinary()
+			if err != nil {
+				panic("Can't marhsal the shard map")
+			}
+			// Build list of unacked nodes
 			// Note that this might include the local node as well, which
 			// is OK. The client part will behave like all other parts.
 			unacknowledgedNodes = append([]string{}, clusterNodes.Nodes...)
 
-			//			unacknowledgedNodes = append(unacknowledgedNodes, clusterNodes.IDs()...)
-			// TOD(stalehd): Remove self from list.
-
+			// TODO: use log message type
 			// Replicate via log
+			if err := c.raftNode.AppendLogEntry(buf); err != nil {
+				// TODO: Check if I'm no longer the leader.
+				panic("Unable to publish log entry")
+			}
 
 			// Next messages will be ackReceived when the changes has replicated
 			// out to the other nodes.
@@ -357,7 +365,11 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 
 			// when a new ack message is received the ack is noted for the node and
 			// until all nodes have acked the state will stay the same.
-
+			for i, v := range unacknowledgedNodes {
+				if v == newState.NodeID {
+					unacknowledgedNodes = append(unacknowledgedNodes[:i], unacknowledgedNodes[i+1:]...)
+				}
+			}
 			// Timeouts are handled when calling the other nodes via gRPC
 			allNodesHaveAcked := false
 			if len(unacknowledgedNodes) == 0 {
@@ -370,6 +382,7 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 			continue
 
 		case ackCompleted:
+			// TODO: Log final commit message, establishing the new state in the cluster
 			log.Printf("STATE: ack complete. operational leader.")
 
 			// ack is completed. Enable the new shard map for the cluster by
@@ -378,40 +391,24 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 			// no further processing required
 			continue
 
-		case waitForLeader:
-			// wait for the leader to announce something. This is do-nothing state
-			continue
-
 		case assumeFollower:
 			log.Printf("STATE: follower")
-			// wait for a log message with a new shard map. Busy wait.
-			continue
+			// Not much happens here but the next state should be - if all
+			// goes well - a shard map log message from the leader.
 
 		case newShardMapReceived:
 			log.Printf("STATE: shardmap received")
 			// update internal map and ack map via gRPC
-			c.setFSMState(ackShardMap, "")
-
-		case waitForCommitLog:
-			log.Printf("STATE: wait for commit log message")
-			// nothing to do here
-			continue
 
 		case commitLogReceived:
 			log.Printf("STATE: commit log received. Operational follower")
 			// commit log received, set state operational and resume normal
-			// operations
-			continue
-
-		case ackShardMap:
-			log.Printf("STATE: ack shardmap")
-			// Ack the shard map to the leader and wait for commit log
-			c.setFSMState(waitForCommitLog, "")
-			continue
+			// operations. Signal to the rest of the library (channel)
 
 		case leaderLost:
 			log.Printf("STATE: leader lost")
-			continue
+			// leader is lost - stop processing until a leader is elected and
+			// the commit log is received
 		}
 	}
 }

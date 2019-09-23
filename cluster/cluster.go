@@ -171,12 +171,12 @@ type ShardMapper interface {
 	// to balance the shards across the buckets in the cluster. If the bucket
 	// already exists nil is returned. Performance critical since this is
 	// used when nodes join or leave the cluster.
-	AddNode(nodeID string) error
+	AddNodes(nodeID ...string) error
 
 	// RemoveNode removes a bucket from the cluster. The returned shard operations
 	// are required to balance the shards across the buckets in the cluster.
 	// Performance critical since this is used when nodes join or leave the cluster.
-	RemoveNode(nodeID string) error
+	RemoveNodes(nodeID ...string) error
 
 	encoding.BinaryMarshaler
 }
