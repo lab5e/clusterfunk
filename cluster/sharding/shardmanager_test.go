@@ -2,10 +2,14 @@ package sharding
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // verifyDistribution ensures that the
 func verifyDistribution(t *testing.T, manager ShardManager) {
+	assert := require.New(t)
+
 	nodes := make(map[string]int)
 	shards := manager.Shards()
 
@@ -19,97 +23,68 @@ func verifyDistribution(t *testing.T, manager ShardManager) {
 		totalWeight += v
 	}
 
-	if totalWeight != manager.TotalWeight() {
-		t.Fatalf("Shards total weight is %d but manager reports %d", totalWeight, manager.TotalWeight())
-	}
+	assert.Equal(totalWeight, manager.TotalWeight(), "Manager reports incorrect total weight")
 
-	weightPerNode := float32(totalWeight) / float32(len(nodes))
-	// Allow for 10% off. If there's less than 10 shards and 3 or more nodes the test will fail but
-	// shards should be >>> nodes.
-	minWeight := 0.9 * weightPerNode
-	maxWeight := 1.1 * weightPerNode
+	weightPerNode := float64(totalWeight) / float64(len(nodes))
 
-	t.Logf("totalW=%d nodes=%d minW=%f weight=%f maxW=%f", totalWeight, len(nodes), minWeight, weightPerNode, maxWeight)
 	for k, v := range nodes {
 		t.Logf("  node: %s w: %d", k, v)
-		if float32(v) < minWeight || float32(v) > maxWeight {
-			t.Fatalf("Distribution is off. Expected %f < weight[%s] < %f but weight = %d", minWeight, k, maxWeight, v)
-		}
+		assert.InDelta(v, weightPerNode, 0.1*weightPerNode, "Distribution is incorrect")
 	}
 }
 
 // verifyShards ensures all shards are distributed to nodes
 func verifyShards(t *testing.T, manager ShardManager, maxShards int) {
+	assert := require.New(t)
+
 	check := make(map[int]int)
 	shards := manager.Shards()
-	if len(shards) != maxShards {
-		t.Fatalf("maxShards != shards (expecting %d but got %d)", maxShards, len(shards))
-	}
+	assert.Equal(maxShards, len(shards), "Incorrect length of shards")
 	for i := range shards {
 		check[shards[i].ID()] = 1
 	}
 	for i := 0; i < maxShards; i++ {
-		_, exists := check[i]
-		if !exists {
-			t.Fatalf("Missing shard %d", i)
-		}
+		assert.Contains(check, i, "Shard %d does not exist", i)
 	}
-}
-func verifyPanicOnInvalidShardID(t *testing.T, manager ShardManager) {
-	defer func() {
-		recover()
-	}()
-	manager.MapToNode(-1)
-	t.Fatal("No panic on unknown shard")
-}
-
-func verifyPanicOnUnknownNodeRemoval(t *testing.T, manager ShardManager) {
-	defer func() {
-		recover()
-	}()
-	manager.RemoveNode("unknown")
-	t.Fatal("No panic on unknown node")
 }
 
 func testShardManager(t *testing.T, manager ShardManager, maxShards int, weights []int) {
-	if err := manager.Init(0, nil); err == nil {
-		t.Fatal("Expected error when maxShards is 0")
-	}
-	if err := manager.Init(len(weights), []int{}); err == nil {
-		t.Fatal("Expected error when weights != maxShards")
-	}
-	if err := manager.Init(len(weights), weights); err != nil {
-		t.Fatal(err)
-	}
-	if err := manager.Init(len(weights), weights); err == nil {
-		t.Fatal("Should not be allowed to init manager twice")
-	}
+	assert := require.New(t)
+	assert.Error(manager.Init(0, nil), "Expected error when maxShards = 0")
+	assert.Error(manager.Init(len(weights), []int{}), "Expected error when weights != maxShards")
+
+	assert.NoError(manager.Init(len(weights), weights), "Regular init should work")
+	assert.Error(manager.Init(len(weights), weights), "Should not be allowed to init manager twice")
+
 	manager.AddNode("A")
 	verifyDistribution(t, manager)
 	verifyShards(t, manager, maxShards)
+
 	manager.AddNode("B")
 	verifyDistribution(t, manager)
 	verifyShards(t, manager, maxShards)
+
 	manager.AddNode("C")
 	verifyDistribution(t, manager)
 	verifyShards(t, manager, maxShards)
 
 	for i := 0; i < maxShards; i++ {
-		if manager.MapToNode(i).NodeID() == "" {
-			t.Fatalf("Shard %d is not mapped to a node", i)
-		}
+		assert.NotEqual("", manager.MapToNode(i).NodeID(), "Shard %d is not mapped to a node", i)
 	}
+
 	manager.RemoveNode("B")
 	verifyDistribution(t, manager)
 	verifyShards(t, manager, maxShards)
+
 	manager.RemoveNode("A")
 	verifyDistribution(t, manager)
 	verifyShards(t, manager, maxShards)
+
 	manager.RemoveNode("C")
 	verifyDistribution(t, manager)
 
-	verifyPanicOnInvalidShardID(t, manager)
-	verifyPanicOnUnknownNodeRemoval(t, manager)
+	require.Panics(t, func() { manager.MapToNode(-1) }, "Panics on invalid shard ID")
+	require.Panics(t, func() { manager.RemoveNode("unknown") }, "Panics on unknown node")
 }
 
 // These are sort-of-sensible defaults for benchmarks
