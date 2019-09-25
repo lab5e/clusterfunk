@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stalehd/clusterfunk/cluster/sharding"
 	"github.com/stalehd/clusterfunk/utils"
 	"google.golang.org/grpc"
 )
@@ -99,7 +100,7 @@ func (c *clusterfunkCluster) Start() error {
 	}
 	// Populate local node list with list from Serf
 
-	go func() {
+	/*	go func() {
 		for {
 			time.Sleep(5 * time.Second)
 			// note: needs a mutex when raft cluster shuts down. If a panic
@@ -113,7 +114,7 @@ func (c *clusterfunkCluster) Start() error {
 				}, "apply log")
 			}
 		}
-	}()
+	}()*/
 
 	c.nodeState = Empty
 	return nil
@@ -305,6 +306,10 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 	log.Printf("STATE: Launching")
 	var unacknowledgedNodes []string
 	clusterNodes := newNodeCollection()
+	shardManager := sharding.NewShardManager()
+	var proposedShardMap []byte
+	var currentShardMap []byte
+	var err error
 
 	for newState := range c.stateChannel {
 		switch newState.State {
@@ -335,23 +340,28 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 			// Reset the list of acked nodes.
 			log.Printf("STATE: reshardCluster")
 			// TODO: ShardManager needs a rewrite
-			//shardMap.AddNodes(newNodes...)
-			//shardMap.RemoveNodes(oldNodes...)
-			//buf, err := shardMap.MarshalBinary()
-			//if err != nil {
-			//	panic("Can't marshal the shard map")
-			//}
+			shardManager.UpdateNodes(clusterNodes.Nodes...)
+
+			proposedShardMap, err = shardManager.MarshalBinary()
+			if err != nil {
+				panic("Can't marshal the shard map")
+			}
 			// Build list of unacked nodes
 			// Note that this might include the local node as well, which
 			// is OK. The client part will behave like all other parts.
 			unacknowledgedNodes = append([]string{}, clusterNodes.Nodes...)
 
 			// TODO: use log message type
-			// Replicate via log
-			//if err := c.raftNode.AppendLogEntry(buf); err != nil {
-			//	// TODO: Check if I'm no longer the leader.
-			//	panic("Unable to publish log entry")
-			//}
+
+			// Replicate proposed shard map via log
+			if err := c.raftNode.AppendLogEntry(proposedShardMap); err != nil {
+				// We might have lost the leadership here. Log and continue.
+				if err := c.raftNode.ra.VerifyLeader().Error(); err == nil {
+					panic("I'm the leader but I could not write the log")
+				}
+				// otherwise -- just log it and continue
+				log.Printf("Could not write log entry for new shard map")
+			}
 
 			// Next messages will be ackReceived when the changes has replicated
 			// out to the other nodes.
@@ -383,10 +393,20 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 			// TODO: Log final commit message, establishing the new state in the cluster
 			log.Printf("STATE: ack complete. operational leader.")
 
+			// Confirm the shard map by writing a commit message in the log
+			currentShardMap = proposedShardMap
+			if err := c.raftNode.AppendLogEntry(currentShardMap); err != nil {
+				// We might have lost the leadership here. Panic if we're still
+				// the leader
+				if err := c.raftNode.ra.VerifyLeader().Error(); err == nil {
+					panic("I'm the leader but I could not write the log")
+				}
+				// otherwise -- just log it and continue
+				log.Printf("Could not write log entry for new shard map")
+			}
 			// ack is completed. Enable the new shard map for the cluster by
-			// sending a commit log message
-
-			// no further processing required
+			// sending a commit log message. No further processing is required
+			// here.
 			continue
 
 		case assumeFollower:
@@ -396,10 +416,11 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 
 		case newShardMapReceived:
 			log.Printf("STATE: shardmap received")
-			// update internal map and ack map via gRPC
+			// update internal map and ack map via gRPC (yes, even if I'm the
+			// leader)
 
 		case commitLogReceived:
-			log.Printf("STATE: commit log received. Operational follower")
+			log.Printf("STATE: commit log received. Operational.")
 			// commit log received, set state operational and resume normal
 			// operations. Signal to the rest of the library (channel)
 
