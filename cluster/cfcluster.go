@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -307,10 +308,7 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 	var unacknowledgedNodes []string
 	clusterNodes := newNodeCollection()
 	shardManager := sharding.NewShardManager()
-	var proposedShardMap []byte
-	var currentShardMap []byte
-	var err error
-
+	shardMapLogIndex := uint64(0)
 	for newState := range c.stateChannel {
 		switch newState.State {
 
@@ -342,10 +340,11 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 			// TODO: ShardManager needs a rewrite
 			shardManager.UpdateNodes(clusterNodes.Nodes...)
 
-			proposedShardMap, err = shardManager.MarshalBinary()
+			proposedShardMap, err := shardManager.MarshalBinary()
 			if err != nil {
-				panic("Can't marshal the shard map")
+				panic(fmt.Sprintf("Can't marshal the shard map: %v", err))
 			}
+			mapMessage := NewLogMessage(ProposedShardMap, proposedShardMap)
 			// Build list of unacked nodes
 			// Note that this might include the local node as well, which
 			// is OK. The client part will behave like all other parts.
@@ -354,15 +353,23 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 			// TODO: use log message type
 
 			// Replicate proposed shard map via log
-			if err := c.raftNode.AppendLogEntry(proposedShardMap); err != nil {
-				// We might have lost the leadership here. Log and continue.
-				if err := c.raftNode.ra.VerifyLeader().Error(); err == nil {
-					panic("I'm the leader but I could not write the log")
-				}
-				// otherwise -- just log it and continue
-				log.Printf("Could not write log entry for new shard map")
+			buf, err := mapMessage.MarshalBinary()
+			if err != nil {
+				panic(fmt.Sprintf("Unable to marshal the log message containing shard map: %v", err))
 			}
-
+			timeCall(func() {
+				if err := c.raftNode.AppendLogEntry(buf); err != nil {
+					// We might have lost the leadership here. Log and continue.
+					if err := c.raftNode.ra.VerifyLeader().Error(); err == nil {
+						panic("I'm the leader but I could not write the log")
+					}
+					// otherwise -- just log it and continue
+					log.Printf("Could not write log entry for new shard map")
+				}
+			}, "Appending shard map log entry")
+			// This is the index we want commits for.
+			shardMapLogIndex = c.raftNode.LastIndex()
+			log.Printf("Shard map index = %d", shardMapLogIndex)
 			// Next messages will be ackReceived when the changes has replicated
 			// out to the other nodes.
 			// No new state here - wait for a series of ackReceived states
@@ -394,8 +401,12 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 			log.Printf("STATE: ack complete. operational leader.")
 
 			// Confirm the shard map by writing a commit message in the log
-			currentShardMap = proposedShardMap
-			if err := c.raftNode.AppendLogEntry(currentShardMap); err != nil {
+			commitMessage := NewLogMessage(ShardMapCommitted, []byte{})
+			buf, err := commitMessage.MarshalBinary()
+			if err != nil {
+				panic(fmt.Sprintf("Unable to marshal commit message: %v", err))
+			}
+			if err := c.raftNode.AppendLogEntry(buf); err != nil {
 				// We might have lost the leadership here. Panic if we're still
 				// the leader
 				if err := c.raftNode.ra.VerifyLeader().Error(); err == nil {
