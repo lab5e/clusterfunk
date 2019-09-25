@@ -74,14 +74,18 @@ func BenchmarkWeightedShardManager(b *testing.B) {
 	}
 	sm.Init(benchmarkShardCount, weights)
 
+	var nodes []string
 	for i := 0; i < benchmarkNodeCount; i++ {
-		sm.AddNode(fmt.Sprintf("Node%04d", i))
+		nodes = append(nodes, fmt.Sprintf("Node%04d", i))
 	}
+	sm.UpdateNodes(nodes...)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		sm.AddNode("NodeXXX")
-		sm.RemoveNode("NodeXXX")
+		nodes = nodes[2:]
+		nodes = append(nodes, fmt.Sprintf("%d", i))
+		nodes = append(nodes, fmt.Sprintf("%db", i))
+		sm.UpdateNodes(nodes...)
 	}
 }
 
@@ -94,9 +98,11 @@ func BenchmarkMapToNode(b *testing.B) {
 	}
 	sm.Init(benchmarkShardCount, weights)
 
+	var nodes []string
 	for i := 0; i < benchmarkNodeCount; i++ {
-		sm.AddNode(fmt.Sprintf("Node%04d", i))
+		nodes = append(nodes, fmt.Sprintf("Node%04d", i))
 	}
+	sm.UpdateNodes(nodes...)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
@@ -137,10 +143,11 @@ func TestMarshalUnmarshalBinary(t *testing.T) {
 	}
 	sm := NewShardManager()
 	sm.Init(benchmarkShardCount, weights)
+	var nodes []string
 	for i := 0; i < benchmarkNodeCount; i++ {
-		sm.AddNode(fmt.Sprintf("Node%04d", i))
+		nodes = append(nodes, fmt.Sprintf("Node%04d", i))
 	}
-
+	sm.UpdateNodes(nodes...)
 	buf, err := sm.MarshalBinary()
 	if err != nil {
 		t.Fatal(err)
@@ -179,10 +186,11 @@ func BenchmarkMarshalManager(b *testing.B) {
 	}
 	sm := NewShardManager()
 	sm.Init(benchmarkShardCount, weights)
+	var nodes []string
 	for i := 0; i < benchmarkNodeCount; i++ {
-		sm.AddNode(fmt.Sprintf("Node%04d", i))
+		nodes = append(nodes, fmt.Sprintf("Node%04d", i))
 	}
-
+	sm.UpdateNodes(nodes...)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		sm.MarshalBinary()
@@ -196,10 +204,11 @@ func BenchmarkUnmarshalManager(b *testing.B) {
 	}
 	sm := NewShardManager()
 	sm.Init(benchmarkShardCount, weights)
+	nodes := []string{}
 	for i := 0; i < benchmarkNodeCount; i++ {
-		sm.AddNode(fmt.Sprintf("Node%04d", i))
+		nodes = append(nodes, fmt.Sprintf("Node%04d", i))
 	}
-
+	sm.UpdateNodes(nodes...)
 	buf, _ := sm.MarshalBinary()
 
 	newManager := NewShardManager()

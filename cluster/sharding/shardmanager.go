@@ -22,13 +22,6 @@ type Shard interface {
 	SetNodeID(nodeID string)
 }
 
-// ShardTransfer is an transfer operation on a shard, ie move from A to B.
-type ShardTransfer struct {
-	Shard             Shard
-	SourceNodeID      string
-	DestinationNodeID string
-}
-
 // ShardManager is a type that manages shards. The number of shards are immutable, ie
 // no new shards will be added for the lifetime. (shards can be added or removed
 // between invocations of the leader)
@@ -42,19 +35,8 @@ type ShardManager interface {
 	Init(maxShards int, weights []int) error
 
 	// UpdateNodes syncs the nodes internally in the cluster and reshards if
-	// necessary. The returned array will contain the required transfers.
-	//UpdateNodes(nodeID ...string) []ShardTransfer
-
-	// AddNode adds a new bucket. The returned shard operations are required
-	// to balance the shards across the buckets in the cluster. If the bucket
-	// already exists nil is returned. Performance critical since this is
-	// used when nodes join or leave the cluster.
-	AddNode(nodeID string) []ShardTransfer
-
-	// AddNode removes a bucket from the cluster. The returned shard operations
-	// are required to balance the shards across the buckets in the cluster.
-	// Performance critical since this is used when nodes join or leave the cluster.
-	RemoveNode(nodeID string) []ShardTransfer
+	// necessary.
+	UpdateNodes(nodeID ...string)
 
 	// GetNode returns the node (ID) responsible for the shards. Performance
 	// critical since this will be used in every single call to determine

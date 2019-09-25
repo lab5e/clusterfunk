@@ -88,26 +88,52 @@ func (sm *weightedShardManager) Init(maxShards int, weights []int) error {
 	}
 	return nil
 }
-
-func (sm *weightedShardManager) AddNode(nodeID string) []ShardTransfer {
+func (sm *weightedShardManager) UpdateNodes(nodeID ...string) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
+	var newNodes []string
+	var removedNodes []string
+
+	// Find the new nodes
+	for _, v := range nodeID {
+		_, exists := sm.nodes[v]
+		if !exists {
+			newNodes = append(newNodes, v)
+		}
+	}
+	for k := range sm.nodes {
+		found := false
+		for _, n := range nodeID {
+			if n == k {
+				// node exists, ignore it
+				found = true
+				break
+			}
+		}
+		if !found {
+			removedNodes = append(removedNodes, k)
+		}
+	}
+
+	for _, v := range newNodes {
+		sm.addNode(v)
+	}
+	for _, v := range removedNodes {
+		sm.removeNode(v)
+	}
+}
+
+func (sm *weightedShardManager) addNode(nodeID string) {
 	newNode := newNodeData(nodeID)
-	ret := make([]ShardTransfer, 0)
 
 	// Invariant: First node
 	if len(sm.nodes) == 0 {
 		for i := range sm.shards {
 			newNode.AddShard(sm.shards[i])
-			ret = append(ret, ShardTransfer{
-				Shard:             sm.shards[i],
-				SourceNodeID:      "",
-				DestinationNodeID: newNode.NodeID,
-			})
 		}
 		sm.nodes[nodeID] = newNode
-		return ret
+		return
 	}
 
 	//Invariant: Node # 2 or later
@@ -117,21 +143,13 @@ func (sm *weightedShardManager) AddNode(nodeID string) []ShardTransfer {
 		for v.TotalWeights > targetCount && v.TotalWeights > 0 {
 			shardToMove := v.RemoveShard(targetCount - v.TotalWeights)
 			newNode.AddShard(shardToMove)
-			ret = append(ret, ShardTransfer{
-				Shard:             shardToMove,
-				SourceNodeID:      v.NodeID,
-				DestinationNodeID: newNode.NodeID,
-			})
 		}
 		sm.nodes[k] = v
 	}
 	sm.nodes[nodeID] = newNode
-	return ret
 }
 
-func (sm *weightedShardManager) RemoveNode(nodeID string) []ShardTransfer {
-	sm.mutex.Lock()
-	defer sm.mutex.Unlock()
+func (sm *weightedShardManager) removeNode(nodeID string) {
 	nodeToRemove, exists := sm.nodes[nodeID]
 	if !exists {
 		panic(fmt.Sprintf("Unknown node ID: %s", nodeID))
@@ -140,25 +158,18 @@ func (sm *weightedShardManager) RemoveNode(nodeID string) []ShardTransfer {
 	// Invariant: This is the last node in the cluster. No point in
 	// generating transfers
 	if len(sm.nodes) == 0 {
-		return []ShardTransfer{}
+		return
 	}
 
-	ret := make([]ShardTransfer, 0)
 	targetCount := sm.totalWeight / len(sm.nodes)
 	for k, v := range sm.nodes {
 		//		fmt.Printf("Removing node %s: Node %s w=%d target=%d\n", nodeID, k, v.TotalWeights, targetCount)
 		for v.TotalWeights < targetCount && nodeToRemove.TotalWeights > 0 {
 			shardToMove := nodeToRemove.RemoveShard(targetCount - v.TotalWeights)
 			v.AddShard(shardToMove)
-			ret = append(ret, ShardTransfer{
-				Shard:             shardToMove,
-				SourceNodeID:      nodeToRemove.NodeID,
-				DestinationNodeID: v.NodeID,
-			})
 		}
 		sm.nodes[k] = v
 	}
-	return ret
 }
 
 func (sm *weightedShardManager) MapToNode(shardID int) Shard {
@@ -197,6 +208,10 @@ type shardWire struct {
 func (sm *weightedShardManager) MarshalBinary() ([]byte, error) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
+
+	if len(sm.nodes) == 0 {
+		return nil, errors.New("map does not contain any nodes")
+	}
 
 	msg := &shardpb.ShardDistribution{}
 	nodeMap := make(map[string]int32)

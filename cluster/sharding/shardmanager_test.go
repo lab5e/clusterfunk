@@ -56,15 +56,15 @@ func testShardManager(t *testing.T, manager ShardManager, maxShards int, weights
 	assert.NoError(manager.Init(len(weights), weights), "Regular init should work")
 	assert.Error(manager.Init(len(weights), weights), "Should not be allowed to init manager twice")
 
-	manager.AddNode("A")
+	manager.UpdateNodes("A")
 	verifyDistribution(t, manager)
 	verifyShards(t, manager, maxShards)
 
-	manager.AddNode("B")
+	manager.UpdateNodes("A", "B")
 	verifyDistribution(t, manager)
 	verifyShards(t, manager, maxShards)
 
-	manager.AddNode("C")
+	manager.UpdateNodes("A", "B", "C")
 	verifyDistribution(t, manager)
 	verifyShards(t, manager, maxShards)
 
@@ -72,23 +72,22 @@ func testShardManager(t *testing.T, manager ShardManager, maxShards int, weights
 		assert.NotEqual("", manager.MapToNode(i).NodeID(), "Shard %d is not mapped to a node", i)
 	}
 
-	manager.RemoveNode("B")
+	manager.UpdateNodes("A", "C")
 	verifyDistribution(t, manager)
 	verifyShards(t, manager, maxShards)
 
-	manager.RemoveNode("A")
+	manager.UpdateNodes("C")
 	verifyDistribution(t, manager)
 	verifyShards(t, manager, maxShards)
 
-	manager.RemoveNode("C")
+	manager.UpdateNodes([]string{}...)
 	verifyDistribution(t, manager)
 
 	require.Panics(t, func() { manager.MapToNode(-1) }, "Panics on invalid shard ID")
-	require.Panics(t, func() { manager.RemoveNode("unknown") }, "Panics on unknown node")
 }
 
 // These are sort-of-sensible defaults for benchmarks
 const (
 	benchmarkShardCount = 10000
-	benchmarkNodeCount  = 50
+	benchmarkNodeCount  = 10
 )
