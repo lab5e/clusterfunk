@@ -41,13 +41,17 @@ type ShardManager interface {
 	// Shard IDs are assigned from 0...maxShards-1
 	Init(maxShards int, weights []int) error
 
-	// AddBucket adds a new bucket. The returned shard operations are required
+	// UpdateNodes syncs the nodes internally in the cluster and reshards if
+	// necessary. The returned array will contain the required transfers.
+	//UpdateNodes(nodeID ...string) []ShardTransfer
+
+	// AddNode adds a new bucket. The returned shard operations are required
 	// to balance the shards across the buckets in the cluster. If the bucket
 	// already exists nil is returned. Performance critical since this is
 	// used when nodes join or leave the cluster.
 	AddNode(nodeID string) []ShardTransfer
 
-	// RemoveBucket removes a bucket from the cluster. The returned shard operations
+	// AddNode removes a bucket from the cluster. The returned shard operations
 	// are required to balance the shards across the buckets in the cluster.
 	// Performance critical since this is used when nodes join or leave the cluster.
 	RemoveNode(nodeID string) []ShardTransfer

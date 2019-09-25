@@ -1,7 +1,6 @@
 package cluster
 
 import (
-	"encoding"
 	"time"
 )
 
@@ -162,21 +161,3 @@ const (
 	// StateNone is the state reported when the node is in an unknown (raft) state
 	StateNone = "none"
 )
-
-// ShardMapper is the cluster's view of the Shard Manager type. It only concerns itself with
-// adding and removing nodes plus
-type ShardMapper interface {
-
-	// AddNode adds a new bucket. The returned shard operations are required
-	// to balance the shards across the buckets in the cluster. If the bucket
-	// already exists nil is returned. Performance critical since this is
-	// used when nodes join or leave the cluster.
-	AddNodes(nodeID ...string) error
-
-	// RemoveNode removes a bucket from the cluster. The returned shard operations
-	// are required to balance the shards across the buckets in the cluster.
-	// Performance critical since this is used when nodes join or leave the cluster.
-	RemoveNodes(nodeID ...string) error
-
-	encoding.BinaryMarshaler
-}

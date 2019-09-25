@@ -305,7 +305,6 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 	log.Printf("STATE: Launching")
 	var unacknowledgedNodes []string
 	clusterNodes := newNodeCollection()
-	var shardMap ShardMapper
 
 	for newState := range c.stateChannel {
 		switch newState.State {
@@ -338,11 +337,10 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 			// TODO: ShardManager needs a rewrite
 			//shardMap.AddNodes(newNodes...)
 			//shardMap.RemoveNodes(oldNodes...)
-
-			buf, err := shardMap.MarshalBinary()
-			if err != nil {
-				panic("Can't marhsal the shard map")
-			}
+			//buf, err := shardMap.MarshalBinary()
+			//if err != nil {
+			//	panic("Can't marshal the shard map")
+			//}
 			// Build list of unacked nodes
 			// Note that this might include the local node as well, which
 			// is OK. The client part will behave like all other parts.
@@ -350,10 +348,10 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 
 			// TODO: use log message type
 			// Replicate via log
-			if err := c.raftNode.AppendLogEntry(buf); err != nil {
-				// TODO: Check if I'm no longer the leader.
-				panic("Unable to publish log entry")
-			}
+			//if err := c.raftNode.AppendLogEntry(buf); err != nil {
+			//	// TODO: Check if I'm no longer the leader.
+			//	panic("Unable to publish log entry")
+			//}
 
 			// Next messages will be ackReceived when the changes has replicated
 			// out to the other nodes.
