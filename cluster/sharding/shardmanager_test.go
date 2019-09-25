@@ -88,6 +88,6 @@ func testShardManager(t *testing.T, manager ShardManager, maxShards int, weights
 
 // These are sort-of-sensible defaults for benchmarks
 const (
-	benchmarkShardCount = 10000
-	benchmarkNodeCount  = 10
+	benchmarkShardCount = 1000
+	benchmarkNodeCount  = 9
 )
