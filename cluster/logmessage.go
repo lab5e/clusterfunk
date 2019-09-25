@@ -10,10 +10,9 @@ const (
 	// to the followers. The payload for this message is a marshalled ShardManager
 	// instance.
 	ProposedShardMap LogMessageType = 1
-	// CommittedShardMap  is the shard map that is committed. It is identical to
-	// the proposed but is included for completeness' sake. The payload for this
-	// message is a marshalled ShardManager instance.
-	CommittedShardMap LogMessageType = 2
+	// ShardMapCommitted is a notification-only message that will synchronize the
+	// shard map distributed in the previous message.
+	ShardMapCommitted LogMessageType = 2
 )
 
 // LogMessage is log messages sent by the leader. There's only two types at this time.

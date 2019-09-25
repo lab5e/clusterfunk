@@ -92,9 +92,17 @@ func (r *RaftNode) Start(nodeID string, verboseLog bool, cfg RaftParameters) err
 	SnapshotInterval:   120 * time.Second,
 	LeaderLeaseTimeout: 500 * time.Millisecond,
 	*/
+	/* These might be too optimistic.
 	config.HeartbeatTimeout = 100 * time.Millisecond
 	config.ElectionTimeout = 100 * time.Millisecond
 	config.LeaderLeaseTimeout = 50 * time.Millisecond
+	*/
+
+	// Slightly
+	config.HeartbeatTimeout = 500 * time.Millisecond
+	config.ElectionTimeout = 500 * time.Millisecond
+	config.CommitTimeout = 25 * time.Millisecond
+	config.LeaderLeaseTimeout = 250 * time.Millisecond
 
 	// The transport logging is separate form the configuration transport. Obviously.
 	logger := io.Writer(os.Stderr)
@@ -135,8 +143,10 @@ func (r *RaftNode) Start(nodeID string, verboseLog bool, cfg RaftParameters) err
 		stableStore = raft.NewInmemStore()
 		snapshotStore = raft.NewInmemSnapshotStore()
 	}
+	fsm := newStateMachine()
+	go r.logObserver(fsm.Events)
 
-	r.ra, err = raft.NewRaft(config, newStateMachine(), logStore, stableStore, snapshotStore, transport)
+	r.ra, err = raft.NewRaft(config, fsm, logStore, stableStore, snapshotStore, transport)
 	if err != nil {
 		return err
 	}
@@ -159,9 +169,11 @@ func (r *RaftNode) Start(nodeID string, verboseLog bool, cfg RaftParameters) err
 	observerChan := make(chan raft.Observation)
 
 	go r.observerFunc(observerChan)
+
 	r.ra.RegisterObserver(raft.NewObserver(observerChan, true, func(*raft.Observation) bool { return true }))
 	log.Printf("Created Raft instance, binding to %s", transport.LocalAddr())
 	r.localNodeID = nodeID
+
 	return nil
 }
 
@@ -173,6 +185,22 @@ func (r *RaftNode) sendEvent(e RaftEvent) {
 	}
 }
 
+func (r *RaftNode) logObserver(ch chan fsmLogEvent) {
+	for ev := range ch {
+		switch ev.EventType {
+		case shardMapReceived:
+			log.Printf("Got shardmap log entry with index %d", ev.Index)
+			// Check if this is a current event (ie matches term and is current)
+		case commitEntryReceived:
+			log.Printf("Got commit entry with index %d", ev.Index)
+			// Check if this is relevant (ie matches term and is current)
+		case fsmReadyEvent:
+			//log.Printf("Ready. Last index = %d", ev.Index)
+		default:
+			log.Printf("Got unknown FSM event: id=%d, index=%d", ev.EventType, ev.Index)
+		}
+	}
+}
 func (r *RaftNode) observerFunc(ch chan raft.Observation) {
 	for k := range ch {
 		switch v := k.Data.(type) {
@@ -189,6 +217,7 @@ func (r *RaftNode) observerFunc(ch chan raft.Observation) {
 				NodeID: string(v.Peer.ID),
 			})
 		case raft.LeaderObservation:
+			log.Printf("Leader observation")
 			// No need for this. The RaftLeaderElected and RaftBecameLeader covers
 			// this event.
 		case raft.RaftState:
@@ -379,6 +408,16 @@ func (r *RaftNode) State() string {
 		return ""
 	}
 	return r.ra.State().String()
+}
+
+// LastIndex returns the last log index received
+func (r *RaftNode) LastIndex() uint64 {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	if r.ra == nil {
+		return 0
+	}
+	return r.ra.LastIndex()
 }
 
 // Events returns the event channel. There is only one
