@@ -179,7 +179,6 @@ func (r *RaftNode) Start(nodeID string, verboseLog bool, cfg RaftParameters) err
 	go r.observerFunc(observerChan)
 
 	r.ra.RegisterObserver(raft.NewObserver(observerChan, true, func(*raft.Observation) bool { return true }))
-	log.Printf("Created Raft instance, binding to %s", transport.LocalAddr())
 	r.localNodeID = nodeID
 
 	return nil
@@ -447,38 +446,4 @@ func (r *RaftNode) Events() <-chan RaftEvent {
 // specified type ID
 func (r *RaftNode) GetReplicatedLogMessage(id byte) []byte {
 	return r.fsm.Entry(id)
-}
-
-// --- temp methods below
-
-// RaftNodeTemp is ... a temp struct
-type RaftNodeTemp struct {
-	ID     string
-	State  string
-	Leader bool
-}
-
-// MemberList returns a list of nodes in the raft cluster
-func (r *RaftNode) MemberList() ([]RaftNodeTemp, error) {
-	r.mutex.RLock()
-	defer r.mutex.RUnlock()
-	if r.ra == nil {
-		return nil, errors.New("raft cluster is not started")
-	}
-	config := r.ra.GetConfiguration()
-	if err := config.Error(); err != nil {
-		return nil, err
-	}
-	leader := r.ra.Leader()
-
-	members := config.Configuration().Servers
-	ret := make([]RaftNodeTemp, len(members))
-	for i, v := range members {
-		ret[i] = RaftNodeTemp{
-			ID:     string(v.ID),
-			State:  v.Suffrage.String(),
-			Leader: (v.Address == leader),
-		}
-	}
-	return ret, nil
 }

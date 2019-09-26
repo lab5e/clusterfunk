@@ -10,8 +10,9 @@ const (
 	// to the followers. The payload for this message is a marshalled ShardManager
 	// instance.
 	ProposedShardMap LogMessageType = 1
-	// ShardMapCommitted is a notification-only message that will synchronize the
-	// shard map distributed in the previous message.
+	// ShardMapCommitted is a  message that will synchronize the
+	// shard map distributed in the previous message. The payload is the
+	// gRPC endpoint the clients should use to acknowledge the map.
 	ShardMapCommitted LogMessageType = 2
 )
 

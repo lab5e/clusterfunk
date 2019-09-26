@@ -10,6 +10,7 @@ require (
 	github.com/hashicorp/raft-boltdb v0.0.0-20190605210249-ef2e128ed477
 	github.com/hashicorp/serf v0.8.4
 	github.com/stretchr/testify v1.4.0
+	golang.org/x/net v0.0.0-20190311183353-d8887717615a
 	google.golang.org/grpc v1.24.0
 )
 

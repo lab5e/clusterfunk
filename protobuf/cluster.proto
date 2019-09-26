@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package clusteproto;
+package clusterproto;
 
 // ConfirmShardMapRequest is sent by followers to the leader to signal readyness
 // with the new shard map

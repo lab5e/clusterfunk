@@ -1,17 +1,5 @@
 package cluster
 
-// NodeKind is the type of node
-type NodeKind int
-
-const (
-	// Voter is a regular cluster member
-	Voter NodeKind = iota
-	// NonVoter is a cluster member without voting rights
-	NonVoter
-	// NonMember is node that is just a member of the swarm
-	NonMember
-)
-
 // Node is one of the participants in the cluster or in the swarm. A node
 // might be a full voting member, a non-voting member or just a member in the
 // swarm.
@@ -20,15 +8,15 @@ type Node interface {
 	ID() string
 
 	// Kind returns the type of node
-	Kind() NodeKind
+	Role() NodeRole
 
 	// Tags returns the node's tags
 	Tags() map[string]string
 }
 
 // NewNode creates a new node
-func NewNode(nodeID string, tags map[string]string, kind NodeKind) Node {
-	ret := &clusterNode{id: nodeID, tags: map[string]string{}, kind: kind}
+func NewNode(nodeID string, tags map[string]string, role NodeRole) Node {
+	ret := &clusterNode{id: nodeID, tags: map[string]string{}, role: role}
 	for k, v := range tags {
 		ret.tags[k] = v
 	}
@@ -38,15 +26,15 @@ func NewNode(nodeID string, tags map[string]string, kind NodeKind) Node {
 type clusterNode struct {
 	id   string
 	tags map[string]string
-	kind NodeKind
+	role NodeRole
 }
 
 func (n *clusterNode) ID() string {
 	return n.id
 }
 
-func (n *clusterNode) Kind() NodeKind {
-	return n.kind
+func (n *clusterNode) Role() NodeRole {
+	return n.role
 }
 
 func (n *clusterNode) Tags() map[string]string {

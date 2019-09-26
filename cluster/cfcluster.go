@@ -19,25 +19,27 @@ type clusterfunkCluster struct {
 	config        Parameters
 	registry      *utils.ZeroconfRegistry
 	name          string
+	localState    NodeState
+	localRole     NodeRole
 	mgmtServer    *grpc.Server
-	nodeState     NodeState
-	clusterState  State
 	eventChannels []chan Event
 	mutex         *sync.RWMutex
 	stateChannel  chan fsmEvent
+	shardManager  sharding.ShardManager
 }
 
 // NewCluster returns a new cluster (client)
-func NewCluster(params Parameters) Cluster {
+func NewCluster(params Parameters, shardManager sharding.ShardManager) Cluster {
 
 	ret := &clusterfunkCluster{
 		config:        params,
 		name:          params.ClusterName,
-		nodeState:     Initializing,
-		clusterState:  Startup,
+		localState:    Invalid,
+		localRole:     Unknown,
 		eventChannels: make([]chan Event, 0),
 		mutex:         &sync.RWMutex{},
 		stateChannel:  make(chan fsmEvent, 5),
+		shardManager:  shardManager,
 	}
 	go ret.clusterStateMachine()
 	return ret
@@ -48,8 +50,8 @@ func (c *clusterfunkCluster) Start() error {
 	if c.config.ClusterName == "" {
 		return errors.New("cluster name not specified")
 	}
-	log.Printf("Launch config: %+v", c.config)
 
+	c.setLocalState(Starting, true)
 	c.serfNode = NewSerfNode()
 
 	// Launch node management endpoint
@@ -61,7 +63,6 @@ func (c *clusterfunkCluster) Start() error {
 		c.registry = utils.NewZeroconfRegistry(c.config.ClusterName)
 
 		if !c.config.Raft.Bootstrap && c.config.Serf.JoinAddress == "" {
-			log.Printf("Looking for other Serf instances...")
 			var err error
 			addrs, err := c.registry.Resolve(1 * time.Second)
 			if err != nil {
@@ -72,7 +73,6 @@ func (c *clusterfunkCluster) Start() error {
 			}
 			c.config.Serf.JoinAddress = addrs[0]
 		}
-		log.Printf("Registering Serf endpoint (%s) in zeroconf", c.config.Serf.Endpoint)
 		if err := c.registry.Register(c.config.NodeID, utils.PortOfHostPort(c.config.Serf.Endpoint)); err != nil {
 			return err
 		}
@@ -100,7 +100,6 @@ func (c *clusterfunkCluster) Start() error {
 		return err
 	}
 
-	c.nodeState = Empty
 	return nil
 }
 
@@ -108,19 +107,19 @@ func (c *clusterfunkCluster) raftEvents(ch <-chan RaftEvent) {
 	for e := range ch {
 		switch e.Type {
 		case RaftNodeAdded:
-			log.Printf("EVENT: Node %s added", e.NodeID)
+			//log.Printf("EVENT: Node %s added", e.NodeID)
 			c.setFSMState(clusterSizeChanged, e.NodeID)
 
 		case RaftNodeRemoved:
-			log.Printf("EVENT: Node %s removed", e.NodeID)
+			//log.Printf("EVENT: Node %s removed", e.NodeID)
 			c.setFSMState(clusterSizeChanged, e.NodeID)
 
 		case RaftLeaderLost:
-			log.Printf("EVENT: Leader lost")
+			//log.Printf("EVENT: Leader lost")
 			c.setFSMState(leaderLost, "")
 
 		case RaftBecameLeader:
-			log.Printf("EVENT: Became leader")
+			//log.Printf("EVENT: Became leader")
 			c.setFSMState(assumeLeadership, "")
 			go func() {
 				// I'm the leader. Start resharding
@@ -147,20 +146,27 @@ func (c *clusterfunkCluster) raftEvents(ch <-chan RaftEvent) {
 	}
 }
 
+func (c *clusterfunkCluster) Role() NodeRole {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	return c.localRole
+}
+
+func (c *clusterfunkCluster) setRole(newRole NodeRole) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	c.localRole = newRole
+}
+
 func (c *clusterfunkCluster) processReplicatedLog(t byte, index uint64) {
 	buf := c.raftNode.GetReplicatedLogMessage(t)
 	if buf == nil {
 		panic(fmt.Sprintf("Could not find a message with type %d", t))
 	}
-	log.Printf("message is %d bytes", len(buf))
-	switch LogMessageType(t) {
-	case ProposedShardMap:
-		sm := sharding.NewShardManager()
-		if err := sm.UnmarshalBinary(buf); err != nil {
-			panic(fmt.Sprintf("Could not unmarshal shard map from log message: %v", err))
-		}
+	dumpMap := func() {
+		log.Println("================== shard map ======================")
 		nodes := make(map[string]int)
-		for _, v := range sm.Shards() {
+		for _, v := range c.shardManager.Shards() {
 			n := nodes[v.NodeID()]
 			n++
 			nodes[v.NodeID()] = n
@@ -168,6 +174,20 @@ func (c *clusterfunkCluster) processReplicatedLog(t byte, index uint64) {
 		for k, v := range nodes {
 			log.Printf("%-20s: %d shards", k, v)
 		}
+		log.Println("===================================================")
+	}
+	switch LogMessageType(t) {
+	case ProposedShardMap:
+		if c.Role() == Leader {
+			log.Printf("Already have an updated shard map")
+			dumpMap()
+			return
+		}
+		if err := c.shardManager.UnmarshalBinary(buf); err != nil {
+			panic(fmt.Sprintf("Could not unmarshal shard map from log message: %v", err))
+		}
+		dumpMap()
+		c.setFSMState(newShardMapReceived, c.raftNode.LocalNodeID())
 	case ShardMapCommitted:
 		log.Printf("Shard map is comitted by leader. Start serving!")
 	default:
@@ -241,48 +261,42 @@ func (c *clusterfunkCluster) AddLocalEndpoint(name, endpoint string) {
 }
 
 func (c *clusterfunkCluster) Events() <-chan Event {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 	ret := make(chan Event)
 	c.eventChannels = append(c.eventChannels, ret)
 	return ret
 }
 
-// State functions for cluster.
-
-func (c *clusterfunkCluster) setState(state State) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	c.clusterState = state
-}
-
-func (c *clusterfunkCluster) State() State {
+func (c *clusterfunkCluster) sendEvent(ev Event) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	return c.clusterState
+	for _, v := range c.eventChannels {
+
+		select {
+		case v <- ev:
+			// great success
+		case <-time.After(1 * time.Second):
+			// drop event
+		}
+	}
 }
 
-func (c *clusterfunkCluster) WaitForState(state State, timeout time.Duration) error {
-	var timeoutch <-chan time.Time
-	if timeout == 0 {
-		timeoutch = make(chan time.Time)
-	} else {
-		timeoutch = time.After(timeout)
-
+func (c *clusterfunkCluster) setLocalState(newState NodeState, lock bool) {
+	if lock {
+		c.mutex.Lock()
+		defer c.mutex.Unlock()
 	}
-	for {
-		select {
-		case <-timeoutch:
-			return errors.New("timed out waiting for cluster state")
-		default:
-			c.mutex.RLock()
-			s := c.clusterState
-			c.mutex.RUnlock()
-			if s == state {
-				return nil
-			}
-			time.Sleep(1 * time.Millisecond)
-		}
-
+	if c.localState != newState {
+		c.localState = newState
+		go c.sendEvent(Event{LocalState: c.localState})
 	}
+}
+
+func (c *clusterfunkCluster) LocalState() NodeState {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	return c.localState
 }
 
 // Cluster mutations -- this is best expressed as a state machine. The state
@@ -326,11 +340,6 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 	log.Printf("STATE: Launching")
 	var unacknowledgedNodes []string
 	clusterNodes := newNodeCollection()
-	shardManager := sharding.NewShardManager()
-	if err := shardManager.Init(numberOfShards, nil); err != nil {
-		panic(err)
-	}
-	log.Printf("Nodes = %d, Shards = %d", len(clusterNodes.Nodes), len(shardManager.Shards()))
 
 	shardMapLogIndex := uint64(0)
 	for newState := range c.stateChannel {
@@ -338,11 +347,13 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 
 		case assumeLeadership:
 			log.Printf("STATE: assume leader")
+			c.setRole(Leader)
 			// start with updating the node list
 			c.setFSMState(updateRaftNodeList, "")
 
 		case clusterSizeChanged:
 			log.Printf("STATE: Cluster size changed")
+			c.setLocalState(Resharding, true)
 			c.setFSMState(updateRaftNodeList, "")
 
 		case updateRaftNodeList:
@@ -362,9 +373,9 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 			// Reset the list of acked nodes.
 			log.Printf("STATE: reshardCluster")
 			// TODO: ShardManager needs a rewrite
-			shardManager.UpdateNodes(clusterNodes.Nodes...)
-			log.Printf("Nodes = %d, Shards = %d", len(clusterNodes.Nodes), len(shardManager.Shards()))
-			proposedShardMap, err := shardManager.MarshalBinary()
+			c.shardManager.UpdateNodes(clusterNodes.Nodes...)
+			log.Printf("Nodes = %d, Shards = %d", len(clusterNodes.Nodes), len(c.shardManager.Shards()))
+			proposedShardMap, err := c.shardManager.MarshalBinary()
 			if err != nil {
 				panic(fmt.Sprintf("Can't marshal the shard map: %v", err))
 			}
@@ -423,8 +434,9 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 		case ackCompleted:
 			// TODO: Log final commit message, establishing the new state in the cluster
 			log.Printf("STATE: ack complete. operational leader.")
-
-			// Confirm the shard map by writing a commit message in the log
+			// ack is completed. Enable the new shard map for the cluster by
+			// sending a commit log message. No further processing is required
+			// here.
 			commitMessage := NewLogMessage(ShardMapCommitted, []byte{})
 			buf, err := commitMessage.MarshalBinary()
 			if err != nil {
@@ -437,15 +449,15 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 					panic("I'm the leader but I could not write the log")
 				}
 				// otherwise -- just log it and continue
-				log.Printf("Could not write log entry for new shard map")
+				log.Printf("Could not write log entry for new shard map: %v", err)
 			}
-			// ack is completed. Enable the new shard map for the cluster by
-			// sending a commit log message. No further processing is required
-			// here.
+			c.setLocalState(Operational, true)
 			continue
 
 		case assumeFollower:
 			log.Printf("STATE: follower")
+			c.setRole(Follower)
+			c.setLocalState(Resharding, true)
 			// Not much happens here but the next state should be - if all
 			// goes well - a shard map log message from the leader.
 
@@ -453,14 +465,17 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 			log.Printf("STATE: shardmap received")
 			// update internal map and ack map via gRPC (yes, even if I'm the
 			// leader)
+			c.setLocalState(Resharding, true)
 
 		case commitLogReceived:
 			log.Printf("STATE: commit log received. Operational.")
 			// commit log received, set state operational and resume normal
 			// operations. Signal to the rest of the library (channel)
+			c.setLocalState(Operational, true)
 
 		case leaderLost:
 			log.Printf("STATE: leader lost")
+			c.setLocalState(Voting, true)
 			// leader is lost - stop processing until a leader is elected and
 			// the commit log is received
 		}
