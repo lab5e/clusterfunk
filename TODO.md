@@ -1,5 +1,6 @@
 # TODOs
-
+* Update node world view when new shard map is received.
+* Update leader node when a new leader is elected
 * Corner case: Client dies on startup when logs are replicated to it -- Raft does not
   detect a just-joined-and-died client. It's probably relevant for clients with
   persistent storage as well. (PR for Raft is in the works)
