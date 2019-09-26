@@ -4,6 +4,9 @@ import (
 	"time"
 )
 
+// TODO: get rid of this (user supplied)
+const numberOfShards = 10000
+
 // EventType is the event type for cluster events
 type EventType int
 

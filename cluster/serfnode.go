@@ -259,6 +259,8 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 			}
 		case serf.EventUser:
 		case serf.EventQuery:
+		case serf.EventMemberFailed:
+			log.Printf("Member has failed but I'm going to be vewy vewy quiet.")
 
 		default:
 			log.Printf("Unknown event: %+v", ev)

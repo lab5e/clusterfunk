@@ -10,8 +10,8 @@ import (
 )
 
 type fsmLogEvent struct {
-	Index uint64
-	Data  []byte
+	Index   uint64
+	LogType byte
 }
 
 // The Raft FSM is used by the clients to access the replicated log. Typically
@@ -36,10 +36,10 @@ func newStateMachine() *raftFSM {
 	}
 }
 
-func (f *raftFSM) logEvent(idx uint64, data []byte) {
+func (f *raftFSM) logEvent(idx uint64, logType byte) {
 	ev := fsmLogEvent{
-		Index: idx,
-		Data:  data,
+		Index:   idx,
+		LogType: logType,
 	}
 	// Why not use select...case...default? Well - it turns out the default clause
 	// is *really* picky so even a 10 us delay will discard the message. Nice to
@@ -58,7 +58,7 @@ func (f *raftFSM) logEvent(idx uint64, data []byte) {
 // method was called on the same Raft node as the FSM.
 func (f *raftFSM) Apply(l *raft.Log) interface{} {
 	//log.Printf("FSM: Apply, index = %d, term = %d", l.Index, l.Term)
-	f.logEvent(l.Index, l.Data)
+	f.logEvent(l.Index, l.Data[0])
 	if len(l.Data) > 1 {
 		f.mutex.Lock()
 		defer f.mutex.Unlock()

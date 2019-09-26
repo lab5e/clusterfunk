@@ -73,7 +73,7 @@ func (sm *weightedShardManager) Init(maxShards int, weights []int) error {
 		return errors.New("shards already set")
 	}
 
-	if len(weights) != maxShards {
+	if weights != nil && len(weights) != maxShards {
 		return errors.New("maxShards and len(weights) must be the same")
 	}
 

@@ -35,9 +35,10 @@ const (
 
 // RaftEvent is an event emitted by the RaftNode type
 type RaftEvent struct {
-	Type   RaftEventType // Type is the event type
-	NodeID string        // NodeID is the node ID of the source
-	Index  uint64        // Index is a log entry index (if relevant)
+	Type    RaftEventType // Type is the event type
+	NodeID  string        // NodeID is the node ID of the source
+	Index   uint64        // Index is a log entry index (if relevant)
+	LogType byte          // Log type identifier from log
 }
 
 // RaftNode is a wrapper for the Raft library
@@ -47,6 +48,7 @@ type RaftNode struct {
 	raftEndpoint string
 	ra           *raft.Raft
 	events       chan RaftEvent
+	fsm          *raftFSM
 }
 
 // NewRaftNode creates a new RaftNode instance
@@ -95,24 +97,27 @@ func (r *RaftNode) Start(nodeID string, verboseLog bool, cfg RaftParameters) err
 	SnapshotInterval:   120 * time.Second,
 	LeaderLeaseTimeout: 500 * time.Millisecond,
 	*/
-	/* These might be too optimistic.
+
+	//These might be too optimistic.
 	config.HeartbeatTimeout = 100 * time.Millisecond
 	config.ElectionTimeout = 100 * time.Millisecond
+	config.CommitTimeout = 5 * time.Millisecond
 	config.LeaderLeaseTimeout = 50 * time.Millisecond
-	*/
 
-	// Slightly
-	config.HeartbeatTimeout = 500 * time.Millisecond
-	config.ElectionTimeout = 500 * time.Millisecond
-	config.CommitTimeout = 25 * time.Millisecond
-	config.LeaderLeaseTimeout = 250 * time.Millisecond
+	/*
+		// Half the defaults
+		config.HeartbeatTimeout = 500 * time.Millisecond
+		config.ElectionTimeout = 500 * time.Millisecond
+		config.CommitTimeout = 25 * time.Millisecond
+		config.LeaderLeaseTimeout = 250 * time.Millisecond
+	*/
 
 	// The transport logging is separate form the configuration transport. Obviously.
 	logger := io.Writer(os.Stderr)
 	if !verboseLog {
 		logger = newMutedLogger().Writer()
 	}
-	transport, err := raft.NewTCPTransport(addr.String(), addr, 3, 5*time.Second, logger)
+	transport, err := raft.NewTCPTransport(addr.String(), addr, 3, 500*time.Millisecond, logger)
 	if err != nil {
 		return err
 	}
@@ -146,10 +151,10 @@ func (r *RaftNode) Start(nodeID string, verboseLog bool, cfg RaftParameters) err
 		stableStore = raft.NewInmemStore()
 		snapshotStore = raft.NewInmemSnapshotStore()
 	}
-	fsm := newStateMachine()
-	go r.logObserver(fsm.Events)
+	r.fsm = newStateMachine()
+	go r.logObserver(r.fsm.Events)
 
-	r.ra, err = raft.NewRaft(config, fsm, logStore, stableStore, snapshotStore, transport)
+	r.ra, err = raft.NewRaft(config, r.fsm, logStore, stableStore, snapshotStore, transport)
 	if err != nil {
 		return err
 	}
@@ -191,9 +196,10 @@ func (r *RaftNode) sendEvent(e RaftEvent) {
 func (r *RaftNode) logObserver(ch chan fsmLogEvent) {
 	for ev := range ch {
 		r.sendEvent(RaftEvent{
-			Type:   RaftReceivedLog,
-			NodeID: string(r.localNodeID),
-			Index:  ev.Index,
+			Type:    RaftReceivedLog,
+			NodeID:  string(r.localNodeID),
+			Index:   ev.Index,
+			LogType: ev.LogType,
 		})
 	}
 }
@@ -233,9 +239,21 @@ func (r *RaftNode) observerFunc(ch chan raft.Observation) {
 					NodeID: r.localNodeID,
 				})
 			}
-		case *raft.RequestVoteRequest:
+		case raft.PeerLiveness:
+			lt, ok := k.Data.(raft.PeerLiveness)
+			if ok {
+				if !lt.Heartbeat {
+					log.Printf("Peer %s has gone away", lt.ID)
+				}
+				if lt.Heartbeat {
+					log.Printf("Peer %s is back up", lt.ID)
+				}
+			}
+		case raft.RequestVoteRequest:
+			// Not using this at the moment
+
 		default:
-			log.Printf("Unknown Raft event: %+v", k)
+			log.Printf("Unknown Raft event: %+v (%T)", k, k.Data)
 		}
 	}
 }
@@ -424,6 +442,14 @@ func (r *RaftNode) LastIndex() uint64 {
 func (r *RaftNode) Events() <-chan RaftEvent {
 	return r.events
 }
+
+// GetReplicatedLogMessage returns the replicated log message with the
+// specified type ID
+func (r *RaftNode) GetReplicatedLogMessage(id byte) []byte {
+	return r.fsm.Entry(id)
+}
+
+// --- temp methods below
 
 // RaftNodeTemp is ... a temp struct
 type RaftNodeTemp struct {

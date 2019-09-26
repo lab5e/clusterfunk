@@ -99,23 +99,6 @@ func (c *clusterfunkCluster) Start() error {
 	if err := c.serfNode.Start(c.config.NodeID, c.config.Verbose, c.config.Serf); err != nil {
 		return err
 	}
-	// Populate local node list with list from Serf
-
-	/*	go func() {
-		for {
-			time.Sleep(5 * time.Second)
-			// note: needs a mutex when raft cluster shuts down. If a panic
-			// is raised when everything is going down the cluster will be
-			// up s**t creek
-			if c.raftNode.Leader() {
-				timeCall(func() {
-					if err := c.raftNode.AppendLogEntry(make([]byte, 89999)); err != nil {
-						log.Printf("Error writing log entry: %v", err)
-					}
-				}, "apply log")
-			}
-		}
-	}()*/
 
 	c.nodeState = Empty
 	return nil
@@ -144,6 +127,7 @@ func (c *clusterfunkCluster) raftEvents(ch <-chan RaftEvent) {
 				c.serfNode.SetTag(NodeRaftState, StateLeader)
 				c.serfNode.PublishTags()
 			}()
+
 		case RaftBecameFollower:
 			// Wait for the leader to redistribute the shards since it's the new leader
 			log.Printf("EVENT: Became follower")
@@ -152,7 +136,42 @@ func (c *clusterfunkCluster) raftEvents(ch <-chan RaftEvent) {
 				c.serfNode.SetTag(NodeRaftState, StateFollower)
 				c.serfNode.PublishTags()
 			}()
+
+		case RaftReceivedLog:
+			log.Printf("EVENT: Log (idx=%d, type=%d) received", e.Index, e.LogType)
+			c.processReplicatedLog(e.LogType, e.Index)
+
+		default:
+			log.Printf("Unknown event received: %+v", e)
 		}
+	}
+}
+
+func (c *clusterfunkCluster) processReplicatedLog(t byte, index uint64) {
+	buf := c.raftNode.GetReplicatedLogMessage(t)
+	if buf == nil {
+		panic(fmt.Sprintf("Could not find a message with type %d", t))
+	}
+	log.Printf("message is %d bytes", len(buf))
+	switch LogMessageType(t) {
+	case ProposedShardMap:
+		sm := sharding.NewShardManager()
+		if err := sm.UnmarshalBinary(buf); err != nil {
+			panic(fmt.Sprintf("Could not unmarshal shard map from log message: %v", err))
+		}
+		nodes := make(map[string]int)
+		for _, v := range sm.Shards() {
+			n := nodes[v.NodeID()]
+			n++
+			nodes[v.NodeID()] = n
+		}
+		for k, v := range nodes {
+			log.Printf("%-20s: %d shards", k, v)
+		}
+	case ShardMapCommitted:
+		log.Printf("Shard map is comitted by leader. Start serving!")
+	default:
+		log.Printf("Don't know how to process log type %d", t)
 	}
 }
 
@@ -308,6 +327,11 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 	var unacknowledgedNodes []string
 	clusterNodes := newNodeCollection()
 	shardManager := sharding.NewShardManager()
+	if err := shardManager.Init(numberOfShards, nil); err != nil {
+		panic(err)
+	}
+	log.Printf("Nodes = %d, Shards = %d", len(clusterNodes.Nodes), len(shardManager.Shards()))
+
 	shardMapLogIndex := uint64(0)
 	for newState := range c.stateChannel {
 		switch newState.State {
@@ -339,7 +363,7 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 			log.Printf("STATE: reshardCluster")
 			// TODO: ShardManager needs a rewrite
 			shardManager.UpdateNodes(clusterNodes.Nodes...)
-
+			log.Printf("Nodes = %d, Shards = %d", len(clusterNodes.Nodes), len(shardManager.Shards()))
 			proposedShardMap, err := shardManager.MarshalBinary()
 			if err != nil {
 				panic(fmt.Sprintf("Can't marshal the shard map: %v", err))

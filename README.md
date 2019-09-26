@@ -20,3 +20,9 @@ A silver bullet.
 ### Shard weights
 
 ## Limitations
+
+## Replicated log
+
+The replicated log is kept quite simple. The first byte indicates the message type
+and any log message type with an higher index overwrites the previous message in
+the log.
