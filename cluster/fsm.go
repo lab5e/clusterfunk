@@ -4,24 +4,14 @@ import (
 	"io"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/hashicorp/raft"
 )
 
-// These are the events emitted by the log. They are handled by the
-// cluster library.
-type fsmLogEventType byte
-
-const (
-	shardMapReceived fsmLogEventType = iota
-	commitEntryReceived
-	fsmReadyEvent
-)
-
 type fsmLogEvent struct {
-	EventType fsmLogEventType
-	Index     uint64
-	Data      []byte
+	Index uint64
+	Data  []byte
 }
 
 // The Raft FSM is used by the clients to access the replicated log. Typically
@@ -31,28 +21,34 @@ type fsmLogEvent struct {
 // The Events channel is a single listener that only the clustering library
 // will listen on. Expect weird behaviour if more than one client is ingesting
 // the messages.
-type raftFsm struct {
+type raftFSM struct {
 	Events chan fsmLogEvent
+	state  map[byte][]byte
 	mutex  *sync.Mutex
 }
 
 // newStateMaching creates a new client-side FSM
-func newStateMachine() *raftFsm {
-	return &raftFsm{Events: make(chan fsmLogEvent), mutex: &sync.Mutex{}}
-}
-func (r *raftFsm) SignalReady(lastIndex uint64) {
-	r.logEvent(fsmReadyEvent, lastIndex, []byte{})
-}
-func (r *raftFsm) logEvent(et fsmLogEventType, idx uint64, data []byte) {
-	ev := fsmLogEvent{
-		EventType: et,
-		Index:     idx,
-		Data:      data,
+func newStateMachine() *raftFSM {
+	return &raftFSM{
+		Events: make(chan fsmLogEvent),
+		state:  make(map[byte][]byte),
+		mutex:  &sync.Mutex{},
 	}
+}
+
+func (f *raftFSM) logEvent(idx uint64, data []byte) {
+	ev := fsmLogEvent{
+		Index: idx,
+		Data:  data,
+	}
+	// Why not use select...case...default? Well - it turns out the default clause
+	// is *really* picky so even a 10 us delay will discard the message. Nice to
+	// know.
 	select {
-	case r.Events <- ev:
-	default:
-		// drop the event.
+	case f.Events <- ev:
+	case <-time.After(1 * time.Millisecond):
+		// drop the event. Panic is a bit strict but nice for debugging.
+		panic("dropped event from FSM")
 	}
 }
 
@@ -60,22 +56,16 @@ func (r *raftFsm) logEvent(et fsmLogEventType, idx uint64, data []byte) {
 // It returns a value which will be made available in the
 // ApplyFuture returned by Raft.Apply method if that
 // method was called on the same Raft node as the FSM.
-func (r *raftFsm) Apply(l *raft.Log) interface{} {
+func (f *raftFSM) Apply(l *raft.Log) interface{} {
 	//log.Printf("FSM: Apply, index = %d, term = %d", l.Index, l.Term)
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	logMsg := NewLogMessage(0, nil)
-	if err := logMsg.UnmarshalBinary(l.Data); err != nil {
-		log.Printf("Couldn't unmarshal log message: %v (id=%d, len=%d)", err, l.Data[0], len(l.Data))
-	}
-	switch logMsg.MessageType {
-	case ProposedShardMap:
-		r.logEvent(shardMapReceived, l.Index, l.Data)
-	case ShardMapCommitted:
-		r.logEvent(commitEntryReceived, l.Index, l.Data)
-	default:
-		log.Printf("Unknown log message type received: id=%d, len=%d", logMsg.MessageType, len(logMsg.Data))
-
+	f.logEvent(l.Index, l.Data)
+	if len(l.Data) > 1 {
+		f.mutex.Lock()
+		defer f.mutex.Unlock()
+		id := l.Data[0]
+		buf := make([]byte, len(l.Data)-1)
+		copy(buf, l.Data[1:])
+		f.state[id] = buf
 	}
 	return nil
 }
@@ -86,15 +76,27 @@ func (r *raftFsm) Apply(l *raft.Log) interface{} {
 // threads, but Apply will be called concurrently with Persist. This means
 // the FSM should be implemented in a fashion that allows for concurrent
 // updates while a snapshot is happening.
-func (r *raftFsm) Snapshot() (raft.FSMSnapshot, error) {
-	log.Printf("FSM: Snapshot")
+func (f *raftFSM) Snapshot() (raft.FSMSnapshot, error) {
 	return &raftSnapshot{}, nil
+}
+
+// Entry returns the latest log message with that particular ID
+func (f *raftFSM) Entry(id byte) []byte {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+	buf, exists := f.state[id]
+	if !exists {
+		return nil
+	}
+	ret := make([]byte, len(buf))
+	copy(ret, buf)
+	return ret
 }
 
 // Restore is used to restore an FSM from a snapshot. It is not called
 // concurrently with any other command. The FSM must discard all previous
 // state.
-func (r *raftFsm) Restore(io.ReadCloser) error {
+func (f *raftFSM) Restore(io.ReadCloser) error {
 	log.Printf("FSM: Restore")
 	return nil
 }
@@ -112,5 +114,5 @@ func (r *raftSnapshot) Persist(sink raft.SnapshotSink) error {
 
 // Release is invoked when we are finished with the snapshot.
 func (r *raftSnapshot) Release() {
-	log.Printf("FSMSnapshot: Release")
+	// nothing happens here.
 }

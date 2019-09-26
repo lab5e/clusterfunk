@@ -29,12 +29,15 @@ const (
 	RaftBecameLeader
 	// RaftBecameFollower is emitted when the node becomes a follower
 	RaftBecameFollower
+	// RaftReceivedLog is emitted when a log entry is receievd
+	RaftReceivedLog
 )
 
 // RaftEvent is an event emitted by the RaftNode type
 type RaftEvent struct {
-	Type   RaftEventType
-	NodeID string
+	Type   RaftEventType // Type is the event type
+	NodeID string        // NodeID is the node ID of the source
+	Index  uint64        // Index is a log entry index (if relevant)
 }
 
 // RaftNode is a wrapper for the Raft library
@@ -187,18 +190,11 @@ func (r *RaftNode) sendEvent(e RaftEvent) {
 
 func (r *RaftNode) logObserver(ch chan fsmLogEvent) {
 	for ev := range ch {
-		switch ev.EventType {
-		case shardMapReceived:
-			log.Printf("Got shardmap log entry with index %d", ev.Index)
-			// Check if this is a current event (ie matches term and is current)
-		case commitEntryReceived:
-			log.Printf("Got commit entry with index %d", ev.Index)
-			// Check if this is relevant (ie matches term and is current)
-		case fsmReadyEvent:
-			//log.Printf("Ready. Last index = %d", ev.Index)
-		default:
-			log.Printf("Got unknown FSM event: id=%d, index=%d", ev.EventType, ev.Index)
-		}
+		r.sendEvent(RaftEvent{
+			Type:   RaftReceivedLog,
+			NodeID: string(r.localNodeID),
+			Index:  ev.Index,
+		})
 	}
 }
 func (r *RaftNode) observerFunc(ch chan raft.Observation) {
@@ -217,9 +213,8 @@ func (r *RaftNode) observerFunc(ch chan raft.Observation) {
 				NodeID: string(v.Peer.ID),
 			})
 		case raft.LeaderObservation:
-			log.Printf("Leader observation")
-			// No need for this. The RaftLeaderElected and RaftBecameLeader covers
-			// this event.
+			// This can be ignored since we're monitoring the state
+			// and are getting the leader info via other channels.
 		case raft.RaftState:
 			switch v {
 			case raft.Candidate:
@@ -239,6 +234,8 @@ func (r *RaftNode) observerFunc(ch chan raft.Observation) {
 				})
 			}
 		case *raft.RequestVoteRequest:
+		default:
+			log.Printf("Unknown Raft event: %+v", k)
 		}
 	}
 }
