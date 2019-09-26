@@ -260,7 +260,18 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 		case serf.EventUser:
 		case serf.EventQuery:
 		case serf.EventMemberFailed:
-			log.Printf("Member has failed but I'm going to be vewy vewy quiet.")
+			e, ok := ev.(serf.MemberEvent)
+			if !ok {
+				continue
+			}
+			for _, v := range e.Members {
+				s.sendEvent(NodeEvent{
+					NodeID: v.Name,
+					Tags:   v.Tags,
+					Joined: false,
+					Update: true,
+				})
+			}
 
 		default:
 			log.Printf("Unknown event: %+v", ev)

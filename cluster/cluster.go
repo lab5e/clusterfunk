@@ -57,6 +57,12 @@ type Cluster interface {
 	// Nodes return a list of the active nodes in the cluster
 	Nodes() []Node
 
+	// LeaderNode returns the leader of the cluster
+	LeaderNode() Node
+
+	// LocalNode returns the local node
+	LocalNode() Node
+
 	// Events returns an event channel for the cluster. The channel will
 	// be closed when the cluster is stopped. Events are for information only
 	Events() <-chan Event

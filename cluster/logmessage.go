@@ -11,8 +11,7 @@ const (
 	// instance.
 	ProposedShardMap LogMessageType = 1
 	// ShardMapCommitted is a  message that will synchronize the
-	// shard map distributed in the previous message. The payload is the
-	// gRPC endpoint the clients should use to acknowledge the map.
+	// shard map distributed in the previous message.
 	ShardMapCommitted LogMessageType = 2
 )
 

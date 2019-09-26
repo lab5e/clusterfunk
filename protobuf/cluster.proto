@@ -19,4 +19,3 @@ message ConfirmShardMapResponse {
 service ClusterLeaderService {
     rpc ConfirmShardMap(ConfirmShardMapRequest) returns (ConfirmShardMapResponse);
 }
-

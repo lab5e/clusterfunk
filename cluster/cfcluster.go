@@ -229,12 +229,21 @@ func (c *clusterfunkCluster) serfEvents(ch <-chan NodeEvent) {
 }
 
 func (c *clusterfunkCluster) Stop() {
+	c.setLocalState(Stopping, true)
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 	if c.raftNode != nil {
 		c.raftNode.Stop()
+		c.raftNode = nil
 	}
 	if c.serfNode != nil {
 		c.serfNode.Stop()
+		c.serfNode = nil
 	}
+
+	c.localRole = Unknown
+	c.setLocalState(Invalid, false)
 }
 
 func (c *clusterfunkCluster) Name() string {
@@ -244,11 +253,15 @@ func (c *clusterfunkCluster) Name() string {
 func (c *clusterfunkCluster) Nodes() []Node {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	return nil
+	panic("not implemented")
 }
 
 func (c *clusterfunkCluster) LocalNode() Node {
-	return nil
+	panic("not implemented")
+}
+
+func (c *clusterfunkCluster) LeaderNode() Node {
+	panic("not implemented")
 }
 
 func (c *clusterfunkCluster) AddLocalEndpoint(name, endpoint string) {
@@ -465,6 +478,7 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 			log.Printf("STATE: shardmap received")
 			// update internal map and ack map via gRPC (yes, even if I'm the
 			// leader)
+			//endpoint := c.LeaderNode().GetEndpoint(LeaderEndpoint)
 			c.setLocalState(Resharding, true)
 
 		case commitLogReceived:
@@ -489,21 +503,21 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 func (c *clusterfunkCluster) updateNode(nodeID string, tags map[string]string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-
+	log.Printf("CLUSTER Update node %s", nodeID)
 }
 
 // addNode adds a new node
 func (c *clusterfunkCluster) addNode(nodeID string, tags map[string]string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-
+	log.Printf("CLUSTER Add node %s", nodeID)
 }
 
 // removeNode removes the node
 func (c *clusterfunkCluster) removeNode(nodeID string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-
+	log.Printf("CLUSTER Remove node %s", nodeID)
 }
 
 func (c *clusterfunkCluster) DumpNodes() {
