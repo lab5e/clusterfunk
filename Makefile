@@ -1,4 +1,4 @@
-all: generate test bins
+all: test bins
 
 clean:
 	go clean
