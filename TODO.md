@@ -1,10 +1,7 @@
 # TODOs
-* Update node world view when new shard map is received.
-* Update leader node when a new leader is elected
 * Corner case: Client dies on startup when logs are replicated to it -- Raft does not
   detect a just-joined-and-died client. It's probably relevant for clients with
   persistent storage as well. (PR for Raft is in the works)
-* Figure out if there's a way to skip old log entries when starting up. (check leader's index vs client index?)
 * Proper FSM and log
 * Replicate logs with SQLite
 * Turn off auto-join/leave for Serf in production clusters
@@ -13,5 +10,3 @@
   some additional machinery on the outside.
 * Open source the parameters library (flags is cumbersome)
 * Complete demo with work spread across nodes
-
-* gRPC for leader tasks (redistribute shards, node join et al)
