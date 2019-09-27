@@ -4,7 +4,7 @@ package cluster
 const numberOfShards = 10000
 
 // NodeState is the enumeration of different states a node can be in.
-type NodeState byte
+type NodeState int32
 
 // These are the (local) states the cluster node can be in
 const (
@@ -18,14 +18,20 @@ const (
 )
 
 // NodeRole is the roles the node can have in the cluster
-type NodeRole byte
+type NodeRole int32
 
 // These are the roles the node might have in the cluster
 const (
-	Unknown  NodeRole = iota // Uknown state
-	Follower                 // A follower in a cluster
-	Leader                   // The current leader node
-	NonVoter                 // Non voting role in cluster
+	Unknown   NodeRole = iota // Uknown state
+	Follower                  // A follower in a cluster
+	Leader                    // The current leader node
+	NonVoter                  // Non voting role in cluster
+	NonMember                 // NonMember nodes are part of the Serf cluster but not the Raft cluste
+)
+
+const (
+	// SerfStatusKey is the key for the serf status
+	SerfStatusKey = "serf.status"
 )
 
 // Event is the interface for cluster events that are triggered
@@ -75,11 +81,6 @@ type Cluster interface {
 // The following are internal tags and values for nodes
 const (
 	clusterEndpointPrefix = "ep."
-	RaftNodeID            = "raft.nodeid"
-	NodeType              = "kind"
-	VoterKind             = "member"
-	NonvoterKind          = "nonvoter"
-	NodeRaftState         = "raft.state"
 )
 
 // The following is a list of well-known endpoints on nodes
@@ -91,13 +92,4 @@ const (
 	RaftEndpoint       = "ep.raft"
 	LeaderEndpoint     = "ep.leader"
 	ManagementEndpoint = "ep.management" //  gRPC endpoint for management
-)
-
-const (
-	// StateLeader is the state reported in the Serf cluster tags
-	StateLeader = "leader"
-	// StateFollower is the state reported when the node is in the follower state
-	StateFollower = "follower"
-	// StateNone is the state reported when the node is in an unknown (raft) state
-	StateNone = "none"
 )

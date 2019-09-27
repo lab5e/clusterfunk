@@ -4,7 +4,38 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
+
+func TestNodeUpdate(t *testing.T) {
+	assert := require.New(t)
+	sm := NewShardManager()
+	assert.NoError(sm.Init(10000, nil))
+
+	sm.UpdateNodes("A")
+	assert.Len(sm.NodeList(), 1)
+	sm.UpdateNodes("B", "A")
+	assert.Len(sm.NodeList(), 2)
+
+	sm.UpdateNodes("C", "B", "A")
+	assert.Len(sm.NodeList(), 3)
+
+	sm.UpdateNodes("A", "B", "C", "D")
+	assert.Len(sm.NodeList(), 4)
+
+	sm.UpdateNodes("E", "A", "B", "C", "D")
+	assert.Len(sm.NodeList(), 5)
+
+	sm.UpdateNodes("C", "B", "A", "E", "D", "F")
+	assert.Len(sm.NodeList(), 6)
+
+	sm.UpdateNodes("A", "B", "C")
+	assert.Len(sm.NodeList(), 3)
+
+	sm.UpdateNodes("D", "A", "B", "C")
+	assert.Len(sm.NodeList(), 4)
+}
 
 // TestNodeData is an internal test
 func TestNodeData(t *testing.T) {

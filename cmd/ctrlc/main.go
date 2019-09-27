@@ -127,7 +127,6 @@ func randomHostPort() string {
 func findRaftNode(joinEndpoint string) (string, error) {
 
 	serfNode := cluster.NewSerfNode()
-	serfNode.SetTag(cluster.NodeType, cluster.NonvoterKind)
 	if err := serfNode.Start(utils.RandomID(), false, cluster.SerfParameters{
 		Endpoint:    randomHostPort(),
 		JoinAddress: joinEndpoint,
@@ -151,6 +150,9 @@ func connectToRaftNode(config utils.GRPCClientParam) (clustermgmt.ClusterManagem
 		return nil, err
 	}
 	conn, err := grpc.Dial(config.ServerEndpoint, opts...)
+	if err != nil {
+		return nil, err
+	}
 	return clustermgmt.NewClusterManagementClient(conn), nil
 }
 

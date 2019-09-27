@@ -54,6 +54,9 @@ type ShardManager interface {
 	// its weight.
 	TotalWeight() int
 
+	// NodeList returns a list of nodes in the shard map
+	NodeList() []string
+
 	// The marshaling methods are used to save and restore the shard manager
 	// from the Raft log.
 

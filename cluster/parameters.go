@@ -19,16 +19,18 @@ type GRPCServerParameters struct {
 // Parameters is the parameters required for the cluster. The defaults are
 // suitable for a development cluster but not for a production cluster.
 type Parameters struct {
-	Raft        RaftParameters
-	Serf        SerfParameters
-	AutoJoin    bool   `param:"desc=Auto join via SerfEvents;default=true"`
-	ClusterName string `param:"desc=Cluster name;default=clusterfunk"`
-	Interface   string `param:"desc=Interface address for services"`
-	Verbose     bool   `param:"desc=Verbose logging for Serf and Raft;default=false"`
-	NodeID      string `param:"desc=Node ID for Serf and Raft;default="`
-	ZeroConf    bool   `param:"desc=Zero-conf startup;default=true"`
-	Management  GRPCServerParameters
-	NonVoting   bool `param:"desc=Nonvoting node;default=false"`
+	Raft           RaftParameters
+	Serf           SerfParameters
+	AutoJoin       bool   `param:"desc=Auto join via SerfEvents;default=true"`
+	ClusterName    string `param:"desc=Cluster name;default=clusterfunk"`
+	Interface      string `param:"desc=Interface address for services"`
+	Verbose        bool   `param:"desc=Verbose logging for Serf and Raft;default=false"`
+	NodeID         string `param:"desc=Node ID for Serf and Raft;default="`
+	ZeroConf       bool   `param:"desc=Zero-conf startup;default=true"`
+	Management     GRPCServerParameters
+	NonVoting      bool   `param:"desc=Nonvoting node;default=false"`
+	NonMember      bool   `param:"desc=Non-member;default=false"`
+	LeaderEndpoint string // This isn't a parameter, it's set by the service
 }
 
 func (p *Parameters) checkAndSetEndpoint(hostport *string) {
@@ -56,16 +58,9 @@ func (p *Parameters) final() {
 	p.checkAndSetEndpoint(&p.Raft.RaftEndpoint)
 	p.checkAndSetEndpoint(&p.Serf.Endpoint)
 	p.checkAndSetEndpoint(&p.Management.Endpoint)
+	p.checkAndSetEndpoint(&p.LeaderEndpoint)
 
 	if p.Verbose {
 		log.Printf("Configuration: %+v", p)
 	}
-}
-
-// NodeType returns the type of node this will be announced as.
-func (p *Parameters) NodeType() string {
-	if p.NonVoting {
-		return NonvoterKind
-	}
-	return VoterKind
 }

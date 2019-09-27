@@ -3,42 +3,24 @@ package cluster
 // Node is one of the participants in the cluster or in the swarm. A node
 // might be a full voting member, a non-voting member or just a member in the
 // swarm.
-type Node interface {
+type Node struct {
 	// ID returns the node ID. This is an unique string in the cluster
-	ID() string
+	ID string
 
 	// Kind returns the type of node
-	Role() NodeRole
+	Role NodeRole
 
 	// Tags returns the node's tags
-	Tags() map[string]string
+	Tags map[string]string
 }
 
 // NewNode creates a new node
 func NewNode(nodeID string, tags map[string]string, role NodeRole) Node {
-	ret := &clusterNode{id: nodeID, tags: map[string]string{}, role: role}
+	ret := Node{ID: nodeID, Tags: map[string]string{}, Role: role}
 	for k, v := range tags {
-		ret.tags[k] = v
+		ret.Tags[k] = v
 	}
 	return ret
-}
-
-type clusterNode struct {
-	id   string
-	tags map[string]string
-	role NodeRole
-}
-
-func (n *clusterNode) ID() string {
-	return n.id
-}
-
-func (n *clusterNode) Role() NodeRole {
-	return n.role
-}
-
-func (n *clusterNode) Tags() map[string]string {
-	return n.tags
 }
 
 // NodeCollection is a collection of nodes. The events from raft might

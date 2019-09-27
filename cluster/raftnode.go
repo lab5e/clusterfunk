@@ -35,10 +35,10 @@ const (
 
 // RaftEvent is an event emitted by the RaftNode type
 type RaftEvent struct {
-	Type    RaftEventType // Type is the event type
-	NodeID  string        // NodeID is the node ID of the source
-	Index   uint64        // Index is a log entry index (if relevant)
-	LogType byte          // Log type identifier from log
+	Type    RaftEventType  // Type is the event type
+	NodeID  string         // NodeID is the node ID of the source
+	Index   uint64         // Index is a log entry index (if relevant)
+	LogType LogMessageType // Log type identifier from log
 }
 
 // RaftNode is a wrapper for the Raft library
@@ -187,7 +187,7 @@ func (r *RaftNode) Start(nodeID string, verboseLog bool, cfg RaftParameters) err
 func (r *RaftNode) sendEvent(e RaftEvent) {
 	select {
 	case r.events <- e:
-	default:
+	case <-time.After(1 * time.Second):
 		log.Printf("**** Nobody's listening to me! ev = %+v", e)
 	}
 }
@@ -220,6 +220,7 @@ func (r *RaftNode) observerFunc(ch chan raft.Observation) {
 		case raft.LeaderObservation:
 			// This can be ignored since we're monitoring the state
 			// and are getting the leader info via other channels.
+
 		case raft.RaftState:
 			switch v {
 			case raft.Candidate:
@@ -368,13 +369,17 @@ func (r *RaftNode) Leader() bool {
 
 // AppendLogEntry appends a log entry to the log. The function returns when
 // there's a quorum in the cluster
-func (r *RaftNode) AppendLogEntry(data []byte) error {
+func (r *RaftNode) AppendLogEntry(data []byte) (uint64, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	if r.ra == nil {
-		return errors.New("raft node not started")
+		return 0, errors.New("raft node not started")
 	}
-	return r.ra.Apply(data, time.Second*2).Error()
+	f := r.ra.Apply(data, time.Second*2)
+	if err := f.Error(); err != nil {
+		return 0, err
+	}
+	return f.Index(), nil
 }
 
 // Members returns a list of the node IDs that are a member of the cluster
@@ -444,6 +449,6 @@ func (r *RaftNode) Events() <-chan RaftEvent {
 
 // GetReplicatedLogMessage returns the replicated log message with the
 // specified type ID
-func (r *RaftNode) GetReplicatedLogMessage(id byte) []byte {
+func (r *RaftNode) GetReplicatedLogMessage(id LogMessageType) LogMessage {
 	return r.fsm.Entry(id)
 }

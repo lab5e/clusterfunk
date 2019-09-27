@@ -3,6 +3,7 @@ package sharding
 import (
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/golang/protobuf/proto"
@@ -19,10 +20,20 @@ func newNodeData(nodeID string) *nodeData {
 	return &nodeData{NodeID: nodeID, TotalWeights: 0, Shards: make([]Shard, 0)}
 }
 
+func (nd *nodeData) checkTotalWeight() {
+	tot := 0
+	for _, n := range nd.Shards {
+		tot += n.Weight()
+	}
+	if tot != nd.TotalWeights {
+		panic(fmt.Sprintf("Total weight is %d not %d", tot, nd.TotalWeights))
+	}
+}
 func (nd *nodeData) AddShard(shard Shard) {
 	shard.SetNodeID(nd.NodeID)
 	nd.TotalWeights += shard.Weight()
 	nd.Shards = append(nd.Shards, shard)
+	nd.checkTotalWeight()
 }
 
 func (nd *nodeData) RemoveShard(preferredWeight int) Shard {
@@ -30,6 +41,7 @@ func (nd *nodeData) RemoveShard(preferredWeight int) Shard {
 		if v.Weight() <= preferredWeight {
 			nd.Shards = append(nd.Shards[:i], nd.Shards[i+1:]...)
 			nd.TotalWeights -= v.Weight()
+			nd.checkTotalWeight()
 			return v
 		}
 	}
@@ -39,16 +51,17 @@ func (nd *nodeData) RemoveShard(preferredWeight int) Shard {
 	// This will cause a panic if there's no shards left. That's OK.
 	// Future me might disagree.
 	ret := nd.Shards[0]
-	if len(nd.Shards) > 1 {
+	if len(nd.Shards) >= 1 {
 		nd.Shards = nd.Shards[1:]
 	}
 	nd.TotalWeights -= ret.Weight()
+	nd.checkTotalWeight()
 	return ret
 }
 
 type weightedShardManager struct {
 	shards      []Shard
-	mutex       *sync.Mutex
+	mutex       *sync.RWMutex
 	totalWeight int
 	nodes       map[string]*nodeData
 }
@@ -57,7 +70,7 @@ type weightedShardManager struct {
 func NewShardManager() ShardManager {
 	return &weightedShardManager{
 		shards:      make([]Shard, 0),
-		mutex:       &sync.Mutex{},
+		mutex:       &sync.RWMutex{},
 		totalWeight: 0,
 		nodes:       make(map[string]*nodeData),
 	}
@@ -85,9 +98,13 @@ func (sm *weightedShardManager) Init(maxShards int, weights []int) error {
 		}
 		sm.totalWeight += weight
 		sm.shards[i] = NewShard(i, weight)
+		if weight == 0 {
+			return fmt.Errorf("Can't use weight = 0 for shard %d", i)
+		}
 	}
 	return nil
 }
+
 func (sm *weightedShardManager) UpdateNodes(nodeID ...string) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
@@ -120,6 +137,7 @@ func (sm *weightedShardManager) UpdateNodes(nodeID ...string) {
 		sm.addNode(v)
 	}
 	for _, v := range removedNodes {
+		log.Printf("Removing node %s", v)
 		sm.removeNode(v)
 	}
 }
@@ -158,23 +176,34 @@ func (sm *weightedShardManager) removeNode(nodeID string) {
 	// Invariant: This is the last node in the cluster. No point in
 	// generating transfers
 	if len(sm.nodes) == 0 {
+		for i := range sm.shards {
+			sm.shards[i].SetNodeID("")
+		}
 		return
 	}
 
 	targetCount := sm.totalWeight / len(sm.nodes)
 	for k, v := range sm.nodes {
 		//		fmt.Printf("Removing node %s: Node %s w=%d target=%d\n", nodeID, k, v.TotalWeights, targetCount)
-		for v.TotalWeights < targetCount && nodeToRemove.TotalWeights > 0 {
+		for v.TotalWeights <= targetCount && nodeToRemove.TotalWeights > 0 {
 			shardToMove := nodeToRemove.RemoveShard(targetCount - v.TotalWeights)
 			v.AddShard(shardToMove)
 		}
 		sm.nodes[k] = v
 	}
+
+	if len(nodeToRemove.Shards) > 0 {
+		weight := 0
+		for i := range nodeToRemove.Shards {
+			weight += nodeToRemove.Shards[i].Weight()
+		}
+		panic(fmt.Sprintf("Failed to remove all weights from node %+v (w = %d)", nodeToRemove, weight))
+	}
 }
 
 func (sm *weightedShardManager) MapToNode(shardID int) Shard {
-	sm.mutex.Lock()
-	defer sm.mutex.Unlock()
+	sm.mutex.RLock()
+	defer sm.mutex.RUnlock()
 	if shardID > len(sm.shards) || shardID < 0 {
 		// This might be too extreme but useful for debugging.
 		// another alternative is to return a catch-all node allowing
@@ -186,16 +215,40 @@ func (sm *weightedShardManager) MapToNode(shardID int) Shard {
 	return sm.shards[shardID]
 }
 
+func (sm *weightedShardManager) verifyShards() {
+	// Verify the returned shards
+	for i := range sm.shards {
+		_, exists := sm.nodes[sm.shards[i].NodeID()]
+		if !exists && len(sm.nodes) > 0 {
+			panic(fmt.Sprintf("Shard %d has invalid node: %s", sm.shards[i].ID(), sm.shards[i].NodeID()))
+		}
+	}
+}
+
 func (sm *weightedShardManager) Shards() []Shard {
-	sm.mutex.Lock()
-	defer sm.mutex.Unlock()
-	return sm.shards[:]
+	sm.mutex.RLock()
+	defer sm.mutex.RUnlock()
+	ret := make([]Shard, len(sm.shards))
+	copy(ret, sm.shards)
+	sm.verifyShards()
+	return ret
 }
 
 func (sm *weightedShardManager) TotalWeight() int {
-	sm.mutex.Lock()
-	defer sm.mutex.Unlock()
+	sm.mutex.RLock()
+	defer sm.mutex.RUnlock()
 	return sm.totalWeight
+}
+
+func (sm *weightedShardManager) NodeList() []string {
+	sm.mutex.RLock()
+	defer sm.mutex.RUnlock()
+
+	var ret []string
+	for k := range sm.nodes {
+		ret = append(ret, k)
+	}
+	return ret
 }
 
 // This is the wire type for the gob encoder
@@ -206,8 +259,8 @@ type shardWire struct {
 }
 
 func (sm *weightedShardManager) MarshalBinary() ([]byte, error) {
-	sm.mutex.Lock()
-	defer sm.mutex.Unlock()
+	sm.mutex.RLock()
+	defer sm.mutex.RUnlock()
 
 	if len(sm.nodes) == 0 {
 		return nil, errors.New("map does not contain any nodes")

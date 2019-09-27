@@ -36,12 +36,17 @@ func verifyDistribution(t *testing.T, manager ShardManager) {
 // verifyShards ensures all shards are distributed to nodes
 func verifyShards(t *testing.T, manager ShardManager, maxShards int) {
 	assert := require.New(t)
-
 	check := make(map[int]int)
 	shards := manager.Shards()
 	assert.Equal(maxShards, len(shards), "Incorrect length of shards")
+	expectedNodes := make(map[string]bool)
+	for _, v := range manager.NodeList() {
+		expectedNodes[v] = true
+	}
+
 	for i := range shards {
 		check[shards[i].ID()] = 1
+		assert.Contains(expectedNodes, shards[i].NodeID())
 	}
 	for i := 0; i < maxShards; i++ {
 		assert.Contains(check, i, "Shard %d does not exist", i)
@@ -57,15 +62,26 @@ func testShardManager(t *testing.T, manager ShardManager, maxShards int, weights
 	assert.Error(manager.Init(len(weights), weights), "Should not be allowed to init manager twice")
 
 	manager.UpdateNodes("A")
+	assert.Len(manager.NodeList(), 1)
 	verifyDistribution(t, manager)
 	verifyShards(t, manager, maxShards)
 
-	manager.UpdateNodes("A", "B")
+	manager.UpdateNodes("B", "A")
+	assert.Len(manager.NodeList(), 2)
 	verifyDistribution(t, manager)
 	verifyShards(t, manager, maxShards)
 
-	manager.UpdateNodes("A", "B", "C")
+	manager.UpdateNodes("C", "B", "A")
+	assert.Len(manager.NodeList(), 3)
 	verifyDistribution(t, manager)
+	verifyShards(t, manager, maxShards)
+
+	manager.UpdateNodes("B", "A", "C", "D", "E")
+	assert.Len(manager.NodeList(), 5, "Manager should contain 5 nodes")
+	verifyShards(t, manager, maxShards)
+
+	manager.UpdateNodes("B", "C", "D")
+	assert.Len(manager.NodeList(), 3, "Manager should contain 3 nodes")
 	verifyShards(t, manager, maxShards)
 
 	for i := 0; i < maxShards; i++ {

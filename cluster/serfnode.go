@@ -193,6 +193,10 @@ func (s *SerfNode) Members() []SerfMemberInfo {
 
 	ret := make([]SerfMemberInfo, 0)
 	for _, v := range s.se.Members() {
+		if v.Status != serf.StatusAlive {
+			// Skip nodes that has left or is in a failed state
+			continue
+		}
 		ret = append(ret, SerfMemberInfo{
 			NodeID: v.Name,
 			Status: v.Status.String(),

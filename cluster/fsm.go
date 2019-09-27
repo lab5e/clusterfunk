@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"sync"
@@ -10,8 +11,9 @@ import (
 )
 
 type fsmLogEvent struct {
-	Index   uint64
-	LogType byte
+	Index    uint64
+	LogType  LogMessageType
+	LeaderID string
 }
 
 // The Raft FSM is used by the clients to access the replicated log. Typically
@@ -23,7 +25,7 @@ type fsmLogEvent struct {
 // the messages.
 type raftFSM struct {
 	Events chan fsmLogEvent
-	state  map[byte][]byte
+	state  map[LogMessageType]LogMessage
 	mutex  *sync.Mutex
 }
 
@@ -31,22 +33,23 @@ type raftFSM struct {
 func newStateMachine() *raftFSM {
 	return &raftFSM{
 		Events: make(chan fsmLogEvent),
-		state:  make(map[byte][]byte),
+		state:  make(map[LogMessageType]LogMessage),
 		mutex:  &sync.Mutex{},
 	}
 }
 
-func (f *raftFSM) logEvent(idx uint64, logType byte) {
+func (f *raftFSM) logEvent(idx uint64, logType LogMessageType, leaderID string) {
 	ev := fsmLogEvent{
-		Index:   idx,
-		LogType: logType,
+		Index:    idx,
+		LogType:  logType,
+		LeaderID: leaderID,
 	}
 	// Why not use select...case...default? Well - it turns out the default clause
 	// is *really* picky so even a 10 us delay will discard the message. Nice to
 	// know.
 	select {
 	case f.Events <- ev:
-	case <-time.After(1 * time.Millisecond):
+	case <-time.After(1 * time.Second):
 		// drop the event. Panic is a bit strict but nice for debugging.
 		panic("dropped event from FSM")
 	}
@@ -58,15 +61,14 @@ func (f *raftFSM) logEvent(idx uint64, logType byte) {
 // method was called on the same Raft node as the FSM.
 func (f *raftFSM) Apply(l *raft.Log) interface{} {
 	//log.Printf("FSM: Apply, index = %d, term = %d", l.Index, l.Term)
-	f.logEvent(l.Index, l.Data[0])
-	if len(l.Data) > 1 {
-		f.mutex.Lock()
-		defer f.mutex.Unlock()
-		id := l.Data[0]
-		buf := make([]byte, len(l.Data)-1)
-		copy(buf, l.Data[1:])
-		f.state[id] = buf
+	msg := LogMessage{}
+	if err := msg.UnmarshalBinary(l.Data); err != nil {
+		panic(fmt.Sprintf(" ***** Error decoding log message: %v", err))
 	}
+	f.logEvent(l.Index, msg.MessageType, msg.SenderID)
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+	f.state[msg.MessageType] = msg
 	return nil
 }
 
@@ -81,16 +83,10 @@ func (f *raftFSM) Snapshot() (raft.FSMSnapshot, error) {
 }
 
 // Entry returns the latest log message with that particular ID
-func (f *raftFSM) Entry(id byte) []byte {
+func (f *raftFSM) Entry(id LogMessageType) LogMessage {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
-	buf, exists := f.state[id]
-	if !exists {
-		return nil
-	}
-	ret := make([]byte, len(buf))
-	copy(ret, buf)
-	return ret
+	return f.state[id]
 }
 
 // Restore is used to restore an FSM from a snapshot. It is not called
