@@ -20,6 +20,7 @@ func NewNode(nodeID string, role NodeRole) Node {
 	return ret
 }
 
+// SetTags copies and sets the tags on the node
 func (n *Node) SetTags(tags map[string]string) {
 	for k, v := range tags {
 		n.Tags[k] = v
