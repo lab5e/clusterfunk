@@ -340,7 +340,7 @@ func (c *clusterfunkCluster) updateNodes(nodes []string) {
 	for _, v := range nodes {
 		n, exists := c.nodes[v]
 		if !exists {
-			n = NewNode(v, make(map[string]string), Follower)
+			n = NewNode(v, Follower)
 			c.nodes[v] = n
 		}
 	}
@@ -348,7 +348,7 @@ func (c *clusterfunkCluster) updateNodes(nodes []string) {
 	for _, v := range c.serfNode.Members() {
 		n, ok := c.nodes[v.NodeID]
 		if !ok {
-			n = NewNode(v.NodeID, make(map[string]string), NonMember)
+			n = NewNode(v.NodeID, NonMember)
 		}
 		c.updateSerfNode(v, &n)
 		c.nodes[v.NodeID] = n
@@ -362,7 +362,7 @@ func (c *clusterfunkCluster) updateNode(nodeID string, tags map[string]string) {
 	log.Printf("CLUSTER Update node %s (TODO)", nodeID)
 	existing, ok := c.nodes[nodeID]
 	if !ok {
-		existing = NewNode(nodeID, make(map[string]string), NonMember)
+		existing = NewNode(nodeID, NonMember)
 		c.nodes[nodeID] = existing
 	}
 	for _, v := range c.serfNode.Members() {
@@ -386,7 +386,7 @@ func (c *clusterfunkCluster) addNode(nodeID string, tags map[string]string) {
 	log.Printf("CLUSTER Add node %s", nodeID)
 	_, ok := c.nodes[nodeID]
 	if !ok {
-		c.nodes[nodeID] = NewNode(nodeID, make(map[string]string), NonMember)
+		c.nodes[nodeID] = NewNode(nodeID, NonMember)
 	}
 }
 
