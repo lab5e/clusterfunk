@@ -44,7 +44,7 @@ func (c *clusterfunkCluster) setFSMState(newState internalFSMState, nodeID strin
 	select {
 	case c.stateChannel <- fsmEvent{State: newState, NodeID: nodeID}:
 	case <-time.After(1 * time.Second):
-		panic("Unable to set cluster FSM state after 1 second")
+		panic(fmt.Sprintf("Unable to set cluster FSM state (%d) after 1 second", newState))
 		// channel is already full - skip
 	}
 }
