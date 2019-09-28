@@ -25,9 +25,6 @@ func (nd *nodeData) checkTotalWeight() {
 	for _, n := range nd.Shards {
 		tot += n.Weight()
 	}
-	if tot != nd.TotalWeights {
-		panic(fmt.Sprintf("Total weight is %d not %d", tot, nd.TotalWeights))
-	}
 }
 func (nd *nodeData) AddShard(shard Shard) {
 	shard.SetNodeID(nd.NodeID)
@@ -191,14 +188,6 @@ func (sm *weightedShardManager) removeNode(nodeID string) {
 		}
 		sm.nodes[k] = v
 	}
-
-	if len(nodeToRemove.Shards) > 0 {
-		weight := 0
-		for i := range nodeToRemove.Shards {
-			weight += nodeToRemove.Shards[i].Weight()
-		}
-		panic(fmt.Sprintf("Failed to remove all weights from node %+v (w = %d)", nodeToRemove, weight))
-	}
 }
 
 func (sm *weightedShardManager) MapToNode(shardID int) Shard {
@@ -215,22 +204,11 @@ func (sm *weightedShardManager) MapToNode(shardID int) Shard {
 	return sm.shards[shardID]
 }
 
-func (sm *weightedShardManager) verifyShards() {
-	// Verify the returned shards
-	for i := range sm.shards {
-		_, exists := sm.nodes[sm.shards[i].NodeID()]
-		if !exists && len(sm.nodes) > 0 {
-			panic(fmt.Sprintf("Shard %d has invalid node: %s", sm.shards[i].ID(), sm.shards[i].NodeID()))
-		}
-	}
-}
-
 func (sm *weightedShardManager) Shards() []Shard {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 	ret := make([]Shard, len(sm.shards))
 	copy(ret, sm.shards)
-	sm.verifyShards()
 	return ret
 }
 
