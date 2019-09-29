@@ -40,9 +40,8 @@ func newStateMachine() *raftFSM {
 
 func (f *raftFSM) logEvent(idx uint64, logType LogMessageType, leaderID string) {
 	ev := fsmLogEvent{
-		Index:    idx,
-		LogType:  logType,
-		LeaderID: leaderID,
+		Index:   idx,
+		LogType: logType,
 	}
 	// Why not use select...case...default? Well - it turns out the default clause
 	// is *really* picky so even a 10 us delay will discard the message. Nice to
@@ -65,7 +64,7 @@ func (f *raftFSM) Apply(l *raft.Log) interface{} {
 	if err := msg.UnmarshalBinary(l.Data); err != nil {
 		panic(fmt.Sprintf(" ***** Error decoding log message: %v", err))
 	}
-	f.logEvent(l.Index, msg.MessageType, msg.SenderID)
+	f.logEvent(l.Index, msg.MessageType, msg.AckEndpoint)
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 	f.state[msg.MessageType] = msg

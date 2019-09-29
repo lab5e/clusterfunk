@@ -185,11 +185,13 @@ func (r *RaftNode) Start(nodeID string, verboseLog bool, cfg RaftParameters) err
 }
 
 func (r *RaftNode) sendEvent(e RaftEvent) {
-	select {
-	case r.events <- e:
-	case <-time.After(1 * time.Second):
-		log.Printf("**** Nobody's listening to me! ev = %+v", e)
-	}
+	go func() {
+		select {
+		case r.events <- e:
+		case <-time.After(1 * time.Second):
+			log.Printf("**** Nobody's listening to me! ev = %+v", e)
+		}
+	}()
 }
 
 func (r *RaftNode) logObserver(ch chan fsmLogEvent) {

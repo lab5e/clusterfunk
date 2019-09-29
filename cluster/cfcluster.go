@@ -121,11 +121,14 @@ func (c *clusterfunkCluster) raftEvents(ch <-chan RaftEvent) {
 		switch e.Type {
 		case RaftNodeAdded:
 			//log.Printf("EVENT: Node %s added", e.NodeID)
+			c.addNode(e.NodeID)
 			c.setFSMState(clusterSizeChanged, e.NodeID)
 
 		case RaftNodeRemoved:
-			//log.Printf("EVENT: Node %s removed", e.NodeID)
+			c.removeNode(e.NodeID)
 			c.setFSMState(clusterSizeChanged, e.NodeID)
+
+			//log.Printf("EVENT: Node %s removed", e.NodeID)
 
 		case RaftLeaderLost:
 			//log.Printf("EVENT: Leader lost")
@@ -166,7 +169,7 @@ func (c *clusterfunkCluster) setRole(newRole NodeRole) {
 func (c *clusterfunkCluster) processReplicatedLog(t LogMessageType, index uint64) {
 	msg := c.raftNode.GetReplicatedLogMessage(t)
 	c.updateNodes(c.shardManager.NodeList())
-	switch LogMessageType(t) {
+	switch msg.MessageType {
 	case ProposedShardMap:
 		if c.Role() == Leader {
 			log.Printf("Already have an updated shard map")
@@ -183,7 +186,8 @@ func (c *clusterfunkCluster) processReplicatedLog(t LogMessageType, index uint64
 			return
 		}
 		atomic.StoreUint64(c.reshardingLogIndex, index)
-		c.setFSMState(newShardMapReceived, msg.SenderID)
+		c.setFSMState(newShardMapReceived, "")
+		c.ackShardMap(msg.AckEndpoint)
 	case ShardMapCommitted:
 		wantedIndex := atomic.LoadUint64(c.wantedShardLogIndex)
 		if wantedIndex > 0 && index < wantedIndex {
@@ -191,20 +195,8 @@ func (c *clusterfunkCluster) processReplicatedLog(t LogMessageType, index uint64
 			return
 		}
 		log.Printf("Shard map is comitted by leader. Start serving!")
-		dumpMap := func() {
-			log.Println("================== shard map ======================")
-			nodes := make(map[string]int)
-			for _, v := range c.shardManager.Shards() {
-				n := nodes[v.NodeID()]
-				n++
-				nodes[v.NodeID()] = n
-			}
-			for k, v := range nodes {
-				log.Printf("%-20s: %d shards", k, v)
-			}
-			log.Println("===================================================")
-		}
-		dumpMap()
+		c.dumpShardMap()
+
 	default:
 		log.Printf("Don't know how to process log type %d", t)
 	}
@@ -213,17 +205,20 @@ func (c *clusterfunkCluster) processReplicatedLog(t LogMessageType, index uint64
 func (c *clusterfunkCluster) serfEvents(ch <-chan NodeEvent) {
 	if c.config.AutoJoin {
 		go func(ch <-chan NodeEvent) {
+			resize := false
 			for ev := range ch {
 				if ev.Update {
 					// Update node list
 					c.updateNode(ev.NodeID, ev.Tags)
-					c.dumpNodes()
 					continue
 				}
 				if ev.Joined {
 					// add node to list
-					c.addNode(ev.NodeID, ev.Tags)
-					c.dumpNodes()
+					if c.addNode(ev.NodeID) {
+						c.updateNode(ev.NodeID, ev.Tags)
+						resize = resize && true
+					}
+
 					if c.config.AutoJoin && c.raftNode.Leader() {
 						if err := c.raftNode.AddMember(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
 							log.Printf("Error adding member: %v - %+v", err, ev)
@@ -231,13 +226,15 @@ func (c *clusterfunkCluster) serfEvents(ch <-chan NodeEvent) {
 					}
 					continue
 				}
-				c.removeNode(ev.NodeID)
-				c.dumpNodes()
+				resize = resize && c.removeNode(ev.NodeID)
 				if c.config.AutoJoin && c.raftNode.Leader() {
 					if err := c.raftNode.RemoveMember(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
 						log.Printf("Error removing member: %v - %+v", err, ev)
 					}
 				}
+			}
+			if resize {
+				c.setFSMState(clusterSizeChanged, "")
 			}
 		}(c.serfNode.Events())
 	}
@@ -380,39 +377,46 @@ func (c *clusterfunkCluster) updateSerfNode(ni SerfMemberInfo, n *Node) {
 }
 
 // addNode adds a new node
-func (c *clusterfunkCluster) addNode(nodeID string, tags map[string]string) {
+func (c *clusterfunkCluster) addNode(nodeID string) bool {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	log.Printf("CLUSTER Add node %s", nodeID)
 	_, ok := c.nodes[nodeID]
 	if !ok {
 		c.nodes[nodeID] = NewNode(nodeID, NonMember)
+		return true
 	}
+	return false
 }
 
 // removeNode removes the node
-func (c *clusterfunkCluster) removeNode(nodeID string) {
+func (c *clusterfunkCluster) removeNode(nodeID string) bool {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	log.Printf("CLUSTER Remove node %s", nodeID)
+	_, ok := c.nodes[nodeID]
+	if !ok {
+		return false
+	}
 	delete(c.nodes, nodeID)
+	return true
 }
 
-// Dump the node's world view
-func (c *clusterfunkCluster) dumpNodes() {
+func (c *clusterfunkCluster) updateNodeList() bool {
+	list := c.raftNode.Members()
+	changed := false
+	for _, v := range list {
+		changed = changed && c.addNode(v)
+	}
+	return changed
+}
+
+func (c *clusterfunkCluster) getNodes() []string {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-
-	log.Printf("==================== nodes ========================")
+	var ret []string
 	for _, v := range c.nodes {
-		me := ""
-		if v.ID == c.raftNode.LocalNodeID() {
-			me = "(that's me!)"
-		}
-		log.Printf("ID: %s %s", v.ID, me)
-		for k, v := range v.Tags {
-			log.Printf("           %s = %s", k, v)
-		}
-		log.Printf("- - - - - - - - - - - - - - - - - - - - - - - - - -")
+		ret = append(ret, v.ID)
 	}
+	return ret
 }

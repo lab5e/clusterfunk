@@ -2,6 +2,8 @@
 * Corner case: Client dies on startup when logs are replicated to it -- Raft does not
   detect a just-joined-and-died client. It's probably relevant for clients with
   persistent storage as well. (PR for Raft is in the works)
+* Move raft node management into the raftnode type. Make coalesced events to avoid
+  raft spamming.
 * Proper FSM and log
 * Replicate logs with SQLite
 * Turn off auto-join/leave for Serf in production clusters

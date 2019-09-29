@@ -39,12 +39,39 @@ const (
 	leaderLost
 )
 
+func (t internalFSMState) String() string {
+	switch t {
+	case clusterSizeChanged:
+		return "clusterSizeChanged"
+	case assumeLeadership:
+		return "assumeLeadership"
+	case assumeFollower:
+		return "assumeFollower"
+	case ackReceived:
+		return "ackReceived"
+	case ackCompleted:
+		return "ackCompleted"
+	case reshardCluster:
+		return "reshardCluster"
+	case updateRaftNodeList:
+		return "updateRaftNodeList"
+	case newShardMapReceived:
+		return "newShardMapReceived"
+	case commitLogReceived:
+		return "commitLogReceived"
+	case leaderLost:
+		return "leaderLost"
+	default:
+		panic(fmt.Sprintf("Unknown state: %d", t))
+	}
+}
+
 // Sets the new state unless a different state is waiting.
 func (c *clusterfunkCluster) setFSMState(newState internalFSMState, nodeID string) {
 	select {
 	case c.stateChannel <- fsmEvent{State: newState, NodeID: nodeID}:
 	case <-time.After(1 * time.Second):
-		panic(fmt.Sprintf("Unable to set cluster FSM state (%d) after 1 second", newState))
+		log.Printf("Unable to set cluster FSM state (%d) after 1 second", newState)
 		// channel is already full - skip
 	}
 }
@@ -53,7 +80,6 @@ func (c *clusterfunkCluster) setFSMState(newState internalFSMState, nodeID strin
 func (c *clusterfunkCluster) clusterStateMachine() {
 	log.Printf("STATE: Launching")
 	var unacknowledgedNodes []string
-	clusterNodes := newNodeCollection()
 
 	shardMapLogIndex := uint64(0)
 	for newState := range c.stateChannel {
@@ -73,33 +99,26 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 		case updateRaftNodeList:
 			log.Printf("STATE: update node list")
 			// list is updated. Start resharding.
-
-			needReshard := clusterNodes.Sync(c.raftNode.Members()...)
-			if needReshard {
-				log.Printf("Have nodes %+v (I'm %s)", clusterNodes, c.raftNode.LocalNodeID())
-				log.Printf("Need resharding")
-				c.setFSMState(reshardCluster, "")
-			}
+			c.updateNodeList()
+			c.setFSMState(reshardCluster, "")
 
 		case reshardCluster:
 			// reshard cluster, distribute via replicated log.
 
 			// Reset the list of acked nodes.
 			log.Printf("STATE: reshardCluster")
+			list := c.getNodes()
 			// TODO: ShardManager needs a rewrite
-			log.Printf("Nodes : %+v", clusterNodes.Nodes)
-			c.shardManager.UpdateNodes(clusterNodes.Nodes...)
-			log.Printf("Nodes = %d, Shards = %d", len(clusterNodes.Nodes), len(c.shardManager.Shards()))
-			log.Printf("Shard Manager Nodes : %+v", c.shardManager.NodeList())
+			c.shardManager.UpdateNodes(list...)
 			proposedShardMap, err := c.shardManager.MarshalBinary()
 			if err != nil {
 				panic(fmt.Sprintf("Can't marshal the shard map: %v", err))
 			}
-			mapMessage := NewLogMessage(ProposedShardMap, c.raftNode.LocalNodeID(), proposedShardMap)
+			mapMessage := NewLogMessage(ProposedShardMap, c.config.LeaderEndpoint, proposedShardMap)
 			// Build list of unacked nodes
 			// Note that this might include the local node as well, which
 			// is OK. The client part will behave like all other parts.
-			unacknowledgedNodes = append([]string{}, clusterNodes.Nodes...)
+			unacknowledgedNodes = append([]string{}, list...)
 
 			// Replicate proposed shard map via log
 			buf, err := mapMessage.MarshalBinary()
@@ -121,7 +140,7 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 			// This is the index we want commits for.
 			shardMapLogIndex = c.raftNode.LastIndex()
 			log.Printf("Shard map index = %d", shardMapLogIndex)
-			c.updateNodes(c.shardManager.NodeList())
+			//c.updateNodes(c.shardManager.NodeList())
 			// Next messages will be ackReceived when the changes has replicated
 			// out to the other nodes.
 			// No new state here - wait for a series of ackReceived states
@@ -135,7 +154,7 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 					unacknowledgedNodes = append(unacknowledgedNodes[:i], unacknowledgedNodes[i+1:]...)
 				}
 			}
-			log.Printf("STATE: ack received from %s, %d of %d nodes have acked", newState.NodeID, len(clusterNodes.Nodes)-len(unacknowledgedNodes), len(clusterNodes.Nodes))
+			log.Printf("STATE: ack received from %s, %d nodes remaining", newState.NodeID, len(unacknowledgedNodes))
 			// Timeouts are handled when calling the other nodes via gRPC
 			allNodesHaveAcked := false
 			if len(unacknowledgedNodes) == 0 {
@@ -181,7 +200,7 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 			log.Printf("STATE: shardmap received")
 			// update internal map and ack map via gRPC
 			c.setLocalState(Resharding)
-			c.ackShardMap(newState.NodeID)
+
 			// No new state - the next is commitLogReceived which is set
 			// via the replicated log events
 
@@ -200,20 +219,12 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 	}
 }
 
-func (c *clusterfunkCluster) ackShardMap(leaderID string) {
-	c.mutex.Lock()
-	node, exists := c.nodes[leaderID]
-	c.mutex.Unlock()
-
-	if !exists {
-		log.Printf("Couldn't ack shard map: Leader (%s) not found", leaderID)
-		return
-	}
+func (c *clusterfunkCluster) ackShardMap(endpoint string) {
 
 	// Step 1 Leader ID
 	// Confirm the shard map
 	clientParam := utils.GRPCClientParam{
-		ServerEndpoint: node.Tags[LeaderEndpoint],
+		ServerEndpoint: endpoint,
 		TLS:            false,
 		CAFile:         "",
 	}
@@ -249,6 +260,6 @@ func (c *clusterfunkCluster) ackShardMap(leaderID string) {
 		atomic.StoreUint64(c.wantedShardLogIndex, uint64(resp.CurrentIndex))
 		return
 	}
-	log.Printf("Shard map ack successfully sent to leader (leader=%s, index=%d)", leaderID, logIndex)
+	log.Printf("Shard map ack successfully sent to leader (leader=%s, index=%d)", endpoint, logIndex)
 	atomic.StoreUint64(c.wantedShardLogIndex, 0)
 }

@@ -19,15 +19,15 @@ const (
 // The payload is a byte array that can be unmarshalled into another type of message.
 type LogMessage struct {
 	MessageType LogMessageType
-	SenderID    string
+	AckEndpoint string
 	Data        []byte
 }
 
 // NewLogMessage creates a new LogMessage instance
-func NewLogMessage(t LogMessageType, sender string, data []byte) LogMessage {
+func NewLogMessage(t LogMessageType, endpoint string, data []byte) LogMessage {
 	return LogMessage{
 		MessageType: t,
-		SenderID:    sender,
+		AckEndpoint: endpoint,
 		Data:        data,
 	}
 }
@@ -36,8 +36,8 @@ func NewLogMessage(t LogMessageType, sender string, data []byte) LogMessage {
 func (m *LogMessage) MarshalBinary() ([]byte, error) {
 	ret := make([]byte, 2)
 	ret[0] = byte(m.MessageType)
-	ret[1] = byte(len(m.SenderID))
-	ret = append(ret, []byte(m.SenderID)...)
+	ret[1] = byte(len(m.AckEndpoint))
+	ret = append(ret, []byte(m.AckEndpoint)...)
 	ret = append(ret, m.Data...)
 	return ret, nil
 }
@@ -49,7 +49,7 @@ func (m *LogMessage) UnmarshalBinary(buf []byte) error {
 	}
 	m.MessageType = LogMessageType(buf[0])
 	strLen := buf[1]
-	m.SenderID = string(buf[2 : 2+strLen])
+	m.AckEndpoint = string(buf[2 : 2+strLen])
 	m.Data = make([]byte, 0)
 	m.Data = append(m.Data, buf[2+strLen:]...)
 	return nil
