@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stalehd/clusterfunk/cluster/clusterproto"
+	"github.com/stalehd/clusterfunk/cluster/fsmtool"
 
 	"github.com/stalehd/clusterfunk/utils"
 	"google.golang.org/grpc"
@@ -27,13 +28,13 @@ type fsmEvent struct {
 // These are the internal states. See implementation for a description. Most of these
 // operations can be interrupted if there's a leader change midway in the process.
 const (
-	clusterSizeChanged internalFSMState = iota
+	initialClusterState internalFSMState = iota
+	clusterSizeChanged
 	assumeLeadership
 	assumeFollower
 	ackReceived
 	ackCompleted
 	reshardCluster
-	updateRaftNodeList
 	newShardMapReceived
 	commitLogReceived
 	leaderLost
@@ -41,6 +42,8 @@ const (
 
 func (t internalFSMState) String() string {
 	switch t {
+	case initialClusterState:
+		return "initialClusterState"
 	case clusterSizeChanged:
 		return "clusterSizeChanged"
 	case assumeLeadership:
@@ -53,8 +56,6 @@ func (t internalFSMState) String() string {
 		return "ackCompleted"
 	case reshardCluster:
 		return "reshardCluster"
-	case updateRaftNodeList:
-		return "updateRaftNodeList"
 	case newShardMapReceived:
 		return "newShardMapReceived"
 	case commitLogReceived:
@@ -79,27 +80,47 @@ func (c *clusterfunkCluster) setFSMState(newState internalFSMState, nodeID strin
 // clusterStateMachine is the FSM for
 func (c *clusterfunkCluster) clusterStateMachine() {
 	log.Printf("STATE: Launching")
+	state := fsmtool.NewStateTransitionTable(initialClusterState)
+	state.LogOnError = true
+	state.LogTransitions = true
+	state.PanicOnError = false
+
+	state.AddTransitions(
+		initialClusterState, assumeLeadership,
+		initialClusterState, assumeFollower,
+		initialClusterState, leaderLost,
+
+		assumeLeadership, leaderLost,
+		assumeFollower, leaderLost,
+
+		leaderLost, assumeLeadership,
+		leaderLost, assumeFollower,
+
+		assumeLeadership, clusterSizeChanged,
+		clusterSizeChanged, reshardCluster,
+		reshardCluster, ackReceived,
+		ackReceived, ackReceived,
+		ackReceived, ackCompleted,
+
+		assumeFollower, newShardMapReceived,
+
+		newShardMapReceived, commitLogReceived,
+		newShardMapReceived, leaderLost,
+
+		commitLogReceived, leaderLost,
+	)
+
 	var unacknowledgedNodes []string
-	oldState := leaderLost
 	shardMapLogIndex := uint64(0)
 	for newState := range c.stateChannel {
-
-		timeCall(func() {
-			log.Printf("STATE: %s", newState.State.String())
-			switch newState.State {
-
+		state.Apply(newState, func(stt *fsmtool.StateTransitionTable) {
+			switch stt.CurrentState.(internalFSMState) {
 			case assumeLeadership:
 				c.setRole(Leader)
-				// start with updating the node list
-				c.setFSMState(updateRaftNodeList, "")
+				c.setFSMState(reshardCluster, "")
 
 			case clusterSizeChanged:
 				c.setLocalState(Resharding)
-				c.setFSMState(updateRaftNodeList, "")
-
-			case updateRaftNodeList:
-				// list is updated. Start resharding.
-				c.updateNodeList()
 				c.setFSMState(reshardCluster, "")
 
 			case reshardCluster:
@@ -210,9 +231,8 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 				// leader is lost - stop processing until a leader is elected and
 				// the commit log is received
 			}
-		}, fmt.Sprintf("STATE: handle %s -> %s state transition", oldState.String(), newState.State.String()))
-		oldState = newState.State
 
+		})
 	}
 }
 
