@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -91,14 +92,18 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 		initialClusterState, leaderLost,
 
 		assumeLeadership, leaderLost,
+		assumeLeadership, reshardCluster,
+		assumeLeadership, clusterSizeChanged,
+
 		assumeFollower, leaderLost,
 
 		leaderLost, assumeLeadership,
 		leaderLost, assumeFollower,
 
-		assumeLeadership, clusterSizeChanged,
 		clusterSizeChanged, reshardCluster,
+
 		reshardCluster, ackReceived,
+
 		ackReceived, ackReceived,
 		ackReceived, ackCompleted,
 
@@ -108,12 +113,21 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 		newShardMapReceived, leaderLost,
 
 		commitLogReceived, leaderLost,
+
+		// Sketchy transitions below
+		assumeFollower, assumeLeadership,
+		ackCompleted, ackReceived,
+		ackCompleted, clusterSizeChanged,
+		ackCompleted, leaderLost,
+		ackCompleted, assumeFollower,
+		reshardCluster, assumeFollower,
 	)
+	state.DumpTransitions(os.Stderr)
 
 	var unacknowledgedNodes []string
 	shardMapLogIndex := uint64(0)
 	for newState := range c.stateChannel {
-		state.Apply(newState, func(stt *fsmtool.StateTransitionTable) {
+		state.Apply(newState.State, func(stt *fsmtool.StateTransitionTable) {
 			switch stt.CurrentState.(internalFSMState) {
 			case assumeLeadership:
 				c.setRole(Leader)
@@ -127,7 +141,7 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 				// reshard cluster, distribute via replicated log.
 
 				// Reset the list of acked nodes.
-				list := c.getNodes()
+				list := c.raftNode.Members()
 				// TODO: ShardManager needs a rewrite
 				c.shardManager.UpdateNodes(list...)
 				proposedShardMap, err := c.shardManager.MarshalBinary()

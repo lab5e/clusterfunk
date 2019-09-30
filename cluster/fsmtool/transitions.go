@@ -2,6 +2,7 @@ package fsmtool
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"time"
 )
@@ -54,7 +55,7 @@ func (s *StateTransitionTable) AddTransitions(states ...interface{}) bool {
 func (s *StateTransitionTable) SetState(state interface{}) bool {
 	validstates, ok := s.ValidTransitions[s.CurrentState]
 	if !ok {
-		panic("I'm in an invalid state. There might be no valid transition from the initial state")
+		panic(fmt.Sprintf("I'm in an invalid state. There is no transitions from %s to another state (or %s)", s.CurrentState, state))
 	}
 	for _, v := range validstates {
 		if v == state {
@@ -89,4 +90,15 @@ func (s *StateTransitionTable) Apply(newState interface{}, code func(stt *StateT
 		log.Printf("State: %s->%s took %f ms", s.CurrentState, newState, execTime)
 	}
 	return true
+}
+
+// DumpTransitions dumps the transitions in a dot-compatible format
+func (s *StateTransitionTable) DumpTransitions(writer io.Writer) {
+	fmt.Fprintf(writer, "digraph StateTransitions {\n")
+	for k, v := range s.ValidTransitions {
+		for _, to := range v {
+			fmt.Fprintf(writer, "    %s -> %s;\n", k, to)
+		}
+	}
+	fmt.Fprintf(writer, "}\n")
 }

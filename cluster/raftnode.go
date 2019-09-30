@@ -291,8 +291,8 @@ func (r *RaftNode) LocalNodeID() string {
 	return r.localNodeID
 }
 
-// AddMember adds a new node to the cluster
-func (r *RaftNode) AddMember(nodeID string, endpoint string) error {
+// AddClusterNode adds a new node to the cluster. Must be leader to perform this operation.
+func (r *RaftNode) AddClusterNode(nodeID string, endpoint string) error {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
@@ -325,8 +325,9 @@ func (r *RaftNode) AddMember(nodeID string, endpoint string) error {
 	return nil
 }
 
-// RemoveMember removes a node from the cluster
-func (r *RaftNode) RemoveMember(nodeID string, endpoint string) error {
+// RemoveClusterNode removes a node from the cluster. Must be leader to perform this
+// operation.
+func (r *RaftNode) RemoveClusterNode(nodeID string, endpoint string) error {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
@@ -430,10 +431,10 @@ func (r *RaftNode) Events() <-chan RaftEventType {
 	return r.events
 }
 
-// GetReplicatedLogMessage returns the replicated log message with the
+// GetLogMessages returns the replicated log message with the
 // specified type ID
-func (r *RaftNode) GetReplicatedLogMessage(id LogMessageType) LogMessage {
-	return r.fsm.Entry(id)
+func (r *RaftNode) GetLogMessages(startingIndex uint64) []LogMessage {
+	return r.fsm.Entries(startingIndex)
 }
 
 func (r *RaftNode) addNode(id string) {
@@ -467,6 +468,8 @@ func (r *RaftNode) sendInternalEvent(ev RaftEventType) {
 	}
 }
 
+// TODO(stalehd): Ordering is important. Emit in same order as they came,
+// remove duplicates of clusterSizeChanged and friends.
 func (r *RaftNode) coalescingEvents() {
 	eventsToGenerate := make(map[RaftEventType]int)
 	for {
@@ -484,7 +487,6 @@ func (r *RaftNode) coalescingEvents() {
 				r.events <- k
 				delete(eventsToGenerate, k)
 			}
-
 		}
 	}
 }

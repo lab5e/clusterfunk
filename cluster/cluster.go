@@ -60,22 +60,9 @@ type Cluster interface {
 	// State is the current cluster state
 	LocalState() NodeState
 
-	// Nodes return a list of the active nodes in the cluster
-	Nodes() []Node
-
-	// LeaderNode returns the leader of the cluster
-	LeaderNode() Node
-
-	// LocalNode returns the local node
-	LocalNode() Node
-
 	// Events returns an event channel for the cluster. The channel will
 	// be closed when the cluster is stopped. Events are for information only
 	Events() <-chan Event
-
-	// AddLocalEndpoint registers an endpoint on the local node
-	// TOOD(stalehd) add LocalNode() + AddEndpoint method to node
-	AddLocalEndpoint(name, endpoint string)
 }
 
 // The following are internal tags and values for nodes

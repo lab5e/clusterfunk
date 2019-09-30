@@ -30,7 +30,7 @@ type clusterfunkCluster struct {
 	shardManager        sharding.ShardManager
 	reshardingLogIndex  *uint64
 	wantedShardLogIndex *uint64
-	nodes               map[string]Node
+	lastProcessedIndex  uint64
 }
 
 // NewCluster returns a new cluster (client)
@@ -55,7 +55,6 @@ func NewCluster(params Parameters, shardManager sharding.ShardManager) Cluster {
 		shardManager:        shardManager,
 		reshardingLogIndex:  reshardIndex,
 		wantedShardLogIndex: wantedIndex,
-		nodes:               make(map[string]Node, 0),
 	}
 	go ret.clusterStateMachine()
 	return ret
@@ -130,15 +129,15 @@ func (c *clusterfunkCluster) raftEvents(ch <-chan RaftEventType) {
 		switch e {
 		case RaftClusterSizeChanged:
 			log.Printf("%d members:  %+v ", c.raftNode.MemberCount(), c.raftNode.Members())
-
+			c.setFSMState(clusterSizeChanged, "")
 		case RaftLeaderLost:
-
+			c.setFSMState(leaderLost, "")
 		case RaftBecameLeader:
-
+			c.setFSMState(assumeLeadership, "")
 		case RaftBecameFollower:
-
+			c.setFSMState(assumeFollower, "")
 		case RaftReceivedLog:
-
+			c.processReplicatedLog()
 		default:
 			log.Printf("Unknown event received: %+v", e)
 		}
@@ -153,75 +152,65 @@ func (c *clusterfunkCluster) setRole(newRole NodeRole) {
 	atomic.StoreInt32(c.localRole, int32(newRole))
 }
 
-func (c *clusterfunkCluster) processReplicatedLog(t LogMessageType, index uint64) {
-	msg := c.raftNode.GetReplicatedLogMessage(t)
-	c.updateNodes(c.shardManager.NodeList())
-	switch msg.MessageType {
-	case ProposedShardMap:
-		if c.Role() == Leader {
-			log.Printf("Already have an updated shard map")
-			// Ack to myself
-			c.setFSMState(ackReceived, c.raftNode.LocalNodeID())
-			return
+func (c *clusterfunkCluster) processReplicatedLog() {
+	messages := c.raftNode.GetLogMessages(c.lastProcessedIndex)
+	log.Printf("*** Got messages: %d", len(messages))
+	for _, msg := range messages {
+		if msg.Index > c.lastProcessedIndex {
+			c.lastProcessedIndex = msg.Index
 		}
-		if err := c.shardManager.UnmarshalBinary(msg.Data); err != nil {
-			panic(fmt.Sprintf("Could not unmarshal shard map from log message: %v", err))
-		}
-		wantedIndex := atomic.LoadUint64(c.wantedShardLogIndex)
-		if wantedIndex > 0 && index != wantedIndex {
-			log.Printf("Ignoring shard map with index %d", index)
-			return
-		}
-		atomic.StoreUint64(c.reshardingLogIndex, index)
-		c.setFSMState(newShardMapReceived, "")
-		c.ackShardMap(msg.AckEndpoint)
-	case ShardMapCommitted:
-		wantedIndex := atomic.LoadUint64(c.wantedShardLogIndex)
-		if wantedIndex > 0 && index < wantedIndex {
-			log.Printf("Ignoring commit message with index %d", index)
-			return
-		}
-		log.Printf("Shard map is comitted by leader. Start serving!")
-		c.dumpShardMap()
+		switch msg.MessageType {
+		case ProposedShardMap:
+			if c.Role() == Leader {
+				log.Printf("Already have an updated shard map")
+				// Ack to myself
+				c.setFSMState(ackReceived, c.raftNode.LocalNodeID())
+				return
+			}
+			if err := c.shardManager.UnmarshalBinary(msg.Data); err != nil {
+				panic(fmt.Sprintf("Could not unmarshal shard map from log message: %v", err))
+			}
+			wantedIndex := atomic.LoadUint64(c.wantedShardLogIndex)
+			if wantedIndex > 0 && msg.Index != wantedIndex {
+				log.Printf("Ignoring shard map with index %d", msg.Index)
+				return
+			}
+			atomic.StoreUint64(c.reshardingLogIndex, msg.Index)
+			c.setFSMState(newShardMapReceived, "")
+			c.ackShardMap(msg.AckEndpoint)
+		case ShardMapCommitted:
+			wantedIndex := atomic.LoadUint64(c.wantedShardLogIndex)
+			if wantedIndex > 0 && msg.Index < wantedIndex {
+				log.Printf("Ignoring commit message with index %d", msg.Index)
+				return
+			}
+			log.Printf("Shard map is comitted by leader. Start serving!")
+			c.dumpShardMap()
 
-	default:
-		log.Printf("Don't know how to process log type %d", t)
+		default:
+			log.Printf("Don't know how to process log type %d", msg.MessageType)
+		}
 	}
+
 }
 
 func (c *clusterfunkCluster) serfEvents(ch <-chan NodeEvent) {
 	if c.config.AutoJoin {
 		go func(ch <-chan NodeEvent) {
-			resize := false
 			for ev := range ch {
-				if ev.Update {
-					// Update node list
-					c.updateNode(ev.NodeID, ev.Tags)
-					continue
-				}
 				if ev.Joined {
-					// add node to list
-					if c.addNode(ev.NodeID) {
-						c.updateNode(ev.NodeID, ev.Tags)
-						resize = resize && true
-					}
-
 					if c.config.AutoJoin && c.raftNode.Leader() {
-						if err := c.raftNode.AddMember(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
+						if err := c.raftNode.AddClusterNode(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
 							log.Printf("Error adding member: %v - %+v", err, ev)
 						}
 					}
 					continue
 				}
-				resize = resize && c.removeNode(ev.NodeID)
 				if c.config.AutoJoin && c.raftNode.Leader() {
-					if err := c.raftNode.RemoveMember(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
+					if err := c.raftNode.RemoveClusterNode(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
 						log.Printf("Error removing member: %v - %+v", err, ev)
 					}
 				}
-			}
-			if resize {
-				c.setFSMState(clusterSizeChanged, "")
 			}
 		}(c.serfNode.Events())
 	}
@@ -247,20 +236,6 @@ func (c *clusterfunkCluster) Stop() {
 
 func (c *clusterfunkCluster) Name() string {
 	return c.name
-}
-
-func (c *clusterfunkCluster) Nodes() []Node {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-	panic("not implemented")
-}
-
-func (c *clusterfunkCluster) LocalNode() Node {
-	panic("not implemented")
-}
-
-func (c *clusterfunkCluster) LeaderNode() Node {
-	panic("not implemented")
 }
 
 func (c *clusterfunkCluster) AddLocalEndpoint(name, endpoint string) {
@@ -307,100 +282,4 @@ func (c *clusterfunkCluster) setLocalState(newState NodeState) {
 
 func (c *clusterfunkCluster) LocalState() NodeState {
 	return NodeState(atomic.LoadInt32(c.localState))
-}
-
-// -----------------------------------------------------------------------------
-// Node operations -- initiated by Serf events
-
-// updateNodes updates our world view
-func (c *clusterfunkCluster) updateNodes(nodes []string) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	for k := range c.nodes {
-		n := c.nodes[k]
-		c.nodes[k] = n
-	}
-	for _, v := range nodes {
-		n, exists := c.nodes[v]
-		if !exists {
-			n = NewNode(v, Follower)
-			c.nodes[v] = n
-		}
-	}
-
-	for _, v := range c.serfNode.Members() {
-		n, ok := c.nodes[v.NodeID]
-		if !ok {
-			n = NewNode(v.NodeID, NonMember)
-		}
-		c.updateSerfNode(v, &n)
-		c.nodes[v.NodeID] = n
-	}
-}
-
-// updateNode updates the node with new tags
-func (c *clusterfunkCluster) updateNode(nodeID string, tags map[string]string) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	existing, ok := c.nodes[nodeID]
-	if !ok {
-		existing = NewNode(nodeID, NonMember)
-		c.nodes[nodeID] = existing
-	}
-	for _, v := range c.serfNode.Members() {
-		if v.NodeID == nodeID {
-			c.updateSerfNode(v, &existing)
-		}
-	}
-}
-
-func (c *clusterfunkCluster) updateSerfNode(ni SerfMemberInfo, n *Node) {
-	n.Tags[SerfStatusKey] = ni.Status
-	for k, v := range ni.Tags {
-		n.Tags[k] = v
-	}
-}
-
-// addNode adds a new node
-func (c *clusterfunkCluster) addNode(nodeID string) bool {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	_, ok := c.nodes[nodeID]
-	if !ok {
-		c.nodes[nodeID] = NewNode(nodeID, NonMember)
-		return true
-	}
-	return false
-}
-
-// removeNode removes the node
-func (c *clusterfunkCluster) removeNode(nodeID string) bool {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	_, ok := c.nodes[nodeID]
-	if !ok {
-		return false
-	}
-	delete(c.nodes, nodeID)
-	return true
-}
-
-func (c *clusterfunkCluster) updateNodeList() bool {
-	list := c.raftNode.Members()
-	changed := false
-	for _, v := range list {
-		changed = changed && c.addNode(v)
-	}
-	return changed
-}
-
-func (c *clusterfunkCluster) getNodes() []string {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-	var ret []string
-	for _, v := range c.nodes {
-		ret = append(ret, v.ID)
-	}
-	return ret
 }

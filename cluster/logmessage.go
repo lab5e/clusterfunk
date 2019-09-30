@@ -20,6 +20,7 @@ const (
 type LogMessage struct {
 	MessageType LogMessageType
 	AckEndpoint string
+	Index       uint64
 	Data        []byte
 }
 
@@ -28,6 +29,7 @@ func NewLogMessage(t LogMessageType, endpoint string, data []byte) LogMessage {
 	return LogMessage{
 		MessageType: t,
 		AckEndpoint: endpoint,
+		Index:       0,
 		Data:        data,
 	}
 }

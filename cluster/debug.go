@@ -16,25 +16,6 @@ func timeCall(f func(), desc string) {
 
 // This is diagnostic functions. They can be removed.. Eventually
 
-// Dump the node's world view
-func (c *clusterfunkCluster) dumpNodes() {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-
-	log.Printf("==================== nodes ========================")
-	for _, v := range c.nodes {
-		me := ""
-		if v.ID == c.raftNode.LocalNodeID() {
-			me = "(that's me!)"
-		}
-		log.Printf("ID: %s %s", v.ID, me)
-		for k, v := range v.Tags {
-			log.Printf("           %s = %s", k, v)
-		}
-		log.Printf("- - - - - - - - - - - - - - - - - - - - - - - - - -")
-	}
-}
-
 func (c *clusterfunkCluster) dumpShardMap() {
 	log.Println("================== shard map ======================")
 	nodes := make(map[string]int)

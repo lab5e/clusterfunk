@@ -67,6 +67,7 @@ func (f *raftFSM) Apply(l *raft.Log) interface{} {
 	f.logEvent(l.Index, msg.MessageType, msg.AckEndpoint)
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
+	msg.Index = l.Index
 	f.state[msg.MessageType] = msg
 	return nil
 }
@@ -82,10 +83,16 @@ func (f *raftFSM) Snapshot() (raft.FSMSnapshot, error) {
 }
 
 // Entry returns the latest log message with that particular ID
-func (f *raftFSM) Entry(id LogMessageType) LogMessage {
+func (f *raftFSM) Entries(startingIndex uint64) []LogMessage {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
-	return f.state[id]
+	ret := make([]LogMessage, 0)
+	for _, v := range f.state {
+		if v.Index > startingIndex {
+			ret = append(ret, v)
+		}
+	}
+	return ret
 }
 
 // Restore is used to restore an FSM from a snapshot. It is not called
