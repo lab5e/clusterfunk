@@ -80,142 +80,139 @@ func (c *clusterfunkCluster) setFSMState(newState internalFSMState, nodeID strin
 func (c *clusterfunkCluster) clusterStateMachine() {
 	log.Printf("STATE: Launching")
 	var unacknowledgedNodes []string
-
+	oldState := leaderLost
 	shardMapLogIndex := uint64(0)
 	for newState := range c.stateChannel {
-		switch newState.State {
 
-		case assumeLeadership:
-			log.Printf("STATE: assume leader")
-			c.setRole(Leader)
-			// start with updating the node list
-			c.setFSMState(updateRaftNodeList, "")
+		timeCall(func() {
+			log.Printf("STATE: %s", newState.State.String())
+			switch newState.State {
 
-		case clusterSizeChanged:
-			log.Printf("STATE: Cluster size changed")
-			c.setLocalState(Resharding)
-			c.setFSMState(updateRaftNodeList, "")
+			case assumeLeadership:
+				c.setRole(Leader)
+				// start with updating the node list
+				c.setFSMState(updateRaftNodeList, "")
 
-		case updateRaftNodeList:
-			log.Printf("STATE: update node list")
-			// list is updated. Start resharding.
-			c.updateNodeList()
-			c.setFSMState(reshardCluster, "")
+			case clusterSizeChanged:
+				c.setLocalState(Resharding)
+				c.setFSMState(updateRaftNodeList, "")
 
-		case reshardCluster:
-			// reshard cluster, distribute via replicated log.
+			case updateRaftNodeList:
+				// list is updated. Start resharding.
+				c.updateNodeList()
+				c.setFSMState(reshardCluster, "")
 
-			// Reset the list of acked nodes.
-			log.Printf("STATE: reshardCluster")
-			list := c.getNodes()
-			// TODO: ShardManager needs a rewrite
-			c.shardManager.UpdateNodes(list...)
-			proposedShardMap, err := c.shardManager.MarshalBinary()
-			if err != nil {
-				panic(fmt.Sprintf("Can't marshal the shard map: %v", err))
-			}
-			mapMessage := NewLogMessage(ProposedShardMap, c.config.LeaderEndpoint, proposedShardMap)
-			// Build list of unacked nodes
-			// Note that this might include the local node as well, which
-			// is OK. The client part will behave like all other parts.
-			unacknowledgedNodes = append([]string{}, list...)
+			case reshardCluster:
+				// reshard cluster, distribute via replicated log.
 
-			// Replicate proposed shard map via log
-			buf, err := mapMessage.MarshalBinary()
-			if err != nil {
-				panic(fmt.Sprintf("Unable to marshal the log message containing shard map: %v", err))
-			}
-			timeCall(func() {
-				index, err := c.raftNode.AppendLogEntry(buf)
+				// Reset the list of acked nodes.
+				list := c.getNodes()
+				// TODO: ShardManager needs a rewrite
+				c.shardManager.UpdateNodes(list...)
+				proposedShardMap, err := c.shardManager.MarshalBinary()
 				if err != nil {
-					// We might have lost the leadership here. Log and continue.
+					panic(fmt.Sprintf("Can't marshal the shard map: %v", err))
+				}
+				mapMessage := NewLogMessage(ProposedShardMap, c.config.LeaderEndpoint, proposedShardMap)
+				// Build list of unacked nodes
+				// Note that this might include the local node as well, which
+				// is OK. The client part will behave like all other parts.
+				unacknowledgedNodes = append([]string{}, list...)
+
+				// Replicate proposed shard map via log
+				buf, err := mapMessage.MarshalBinary()
+				if err != nil {
+					panic(fmt.Sprintf("Unable to marshal the log message containing shard map: %v", err))
+				}
+				timeCall(func() {
+					index, err := c.raftNode.AppendLogEntry(buf)
+					if err != nil {
+						// We might have lost the leadership here. Log and continue.
+						if err := c.raftNode.ra.VerifyLeader().Error(); err == nil {
+							panic("I'm the leader but I could not write the log")
+						}
+						// otherwise -- just log it and continue
+						log.Printf("Could not write log entry for new shard map")
+					}
+					atomic.StoreUint64(c.reshardingLogIndex, index)
+				}, "Appending shard map log entry")
+				// This is the index we want commits for.
+				shardMapLogIndex = c.raftNode.LastIndex()
+				log.Printf("Shard map index = %d", shardMapLogIndex)
+				//c.updateNodes(c.shardManager.NodeList())
+				// Next messages will be ackReceived when the changes has replicated
+				// out to the other nodes.
+				// No new state here - wait for a series of ackReceived states
+				// from the nodes.
+
+			case ackReceived:
+				// when a new ack message is received the ack is noted for the node and
+				// until all nodes have acked the state will stay the same.
+				for i, v := range unacknowledgedNodes {
+					if v == newState.NodeID {
+						unacknowledgedNodes = append(unacknowledgedNodes[:i], unacknowledgedNodes[i+1:]...)
+					}
+				}
+				log.Printf("STATE: ack received from %s, %d nodes remaining", newState.NodeID, len(unacknowledgedNodes))
+				// Timeouts are handled when calling the other nodes via gRPC
+				allNodesHaveAcked := false
+				if len(unacknowledgedNodes) == 0 {
+					allNodesHaveAcked = true
+				}
+
+				if allNodesHaveAcked {
+					c.setFSMState(ackCompleted, "")
+				}
+				return // continue
+
+			case ackCompleted:
+				// TODO: Log final commit message, establishing the new state in the cluster
+				// ack is completed. Enable the new shard map for the cluster by
+				// sending a commit log message. No further processing is required
+				// here.
+				commitMessage := NewLogMessage(ShardMapCommitted, c.raftNode.LocalNodeID(), []byte{})
+				buf, err := commitMessage.MarshalBinary()
+				if err != nil {
+					panic(fmt.Sprintf("Unable to marshal commit message: %v", err))
+				}
+				if _, err := c.raftNode.AppendLogEntry(buf); err != nil {
+					// We might have lost the leadership here. Panic if we're still
+					// the leader
 					if err := c.raftNode.ra.VerifyLeader().Error(); err == nil {
 						panic("I'm the leader but I could not write the log")
 					}
 					// otherwise -- just log it and continue
-					log.Printf("Could not write log entry for new shard map")
+					log.Printf("Could not write log entry for new shard map: %v", err)
 				}
-				atomic.StoreUint64(c.reshardingLogIndex, index)
-			}, "Appending shard map log entry")
-			// This is the index we want commits for.
-			shardMapLogIndex = c.raftNode.LastIndex()
-			log.Printf("Shard map index = %d", shardMapLogIndex)
-			//c.updateNodes(c.shardManager.NodeList())
-			// Next messages will be ackReceived when the changes has replicated
-			// out to the other nodes.
-			// No new state here - wait for a series of ackReceived states
-			// from the nodes.
+				c.setLocalState(Operational)
+				return // continue
 
-		case ackReceived:
-			// when a new ack message is received the ack is noted for the node and
-			// until all nodes have acked the state will stay the same.
-			for i, v := range unacknowledgedNodes {
-				if v == newState.NodeID {
-					unacknowledgedNodes = append(unacknowledgedNodes[:i], unacknowledgedNodes[i+1:]...)
-				}
+			case assumeFollower:
+				c.setRole(Follower)
+				c.setLocalState(Resharding)
+				// Not much happens here but the next state should be - if all
+				// goes well - a shard map log message from the leader.
+
+			case newShardMapReceived:
+				// update internal map and ack map via gRPC
+				c.setLocalState(Resharding)
+
+				// No new state - the next is commitLogReceived which is set
+				// via the replicated log events
+
+			case commitLogReceived:
+				// commit log received, set state operational and resume normal
+				// operations. Signal to the rest of the library (channel)
+				c.setLocalState(Operational)
+
+			case leaderLost:
+				c.setLocalState(Voting)
+				// leader is lost - stop processing until a leader is elected and
+				// the commit log is received
 			}
-			log.Printf("STATE: ack received from %s, %d nodes remaining", newState.NodeID, len(unacknowledgedNodes))
-			// Timeouts are handled when calling the other nodes via gRPC
-			allNodesHaveAcked := false
-			if len(unacknowledgedNodes) == 0 {
-				allNodesHaveAcked = true
-			}
+		}, fmt.Sprintf("STATE: handle %s -> %s state transition", oldState.String(), newState.State.String()))
+		oldState = newState.State
 
-			if allNodesHaveAcked {
-				c.setFSMState(ackCompleted, "")
-			}
-			continue
-
-		case ackCompleted:
-			// TODO: Log final commit message, establishing the new state in the cluster
-			log.Printf("STATE: ack complete. operational leader.")
-			// ack is completed. Enable the new shard map for the cluster by
-			// sending a commit log message. No further processing is required
-			// here.
-			commitMessage := NewLogMessage(ShardMapCommitted, c.raftNode.LocalNodeID(), []byte{})
-			buf, err := commitMessage.MarshalBinary()
-			if err != nil {
-				panic(fmt.Sprintf("Unable to marshal commit message: %v", err))
-			}
-			if _, err := c.raftNode.AppendLogEntry(buf); err != nil {
-				// We might have lost the leadership here. Panic if we're still
-				// the leader
-				if err := c.raftNode.ra.VerifyLeader().Error(); err == nil {
-					panic("I'm the leader but I could not write the log")
-				}
-				// otherwise -- just log it and continue
-				log.Printf("Could not write log entry for new shard map: %v", err)
-			}
-			c.setLocalState(Operational)
-			continue
-
-		case assumeFollower:
-			log.Printf("STATE: follower")
-			c.setRole(Follower)
-			c.setLocalState(Resharding)
-			// Not much happens here but the next state should be - if all
-			// goes well - a shard map log message from the leader.
-
-		case newShardMapReceived:
-			log.Printf("STATE: shardmap received")
-			// update internal map and ack map via gRPC
-			c.setLocalState(Resharding)
-
-			// No new state - the next is commitLogReceived which is set
-			// via the replicated log events
-
-		case commitLogReceived:
-			log.Printf("STATE: commit log received. Operational.")
-			// commit log received, set state operational and resume normal
-			// operations. Signal to the rest of the library (channel)
-			c.setLocalState(Operational)
-
-		case leaderLost:
-			log.Printf("STATE: leader lost")
-			c.setLocalState(Voting)
-			// leader is lost - stop processing until a leader is elected and
-			// the commit log is received
-		}
 	}
 }
 

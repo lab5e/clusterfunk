@@ -116,41 +116,23 @@ func (c *clusterfunkCluster) Start() error {
 	return nil
 }
 
-func (c *clusterfunkCluster) raftEvents(ch <-chan RaftEvent) {
+func (c *clusterfunkCluster) raftEvents(ch <-chan RaftEventType) {
 	for e := range ch {
-		switch e.Type {
-		case RaftNodeAdded:
-			//log.Printf("EVENT: Node %s added", e.NodeID)
-			c.addNode(e.NodeID)
-			c.setFSMState(clusterSizeChanged, e.NodeID)
-
-		case RaftNodeRemoved:
-			c.removeNode(e.NodeID)
-			c.setFSMState(clusterSizeChanged, e.NodeID)
-
-			//log.Printf("EVENT: Node %s removed", e.NodeID)
+		switch e {
+		case RaftClusterSizeChanged:
+			log.Printf("RAFT: Cluster size changed: %d members:  %+v ", c.raftNode.MemberCount(), c.raftNode.Members())
 
 		case RaftLeaderLost:
-			//log.Printf("EVENT: Leader lost")
-			c.setLocalState(Voting)
-			c.setFSMState(leaderLost, "")
+			log.Printf("RAFT: Leader lost")
 
 		case RaftBecameLeader:
-			//log.Printf("EVENT: Became leader")
-			c.setRole(Leader)
-			c.setLocalState(Resharding)
-			c.setFSMState(assumeLeadership, "")
+			log.Printf("RAFT: I'm leader")
 
 		case RaftBecameFollower:
-			// Wait for the leader to redistribute the shards since it's the new leader
-			log.Printf("EVENT: Became follower")
-			c.setRole(Follower)
-			c.setLocalState(Resharding)
-			c.setFSMState(assumeFollower, "")
+			log.Printf("RAFT: I'm follower")
 
 		case RaftReceivedLog:
-			log.Printf("EVENT: Log (idx=%d, type=%d) received", e.Index, e.LogType)
-			c.processReplicatedLog(e.LogType, e.Index)
+			log.Printf("RAFT: Log message")
 
 		default:
 			log.Printf("Unknown event received: %+v", e)
@@ -356,7 +338,6 @@ func (c *clusterfunkCluster) updateNodes(nodes []string) {
 func (c *clusterfunkCluster) updateNode(nodeID string, tags map[string]string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	log.Printf("CLUSTER Update node %s (TODO)", nodeID)
 	existing, ok := c.nodes[nodeID]
 	if !ok {
 		existing = NewNode(nodeID, NonMember)
@@ -380,7 +361,6 @@ func (c *clusterfunkCluster) updateSerfNode(ni SerfMemberInfo, n *Node) {
 func (c *clusterfunkCluster) addNode(nodeID string) bool {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	log.Printf("CLUSTER Add node %s", nodeID)
 	_, ok := c.nodes[nodeID]
 	if !ok {
 		c.nodes[nodeID] = NewNode(nodeID, NonMember)
@@ -393,7 +373,6 @@ func (c *clusterfunkCluster) addNode(nodeID string) bool {
 func (c *clusterfunkCluster) removeNode(nodeID string) bool {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	log.Printf("CLUSTER Remove node %s", nodeID)
 	_, ok := c.nodes[nodeID]
 	if !ok {
 		return false

@@ -19,10 +19,8 @@ import (
 type RaftEventType int
 
 const (
-	//RaftNodeAdded is emitted when a new node is added
-	RaftNodeAdded RaftEventType = iota
-	// RaftNodeRemoved is emitted when a node is removed
-	RaftNodeRemoved
+	//RaftClusterSizeChanged is emitted when a new node is added
+	RaftClusterSizeChanged RaftEventType = iota
 	// RaftLeaderLost is emitted when the leader is lost, ie the node enters the candidate state
 	RaftLeaderLost
 	// RaftBecameLeader is emitted when the leader becomes the leader
@@ -33,30 +31,36 @@ const (
 	RaftReceivedLog
 )
 
-// RaftEvent is an event emitted by the RaftNode type
-type RaftEvent struct {
-	Type    RaftEventType  // Type is the event type
-	NodeID  string         // NodeID is the node ID of the source
-	Index   uint64         // Index is a log entry index (if relevant)
-	LogType LogMessageType // Log type identifier from log
-}
-
-// RaftNode is a wrapper for the Raft library
+// RaftNode is a wrapper for the Raft library. The raw events are coalesced into
+// higher level events (particularly RaftClusterSizeChanged). Coalesced events
+// introduce a small (millisecond) delay on the events but everything on top of
+// this library will operate in the millisecond range.
+//
+// In addition this type keeps track of the active nodes at all times via the
+// raft events. There's no guarantee that the list of nodes in the cluster will
+// be up to date or correct for the followers. The followers will only
+// interact with the leader of the cluster.
 type RaftNode struct {
-	mutex        *sync.RWMutex
-	localNodeID  string
-	raftEndpoint string
-	ra           *raft.Raft
-	events       chan RaftEvent
-	fsm          *raftFSM
+	mutex          *sync.RWMutex
+	nodeMutex      *sync.RWMutex
+	localNodeID    string
+	raftEndpoint   string
+	ra             *raft.Raft
+	events         chan RaftEventType
+	fsm            *raftFSM
+	nodes          map[string]bool
+	internalEvents chan RaftEventType
 }
 
 // NewRaftNode creates a new RaftNode instance
 func NewRaftNode() *RaftNode {
 	return &RaftNode{
-		localNodeID: "",
-		mutex:       &sync.RWMutex{},
-		events:      make(chan RaftEvent, 2), // tiny buffer here to make multiple events feasable.
+		localNodeID:    "",
+		mutex:          &sync.RWMutex{},
+		nodeMutex:      &sync.RWMutex{},
+		events:         make(chan RaftEventType, 10), // tiny buffer here to make multiple events feasable.
+		internalEvents: make(chan RaftEventType, 10),
+		nodes:          make(map[string]bool, 0), // Active nodes in the cluster
 	}
 }
 
@@ -176,32 +180,20 @@ func (r *RaftNode) Start(nodeID string, verboseLog bool, cfg RaftParameters) err
 	}
 	observerChan := make(chan raft.Observation)
 
+	// This node will - surprise - be a member of the cluster
+	r.addNode(nodeID)
+	go r.coalescingEvents()
 	go r.observerFunc(observerChan)
-
 	r.ra.RegisterObserver(raft.NewObserver(observerChan, true, func(*raft.Observation) bool { return true }))
 	r.localNodeID = nodeID
+	r.sendInternalEvent(RaftBecameFollower)
 
 	return nil
 }
 
-func (r *RaftNode) sendEvent(e RaftEvent) {
-	go func() {
-		select {
-		case r.events <- e:
-		case <-time.After(1 * time.Second):
-			log.Printf("**** Nobody's listening to me! ev = %+v", e)
-		}
-	}()
-}
-
 func (r *RaftNode) logObserver(ch chan fsmLogEvent) {
-	for ev := range ch {
-		r.sendEvent(RaftEvent{
-			Type:    RaftReceivedLog,
-			NodeID:  string(r.localNodeID),
-			Index:   ev.Index,
-			LogType: ev.LogType,
-		})
+	for range ch {
+		r.sendInternalEvent(RaftReceivedLog)
 	}
 }
 func (r *RaftNode) observerFunc(ch chan raft.Observation) {
@@ -209,16 +201,11 @@ func (r *RaftNode) observerFunc(ch chan raft.Observation) {
 		switch v := k.Data.(type) {
 		case raft.PeerObservation:
 			if v.Removed {
-				r.sendEvent(RaftEvent{
-					Type:   RaftNodeRemoved,
-					NodeID: string(v.Peer.ID),
-				})
+				r.removeNode(string(v.Peer.ID))
 				continue
 			}
-			r.sendEvent(RaftEvent{
-				Type:   RaftNodeAdded,
-				NodeID: string(v.Peer.ID),
-			})
+			r.addNode(string(v.Peer.ID))
+
 		case raft.LeaderObservation:
 			// This can be ignored since we're monitoring the state
 			// and are getting the leader info via other channels.
@@ -226,29 +213,20 @@ func (r *RaftNode) observerFunc(ch chan raft.Observation) {
 		case raft.RaftState:
 			switch v {
 			case raft.Candidate:
-				r.sendEvent(RaftEvent{
-					Type:   RaftLeaderLost,
-					NodeID: "",
-				})
+				r.sendInternalEvent(RaftLeaderLost)
 			case raft.Follower:
-				r.sendEvent(RaftEvent{
-					Type:   RaftBecameFollower,
-					NodeID: r.localNodeID,
-				})
+				r.sendInternalEvent(RaftBecameFollower)
 			case raft.Leader:
-				r.sendEvent(RaftEvent{
-					Type:   RaftBecameLeader,
-					NodeID: r.localNodeID,
-				})
+				r.sendInternalEvent(RaftBecameLeader)
 			}
 		case raft.PeerLiveness:
 			lt, ok := k.Data.(raft.PeerLiveness)
 			if ok {
 				if !lt.Heartbeat {
-					log.Printf("Peer %s has gone away", lt.ID)
+					r.removeNode(string(lt.ID))
 				}
 				if lt.Heartbeat {
-					log.Printf("Peer %s is back up", lt.ID)
+					r.addNode(string(lt.ID))
 				}
 			}
 		case raft.RequestVoteRequest:
@@ -305,7 +283,6 @@ func (r *RaftNode) AddMember(nodeID string, endpoint string) error {
 		return errors.New("must be leader to add a new member")
 	}
 
-	log.Printf("Joining server: %s", endpoint)
 	configFuture := r.ra.GetConfiguration()
 	if err := configFuture.Error(); err != nil {
 		return err
@@ -322,7 +299,7 @@ func (r *RaftNode) AddMember(nodeID string, endpoint string) error {
 	if f.Error() != nil {
 		return f.Error()
 	}
-	log.Printf("%s joined cluster with node ID %s", endpoint, nodeID)
+	r.addNode(nodeID)
 	return nil
 }
 
@@ -343,6 +320,7 @@ func (r *RaftNode) RemoveMember(nodeID string, endpoint string) error {
 		return err
 	}
 
+	r.removeNode(nodeID)
 	for _, srv := range configFuture.Configuration().Servers {
 		if srv.ID == raft.ServerID(nodeID) && srv.Address == raft.ServerAddress(endpoint) {
 			return r.ra.RemoveServer(raft.ServerID(nodeID), 0, 0).Error()
@@ -359,7 +337,8 @@ func (r *RaftNode) Endpoint() string {
 	return r.raftEndpoint
 }
 
-// Leader returns true if this node is the leader
+// Leader returns true if this node is the leader. This will verify the
+// leadership with the Raft library.
 func (r *RaftNode) Leader() bool {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
@@ -381,6 +360,10 @@ func (r *RaftNode) AppendLogEntry(data []byte) (uint64, error) {
 	if err := f.Error(); err != nil {
 		return 0, err
 	}
+	// TODO: Check if this is really necessary. Apply might do the job
+	if err := r.ra.Barrier(0).Error(); err != nil {
+		return 0, err
+	}
 	return f.Index(), nil
 }
 
@@ -388,18 +371,9 @@ func (r *RaftNode) AppendLogEntry(data []byte) (uint64, error) {
 func (r *RaftNode) Members() []string {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	if r.ra == nil {
-		return []string{}
-	}
-	config := r.ra.GetConfiguration()
-	if err := config.Error(); err != nil {
-		panic(fmt.Sprintf("Unable to read member list from Raft: %v", err))
-	}
-
-	members := config.Configuration().Servers
-	ret := make([]string, len(members))
-	for i, v := range members {
-		ret[i] = string(v.ID)
+	var ret []string
+	for k := range r.nodes {
+		ret = append(ret, k)
 	}
 	return ret
 }
@@ -411,24 +385,7 @@ func (r *RaftNode) Members() []string {
 func (r *RaftNode) MemberCount() int {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	if r.ra == nil {
-		return 0
-	}
-	cfg := r.ra.GetConfiguration()
-	if cfg.Error() != nil {
-		return 0
-	}
-	return len(cfg.Configuration().Servers)
-}
-
-// State returns the Raft server's state
-func (r *RaftNode) State() string {
-	r.mutex.RLock()
-	defer r.mutex.RUnlock()
-	if r.ra == nil {
-		return ""
-	}
-	return r.ra.State().String()
+	return len(r.nodes)
 }
 
 // LastIndex returns the last log index received
@@ -445,7 +402,7 @@ func (r *RaftNode) LastIndex() uint64 {
 // event channel so use multiple listeners at your own peril.
 // You will get NodeAdded, NodeRemoved, LeaderLost and LeaderChanged
 // events on this channel.
-func (r *RaftNode) Events() <-chan RaftEvent {
+func (r *RaftNode) Events() <-chan RaftEventType {
 	return r.events
 }
 
@@ -453,4 +410,57 @@ func (r *RaftNode) Events() <-chan RaftEvent {
 // specified type ID
 func (r *RaftNode) GetReplicatedLogMessage(id LogMessageType) LogMessage {
 	return r.fsm.Entry(id)
+}
+
+func (r *RaftNode) addNode(id string) {
+	r.nodeMutex.Lock()
+	defer r.nodeMutex.Unlock()
+
+	_, exists := r.nodes[id]
+	if exists {
+		return
+	}
+	r.nodes[id] = true
+	r.sendInternalEvent(RaftClusterSizeChanged)
+}
+
+func (r *RaftNode) removeNode(id string) {
+	r.nodeMutex.Lock()
+	defer r.nodeMutex.Unlock()
+
+	_, exists := r.nodes[id]
+	if exists {
+		delete(r.nodes, id)
+		r.sendInternalEvent(RaftClusterSizeChanged)
+	}
+}
+
+func (r *RaftNode) sendInternalEvent(ev RaftEventType) {
+	select {
+	case r.internalEvents <- ev:
+	case <-time.After(10 * time.Millisecond):
+		panic("Unable to send internal event. Channel full?")
+	}
+}
+
+func (r *RaftNode) coalescingEvents() {
+	eventsToGenerate := make(map[RaftEventType]int)
+	for {
+		timedOut := false
+		select {
+		case ev := <-r.internalEvents:
+			eventsToGenerate[ev]++
+			// got event
+		case <-time.After(1 * time.Millisecond):
+			timedOut = true
+		}
+		if timedOut {
+			for k := range eventsToGenerate {
+				// generate appropriate event
+				r.events <- k
+				delete(eventsToGenerate, k)
+			}
+
+		}
+	}
 }

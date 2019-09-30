@@ -31,29 +31,29 @@ func main() {
 
 	c := cluster.NewCluster(config, shards)
 	defer c.Stop()
-
-	go func(ch <-chan cluster.Event) {
-		for ev := range ch {
-			switch ev.LocalState {
-			case cluster.Invalid:
-				log.Println("DEMO STATE Cluster node is in invalid state")
-			case cluster.Joining:
-				log.Println("DEMO STATE Cluster node is joining a cluster")
-			case cluster.Voting:
-				log.Println("DEMO STATE Cluster node is voting")
-			case cluster.Operational:
-				log.Println("DEMO STATE Cluster node is operational")
-			case cluster.Resharding:
-				log.Println("DEMO STATE Cluster node is resharding")
-			case cluster.Starting:
-				log.Println("DEMO STATE Cluster node is starting")
-			case cluster.Stopping:
-				log.Println("DEMO STATE Cluster node is operational")
-			default:
-				log.Println("DEMO STATE *** Unknown state", ev.LocalState)
+	/*
+		go func(ch <-chan cluster.Event) {
+			for ev := range ch {
+				switch ev.LocalState {
+				case cluster.Invalid:
+					log.Println("DEMO STATE Cluster node is in invalid state")
+				case cluster.Joining:
+					log.Println("DEMO STATE Cluster node is joining a cluster")
+				case cluster.Voting:
+					log.Println("DEMO STATE Cluster node is voting")
+				case cluster.Operational:
+					log.Println("DEMO STATE Cluster node is operational")
+				case cluster.Resharding:
+					log.Println("DEMO STATE Cluster node is resharding")
+				case cluster.Starting:
+					log.Println("DEMO STATE Cluster node is starting")
+				case cluster.Stopping:
+					log.Println("DEMO STATE Cluster node is operational")
+				default:
+					log.Println("DEMO STATE *** Unknown state", ev.LocalState)
+				}
 			}
-		}
-	}(c.Events())
+		}(c.Events())*/
 
 	if err := c.Start(); err != nil {
 		log.Printf("Error starting cluster: %v\n", err)
