@@ -31,6 +31,24 @@ const (
 	RaftReceivedLog
 )
 
+// String is the string representation of the event
+func (r RaftEventType) String() string {
+	switch r {
+	case RaftClusterSizeChanged:
+		return "RaftClusterSizeChanged"
+	case RaftLeaderLost:
+		return "RaftLeaderLost"
+	case RaftBecameLeader:
+		return "RaftBecameLeader"
+	case RaftBecameFollower:
+		return "RaftBecameFollower"
+	case RaftReceivedLog:
+		return "RaftReceivedLog"
+	default:
+		panic(fmt.Sprintf("Unknown raft event type: %d", r))
+	}
+}
+
 // RaftNode is a wrapper for the Raft library. The raw events are coalesced into
 // higher level events (particularly RaftClusterSizeChanged). Coalesced events
 // introduce a small (millisecond) delay on the events but everything on top of
@@ -218,6 +236,10 @@ func (r *RaftNode) observerFunc(ch chan raft.Observation) {
 				r.sendInternalEvent(RaftBecameFollower)
 			case raft.Leader:
 				r.sendInternalEvent(RaftBecameLeader)
+				// Cluster size changed events will not be triggered when the
+				// node is the only member in the cluster. This is just to
+				// make sure the event is triggered for the first time.
+				r.sendInternalEvent(RaftClusterSizeChanged)
 			}
 		case raft.PeerLiveness:
 			lt, ok := k.Data.(raft.PeerLiveness)
@@ -327,7 +349,9 @@ func (r *RaftNode) RemoveMember(nodeID string, endpoint string) error {
 		}
 	}
 
-	return errors.New("unknown member node")
+	// The server does not exist in the cluster - *technically* an error but
+	// it's no longer in the cluster so we're good.
+	return nil
 }
 
 // Endpoint returns the Raft endpoint (aka bind address)

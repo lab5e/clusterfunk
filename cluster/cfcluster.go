@@ -117,22 +117,27 @@ func (c *clusterfunkCluster) Start() error {
 }
 
 func (c *clusterfunkCluster) raftEvents(ch <-chan RaftEventType) {
+	lastTime := time.Now()
+	deltaT := func() float64 {
+		t := time.Now()
+		diff := t.Sub(lastTime)
+		lastTime = t
+		return float64(diff) / float64(time.Millisecond)
+	}
+
 	for e := range ch {
+		log.Printf("RAFT: %s (%f ms since last event)", e.String(), deltaT())
 		switch e {
 		case RaftClusterSizeChanged:
-			log.Printf("RAFT: Cluster size changed: %d members:  %+v ", c.raftNode.MemberCount(), c.raftNode.Members())
+			log.Printf("%d members:  %+v ", c.raftNode.MemberCount(), c.raftNode.Members())
 
 		case RaftLeaderLost:
-			log.Printf("RAFT: Leader lost")
 
 		case RaftBecameLeader:
-			log.Printf("RAFT: I'm leader")
 
 		case RaftBecameFollower:
-			log.Printf("RAFT: I'm follower")
 
 		case RaftReceivedLog:
-			log.Printf("RAFT: Log message")
 
 		default:
 			log.Printf("Unknown event received: %+v", e)
