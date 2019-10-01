@@ -59,15 +59,16 @@ func (r RaftEventType) String() string {
 // be up to date or correct for the followers. The followers will only
 // interact with the leader of the cluster.
 type RaftNode struct {
-	mutex          *sync.RWMutex
-	nodeMutex      *sync.RWMutex
-	localNodeID    string
-	raftEndpoint   string
-	ra             *raft.Raft
-	events         chan RaftEventType
-	fsm            *raftFSM
-	nodes          map[string]bool
-	internalEvents chan RaftEventType
+	mutex          *sync.RWMutex                 // Mutex for the attributes
+	nodeMutex      *sync.RWMutex                 // Mutex for the node
+	fsmMutex       *sync.RWMutex                 // Mutex for the FSM
+	nodes          map[string]bool               // Map of nodes
+	localNodeID    string                        // The local node ID
+	raftEndpoint   string                        // Raft endpoint
+	ra             *raft.Raft                    // Raft instance
+	events         chan RaftEventType            // Events from Raft
+	internalEvents chan RaftEventType            // Internal event queue
+	state          map[LogMessageType]LogMessage // The internal FSM state
 }
 
 // NewRaftNode creates a new RaftNode instance
@@ -76,9 +77,11 @@ func NewRaftNode() *RaftNode {
 		localNodeID:    "",
 		mutex:          &sync.RWMutex{},
 		nodeMutex:      &sync.RWMutex{},
+		fsmMutex:       &sync.RWMutex{},
 		events:         make(chan RaftEventType, 10), // tiny buffer here to make multiple events feasable.
 		internalEvents: make(chan RaftEventType, 10),
 		nodes:          make(map[string]bool, 0), // Active nodes in the cluster
+		state: make(map[LogMessageType]LogMessage),
 	}
 }
 
@@ -173,10 +176,7 @@ func (r *RaftNode) Start(nodeID string, verboseLog bool, cfg RaftParameters) err
 		stableStore = raft.NewInmemStore()
 		snapshotStore = raft.NewInmemSnapshotStore()
 	}
-	r.fsm = newStateMachine()
-	go r.logObserver(r.fsm.Events)
-
-	r.ra, err = raft.NewRaft(config, r.fsm, logStore, stableStore, snapshotStore, transport)
+	r.ra, err = raft.NewRaft(config, r, logStore, stableStore, snapshotStore, transport)
 	if err != nil {
 		return err
 	}
@@ -209,11 +209,6 @@ func (r *RaftNode) Start(nodeID string, verboseLog bool, cfg RaftParameters) err
 	return nil
 }
 
-func (r *RaftNode) logObserver(ch chan fsmLogEvent) {
-	for range ch {
-		r.sendInternalEvent(RaftReceivedLog)
-	}
-}
 func (r *RaftNode) observerFunc(ch chan raft.Observation) {
 	for k := range ch {
 		switch v := k.Data.(type) {
@@ -434,7 +429,15 @@ func (r *RaftNode) Events() <-chan RaftEventType {
 // GetLogMessages returns the replicated log message with the
 // specified type ID
 func (r *RaftNode) GetLogMessages(startingIndex uint64) []LogMessage {
-	return r.fsm.Entries(startingIndex)
+	r.fsmMutex.Lock()
+	defer r.fsmMutex.Unlock()
+	ret := make([]LogMessage, 0)
+	for _, v := range r.state {
+		if v.Index > startingIndex {
+			ret = append(ret, v)
+		}
+	}
+	return ret
 }
 
 func (r *RaftNode) addNode(id string) {
@@ -499,4 +502,59 @@ func (r *RaftNode) coalescingEvents() {
 			eventsToGenerate = make([]RaftEventType, 0)
 		}
 	}
+}
+
+// The raft.FSM implementation. Right now the implementation looks a lot more
+// like a storage layer but technically it's a FSM
+
+// Apply log is invoked once a log entry is committed.
+// It returns a value which will be made available in the
+// ApplyFuture returned by Raft.Apply method if that
+// method was called on the same Raft node as the FSM.
+func (r *RaftNode) Apply(l *raft.Log) interface{} {
+	//log.Printf("FSM: Apply, index = %d, term = %d", l.Index, l.Term)
+	msg := LogMessage{}
+	if err := msg.UnmarshalBinary(l.Data); err != nil {
+		panic(fmt.Sprintf(" ***** Error decoding log message: %v", err))
+	}
+	r.fsmMutex.Lock()
+	defer r.fsmMutex.Unlock()
+	msg.Index = l.Index
+	r.state[msg.MessageType] = msg
+	r.sendInternalEvent(RaftReceivedLog)
+	return nil
+}
+
+// Snapshot is used to support log compaction. This call should
+// return an FSMSnapshot which can be used to save a point-in-time
+// snapshot of the FSM. Apply and Snapshot are not called in multiple
+// threads, but Apply will be called concurrently with Persist. This means
+// the FSM should be implemented in a fashion that allows for concurrent
+// updates while a snapshot is happening.
+func (r *RaftNode) Snapshot() (raft.FSMSnapshot, error) {
+	return &raftSnapshot{}, nil
+}
+
+// Restore is used to restore an FSM from a snapshot. It is not called
+// concurrently with any other command. The FSM must discard all previous
+// state.
+func (r *RaftNode) Restore(io.ReadCloser) error {
+	log.Printf("FSM: Restore")
+	return nil
+}
+
+type raftSnapshot struct {
+}
+
+// Persist should dump all necessary state to the WriteCloser 'sink',
+// and call sink.Close() when finished or call sink.Cancel() on error.
+func (r *raftSnapshot) Persist(sink raft.SnapshotSink) error {
+	log.Printf("FSMSnapshot: Persist")
+	sink.Close()
+	return nil
+}
+
+// Release is invoked when we are finished with the snapshot.
+func (r *raftSnapshot) Release() {
+	// nothing happens here.
 }

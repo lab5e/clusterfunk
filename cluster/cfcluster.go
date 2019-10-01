@@ -154,7 +154,6 @@ func (c *clusterfunkCluster) setRole(newRole NodeRole) {
 
 func (c *clusterfunkCluster) processReplicatedLog() {
 	messages := c.raftNode.GetLogMessages(c.lastProcessedIndex)
-	log.Printf("*** Got messages: %d", len(messages))
 	for _, msg := range messages {
 		if msg.Index > c.lastProcessedIndex {
 			c.lastProcessedIndex = msg.Index

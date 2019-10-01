@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"sync/atomic"
 	"time"
 
@@ -128,7 +127,6 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 		newShardMapReceived, newShardMapReceived,
 		reshardCluster, reshardCluster,
 	)
-	state.DumpTransitions(os.Stderr)
 
 	var unacknowledgedNodes []string
 	shardMapLogIndex := uint64(0)
