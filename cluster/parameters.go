@@ -43,7 +43,9 @@ func (p *Parameters) checkAndSetEndpoint(hostport *string) {
 	}
 	*hostport = fmt.Sprintf("%s:%d", p.Interface, port)
 }
-func (p *Parameters) final() {
+
+// Final sets the defaults for the parameters
+func (p *Parameters) Final() {
 	if p.NodeID == "" {
 		p.NodeID = utils.RandomID()
 	}

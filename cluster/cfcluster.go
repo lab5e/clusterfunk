@@ -61,7 +61,7 @@ func NewCluster(params Parameters, shardManager sharding.ShardManager) Cluster {
 }
 
 func (c *clusterfunkCluster) Start() error {
-	c.config.final()
+	c.config.Final()
 	if c.config.ClusterName == "" {
 		return errors.New("cluster name not specified")
 	}
