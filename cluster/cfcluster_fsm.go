@@ -146,7 +146,7 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 
 				// Reset the list of acked nodes.
 				list := c.raftNode.Members()
-				// TODO: ShardManager needs a rewrite
+
 				c.shardManager.UpdateNodes(list...)
 				proposedShardMap, err := c.shardManager.MarshalBinary()
 				if err != nil {
