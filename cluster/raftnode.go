@@ -471,22 +471,32 @@ func (r *RaftNode) sendInternalEvent(ev RaftEventType) {
 // TODO(stalehd): Ordering is important. Emit in same order as they came,
 // remove duplicates of clusterSizeChanged and friends.
 func (r *RaftNode) coalescingEvents() {
-	eventsToGenerate := make(map[RaftEventType]int)
+	eventsToGenerate := make([]RaftEventType, 0)
 	for {
 		timedOut := false
 		select {
 		case ev := <-r.internalEvents:
-			eventsToGenerate[ev]++
-			// got event
+			found := false
+			for i := range eventsToGenerate {
+				if eventsToGenerate[i] == ev {
+					found = true
+					break
+				}
+			}
+			if !found {
+				eventsToGenerate = append(eventsToGenerate, ev)
+			}
+			continue
+
 		case <-time.After(1 * time.Millisecond):
 			timedOut = true
 		}
 		if timedOut {
-			for k := range eventsToGenerate {
+			for i := range eventsToGenerate {
 				// generate appropriate event
-				r.events <- k
-				delete(eventsToGenerate, k)
+				r.events <- eventsToGenerate[i]
 			}
+			eventsToGenerate = make([]RaftEventType, 0)
 		}
 	}
 }

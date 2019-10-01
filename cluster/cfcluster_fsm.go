@@ -114,13 +114,19 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 
 		commitLogReceived, leaderLost,
 
-		// Sketchy transitions below
+		// Sketchy transitions below. We're doing both the client and
+		// server FSM at the same time. Split into two different FSMs
+		// to make cleaner interfaces.
 		assumeFollower, assumeLeadership,
 		ackCompleted, ackReceived,
 		ackCompleted, clusterSizeChanged,
 		ackCompleted, leaderLost,
 		ackCompleted, assumeFollower,
 		reshardCluster, assumeFollower,
+		assumeFollower, clusterSizeChanged,
+		reshardCluster, clusterSizeChanged,
+		newShardMapReceived, newShardMapReceived,
+		reshardCluster, reshardCluster,
 	)
 	state.DumpTransitions(os.Stderr)
 
