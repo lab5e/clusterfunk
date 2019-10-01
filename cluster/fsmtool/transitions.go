@@ -14,12 +14,14 @@ type StateTransitionTable struct {
 	PanicOnError     bool
 	LogStates        bool
 	LogTransitions   bool
+	Name             string
 	ValidTransitions map[interface{}][]interface{}
 }
 
 // NewStateTransitionTable creates a new state transition table.
 func NewStateTransitionTable(initialState interface{}) *StateTransitionTable {
 	return &StateTransitionTable{
+		Name:             "State",
 		CurrentState:     initialState,
 		LogOnError:       false,
 		PanicOnError:     false,
@@ -68,12 +70,14 @@ func (s *StateTransitionTable) SetState(state interface{}) bool {
 
 // Apply applies the state transition with the given function and logs debug information
 func (s *StateTransitionTable) Apply(newState interface{}, code func(stt *StateTransitionTable)) bool {
+	oldState := s.CurrentState
 	if !s.SetState(newState) {
+		msg := fmt.Sprintf("%s: Invalid state assignment: Current state = %s, invalid state = %s", s.Name, s.CurrentState, newState)
 		if s.LogOnError {
-			log.Printf("Invalid state assignment: Current state = %s, invalid state = %s", s.CurrentState, newState)
+			log.Printf(msg)
 		}
 		if s.PanicOnError {
-			panic(fmt.Sprintf("Invalid state assignment: Current state = %s, invalid state = %s", s.CurrentState, newState))
+			panic(msg)
 		}
 		return false
 	}
@@ -82,12 +86,12 @@ func (s *StateTransitionTable) Apply(newState interface{}, code func(stt *StateT
 		start = time.Now()
 	}
 
-	s.CurrentState = newState
 	code(s)
+
 	if s.LogTransitions {
 		stop := time.Now()
 		execTime := float64(stop.Sub(start)) / float64(time.Millisecond)
-		log.Printf("State: %s->%s took %f ms", s.CurrentState, newState, execTime)
+		log.Printf("%s: %s->%s took %f ms", s.Name, oldState, newState, execTime)
 	}
 	return true
 }
