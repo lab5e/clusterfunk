@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -15,22 +14,23 @@ import (
 
 // clusterfunkClusterß implements the Cluster interface
 type clusterfunkCluster struct {
-	serfNode            *SerfNode
-	raftNode            *RaftNode
-	config              Parameters
-	registry            *utils.ZeroconfRegistry
-	name                string
-	localState          *int32
-	localRole           *int32
-	mgmtServer          *grpc.Server // gRPC server for management
-	leaderServer        *grpc.Server // gRPC server for leader
-	eventChannels       []chan Event
-	mutex               *sync.RWMutex
-	stateChannel        chan fsmEvent
-	shardManager        sharding.ShardManager
-	reshardingLogIndex  *uint64
-	wantedShardLogIndex *uint64
-	lastProcessedIndex  uint64
+	serfNode             *SerfNode
+	raftNode             *RaftNode
+	config               Parameters
+	registry             *utils.ZeroconfRegistry
+	name                 string
+	localState           *int32
+	localRole            *int32
+	mgmtServer           *grpc.Server // gRPC server for management
+	leaderServer         *grpc.Server // gRPC server for leader
+	eventChannels        []chan Event
+	mutex                *sync.RWMutex
+	followerStateChannel chan fsmFollowerEvent
+	stateChannel         chan fsmEvent
+	shardManager         sharding.ShardManager
+	reshardingLogIndex   *uint64
+	wantedShardLogIndex  *uint64
+	lastProcessedIndex   uint64
 }
 
 // NewCluster returns a new cluster (client)
@@ -45,18 +45,20 @@ func NewCluster(params Parameters, shardManager sharding.ShardManager) Cluster {
 	atomic.StoreInt32(state, int32(Invalid))
 	atomic.StoreInt32(role, int32(Unknown))
 	ret := &clusterfunkCluster{
-		config:              params,
-		name:                params.ClusterName,
-		localState:          state,
-		localRole:           role,
-		eventChannels:       make([]chan Event, 0),
-		mutex:               &sync.RWMutex{},
-		stateChannel:        make(chan fsmEvent, 5),
-		shardManager:        shardManager,
-		reshardingLogIndex:  reshardIndex,
-		wantedShardLogIndex: wantedIndex,
+		config:               params,
+		name:                 params.ClusterName,
+		localState:           state,
+		localRole:            role,
+		eventChannels:        make([]chan Event, 0),
+		mutex:                &sync.RWMutex{},
+		stateChannel:         make(chan fsmEvent, 5),
+		followerStateChannel: make(chan fsmFollowerEvent, 5),
+		shardManager:         shardManager,
+		reshardingLogIndex:   reshardIndex,
+		wantedShardLogIndex:  wantedIndex,
 	}
 	go ret.clusterStateMachine()
+	go ret.followerStateMachine()
 	return ret
 }
 
@@ -116,26 +118,21 @@ func (c *clusterfunkCluster) Start() error {
 }
 
 func (c *clusterfunkCluster) raftEvents(ch <-chan RaftEventType) {
-	lastTime := time.Now()
-	deltaT := func() float64 {
-		t := time.Now()
-		diff := t.Sub(lastTime)
-		lastTime = t
-		return float64(diff) / float64(time.Millisecond)
-	}
 
 	for e := range ch {
-		log.Printf("RAFT: %s (%f ms since last event)", e.String(), deltaT())
+		log.Printf("RAFT: %s", e)
 		switch e {
 		case RaftClusterSizeChanged:
 			log.Printf("%d members:  %+v ", c.raftNode.MemberCount(), c.raftNode.Members())
 			c.setFSMState(clusterSizeChanged, "")
 		case RaftLeaderLost:
-			c.setFSMState(leaderLost, "")
+			c.setFollowerState(leaderLost, LogMessage{})
 		case RaftBecameLeader:
 			c.setFSMState(assumeLeadership, "")
+			c.setFollowerState(leaderElected, LogMessage{})
 		case RaftBecameFollower:
 			c.setFSMState(assumeFollower, "")
+			c.setFollowerState(leaderElected, LogMessage{})
 		case RaftReceivedLog:
 			c.processReplicatedLog()
 		default:
@@ -154,37 +151,17 @@ func (c *clusterfunkCluster) setRole(newRole NodeRole) {
 
 func (c *clusterfunkCluster) processReplicatedLog() {
 	messages := c.raftNode.GetLogMessages(c.lastProcessedIndex)
+	log.Printf("Messages: %d", len(messages))
 	for _, msg := range messages {
 		if msg.Index > c.lastProcessedIndex {
 			c.lastProcessedIndex = msg.Index
 		}
 		switch msg.MessageType {
 		case ProposedShardMap:
-			if c.Role() == Leader {
-				log.Printf("Already have an updated shard map")
-				// Ack to myself
-				c.setFSMState(ackReceived, c.raftNode.LocalNodeID())
-				return
-			}
-			if err := c.shardManager.UnmarshalBinary(msg.Data); err != nil {
-				panic(fmt.Sprintf("Could not unmarshal shard map from log message: %v", err))
-			}
-			wantedIndex := atomic.LoadUint64(c.wantedShardLogIndex)
-			if wantedIndex > 0 && msg.Index != wantedIndex {
-				log.Printf("Ignoring shard map with index %d", msg.Index)
-				return
-			}
-			atomic.StoreUint64(c.reshardingLogIndex, msg.Index)
-			c.setFSMState(newShardMapReceived, "")
-			c.ackShardMap(msg.AckEndpoint)
+			c.setFollowerState(newShardMapReceived, msg)
+
 		case ShardMapCommitted:
-			wantedIndex := atomic.LoadUint64(c.wantedShardLogIndex)
-			if wantedIndex > 0 && msg.Index < wantedIndex {
-				log.Printf("Ignoring commit message with index %d", msg.Index)
-				return
-			}
-			log.Printf("Shard map is comitted by leader. Start serving!")
-			c.dumpShardMap()
+			c.setFollowerState(commitLogReceived, msg)
 
 		default:
 			log.Printf("Don't know how to process log type %d", msg.MessageType)
@@ -272,6 +249,7 @@ func (c *clusterfunkCluster) sendEvent(ev Event) {
 }
 
 func (c *clusterfunkCluster) setLocalState(newState NodeState) {
+	log.Printf("Setting state %s", newState)
 	currentState := NodeState(atomic.LoadInt32(c.localState))
 	if currentState != newState {
 		atomic.StoreInt32(c.localState, int32(newState))

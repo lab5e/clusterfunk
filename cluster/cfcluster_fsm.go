@@ -22,22 +22,27 @@ type internalFSMState int
 // The FSM even is used to set the state with an optional node parameter
 type fsmEvent struct {
 	State  internalFSMState
-	NodeID string
+	NodeID string // This field is set if there's an ack from a node.
 }
 
-// These are the internal states. See implementation for a description. Most of these
-// operations can be interrupted if there's a leader change midway in the process.
+type fsmFollowerEvent struct {
+	State      internalFSMState // This is the new state to set
+	LogMessage LogMessage       // This field is set when a log message is received.
+}
+
+// These are the internal states for both leaders and followers but they use separate FSMs.
 const (
 	initialClusterState internalFSMState = iota
-	clusterSizeChanged
-	assumeLeadership
-	assumeFollower
-	ackReceived
-	ackCompleted
-	reshardCluster
-	newShardMapReceived
-	commitLogReceived
-	leaderLost
+	clusterSizeChanged                   // Leader state
+	assumeLeadership                     // Leader state
+	assumeFollower                       // Leader state
+	ackReceived                          // Leader state
+	ackCompleted                         // Leader state
+	reshardCluster                       // Leader state
+	newShardMapReceived                  // Follower state
+	commitLogReceived                    // Follower state
+	leaderLost                           // Leader and follower state
+	leaderElected                        // Follower state
 )
 
 func (t internalFSMState) String() string {
@@ -62,6 +67,8 @@ func (t internalFSMState) String() string {
 		return "commitLogReceived"
 	case leaderLost:
 		return "leaderLost"
+	case leaderElected:
+		return "leaderElected"
 	default:
 		panic(fmt.Sprintf("Unknown state: %d", t))
 	}
@@ -77,27 +84,97 @@ func (c *clusterfunkCluster) setFSMState(newState internalFSMState, nodeID strin
 	}
 }
 
+func (c *clusterfunkCluster) setFollowerState(newState internalFSMState, msg LogMessage) {
+	select {
+	case c.followerStateChannel <- fsmFollowerEvent{State: newState, LogMessage: msg}:
+	case <-time.After(1 * time.Second):
+		log.Printf("********************* Follower FSM not reading from channel")
+	}
+}
+func (c *clusterfunkCluster) followerStateMachine() {
+	state := fsmtool.NewStateTransitionTable(initialClusterState)
+	state.LogOnError = true
+	state.LogTransitions = true
+	state.PanicOnError = false
+	state.Name = "Follower"
+	state.AddTransitions(
+		initialClusterState, leaderLost, // Leader is lost, wait for vote
+		initialClusterState, leaderElected,
+
+		leaderLost, leaderElected,
+		leaderElected, leaderLost,
+
+		leaderElected, newShardMapReceived,
+
+		newShardMapReceived, commitLogReceived,
+		newShardMapReceived, leaderLost,
+		commitLogReceived, leaderLost,
+		commitLogReceived, newShardMapReceived,
+		commitLogReceived, commitLogReceived,
+
+		// Investigate:
+		newShardMapReceived, newShardMapReceived,
+	)
+
+	for newState := range c.followerStateChannel {
+		state.Apply(newState.State, func(sst *fsmtool.StateTransitionTable) {
+			switch newState.State {
+			case initialClusterState:
+				// no-op
+
+			case leaderLost:
+				// halt processing
+				c.setLocalState(Voting)
+
+			case leaderElected:
+				// wait for shard map and commit message
+				c.setLocalState(Resharding)
+
+			case newShardMapReceived:
+				// apply shard map
+				if err := c.shardManager.UnmarshalBinary(newState.LogMessage.Data); err != nil {
+					panic(fmt.Sprintf("Could not unmarshal shard map from log message: %v", err))
+				}
+				wantedIndex := atomic.LoadUint64(c.wantedShardLogIndex)
+				if wantedIndex > 0 && newState.LogMessage.Index != wantedIndex {
+					log.Printf("Ignoring shard map with index %d", newState.LogMessage.Index)
+					break
+				}
+				atomic.StoreUint64(c.reshardingLogIndex, newState.LogMessage.Index)
+				c.ackShardMap(newState.LogMessage.AckEndpoint)
+
+			case commitLogReceived:
+
+				// start serving
+				wantedIndex := atomic.LoadUint64(c.wantedShardLogIndex)
+				if wantedIndex > 0 && newState.LogMessage.Index < wantedIndex {
+					log.Printf("Ignoring commit message with index %d", newState.LogMessage.Index)
+					break
+				}
+				log.Printf("Shard map is comitted by leader. Start serving!")
+				c.dumpShardMap()
+
+				c.setLocalState(Operational)
+			}
+		})
+	}
+}
+
 // clusterStateMachine is the FSM for
 func (c *clusterfunkCluster) clusterStateMachine() {
 	log.Printf("STATE: Launching")
 	state := fsmtool.NewStateTransitionTable(initialClusterState)
 	state.LogOnError = true
-	state.LogTransitions = true
+	state.LogTransitions = false
 	state.PanicOnError = false
+	state.Name = "Leader"
 
 	state.AddTransitions(
 		initialClusterState, assumeLeadership,
 		initialClusterState, assumeFollower,
-		initialClusterState, leaderLost,
 
-		assumeLeadership, leaderLost,
 		assumeLeadership, reshardCluster,
 		assumeLeadership, clusterSizeChanged,
-
-		assumeFollower, leaderLost,
-
-		leaderLost, assumeLeadership,
-		leaderLost, assumeFollower,
 
 		clusterSizeChanged, reshardCluster,
 
@@ -105,26 +182,16 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 
 		ackReceived, ackReceived,
 		ackReceived, ackCompleted,
+		ackReceived, clusterSizeChanged,
 
-		assumeFollower, newShardMapReceived,
-
-		newShardMapReceived, commitLogReceived,
-		newShardMapReceived, leaderLost,
-
-		commitLogReceived, leaderLost,
-
-		// Sketchy transitions below. We're doing both the client and
-		// server FSM at the same time. Split into two different FSMs
-		// to make cleaner interfaces.
+		// Sketchy transitions below.
 		assumeFollower, assumeLeadership,
+		assumeFollower, assumeFollower,
 		ackCompleted, ackReceived,
 		ackCompleted, clusterSizeChanged,
-		ackCompleted, leaderLost,
 		ackCompleted, assumeFollower,
 		reshardCluster, assumeFollower,
-		assumeFollower, clusterSizeChanged,
 		reshardCluster, clusterSizeChanged,
-		newShardMapReceived, newShardMapReceived,
 		reshardCluster, reshardCluster,
 	)
 
@@ -138,8 +205,8 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 				c.setFSMState(reshardCluster, "")
 
 			case clusterSizeChanged:
-				c.setLocalState(Resharding)
 				c.setFSMState(reshardCluster, "")
+				c.setLocalState(Resharding)
 
 			case reshardCluster:
 				// reshard cluster, distribute via replicated log.
@@ -163,18 +230,16 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 				if err != nil {
 					panic(fmt.Sprintf("Unable to marshal the log message containing shard map: %v", err))
 				}
-				timeCall(func() {
-					index, err := c.raftNode.AppendLogEntry(buf)
-					if err != nil {
-						// We might have lost the leadership here. Log and continue.
-						if err := c.raftNode.ra.VerifyLeader().Error(); err == nil {
-							panic("I'm the leader but I could not write the log")
-						}
-						// otherwise -- just log it and continue
-						log.Printf("Could not write log entry for new shard map")
+				index, err := c.raftNode.AppendLogEntry(buf)
+				if err != nil {
+					// We might have lost the leadership here. Log and continue.
+					if err := c.raftNode.ra.VerifyLeader().Error(); err == nil {
+						panic("I'm the leader but I could not write the log")
 					}
-					atomic.StoreUint64(c.reshardingLogIndex, index)
-				}, "Appending shard map log entry")
+					// otherwise -- just log it and continue
+					log.Printf("Could not write log entry for new shard map")
+				}
+				atomic.StoreUint64(c.reshardingLogIndex, index)
 				// This is the index we want commits for.
 				shardMapLogIndex = c.raftNode.LastIndex()
 				log.Printf("Shard map index = %d", shardMapLogIndex)
@@ -223,33 +288,13 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 					// otherwise -- just log it and continue
 					log.Printf("Could not write log entry for new shard map: %v", err)
 				}
-				c.setLocalState(Operational)
 				return // continue
 
 			case assumeFollower:
-				c.setRole(Follower)
-				c.setLocalState(Resharding)
 				// Not much happens here but the next state should be - if all
 				// goes well - a shard map log message from the leader.
-
-			case newShardMapReceived:
-				// update internal map and ack map via gRPC
-				c.setLocalState(Resharding)
-
-				// No new state - the next is commitLogReceived which is set
-				// via the replicated log events
-
-			case commitLogReceived:
-				// commit log received, set state operational and resume normal
-				// operations. Signal to the rest of the library (channel)
-				c.setLocalState(Operational)
-
-			case leaderLost:
-				c.setLocalState(Voting)
-				// leader is lost - stop processing until a leader is elected and
-				// the commit log is received
+				c.setRole(Follower)
 			}
-
 		})
 	}
 }

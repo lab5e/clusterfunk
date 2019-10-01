@@ -17,6 +17,27 @@ const (
 	Stopping                     // Stopping the node
 )
 
+func (n NodeState) String() string {
+	switch n {
+	case Invalid:
+		return "Invalid"
+	case Joining:
+		return "Joining"
+	case Operational:
+		return "Operational"
+	case Voting:
+		return "Voting"
+	case Resharding:
+		return "Resharding"
+	case Starting:
+		return "Starting"
+	case Stopping:
+		return "Stopping"
+	default:
+		panic("Unknown node state")
+	}
+}
+
 // NodeRole is the roles the node can have in the cluster
 type NodeRole int32
 
