@@ -84,7 +84,7 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 	state.LogOnError = true
 	state.LogTransitions = true
 	state.PanicOnError = false
-
+	state.AllowInvalid = true
 	state.AddTransitions(
 		initialClusterState, assumeLeadership,
 		initialClusterState, assumeFollower,
@@ -116,16 +116,6 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 		// Sketchy transitions below. We're doing both the client and
 		// server FSM at the same time. Split into two different FSMs
 		// to make cleaner interfaces.
-		assumeFollower, assumeLeadership,
-		ackCompleted, ackReceived,
-		ackCompleted, clusterSizeChanged,
-		ackCompleted, leaderLost,
-		ackCompleted, assumeFollower,
-		reshardCluster, assumeFollower,
-		assumeFollower, clusterSizeChanged,
-		reshardCluster, clusterSizeChanged,
-		newShardMapReceived, newShardMapReceived,
-		reshardCluster, reshardCluster,
 	)
 
 	var unacknowledgedNodes []string

@@ -15,6 +15,7 @@ type StateTransitionTable struct {
 	LogStates        bool
 	LogTransitions   bool
 	Name             string
+	AllowInvalid     bool // Allow invalid state transitions (but log errors)
 	ValidTransitions map[interface{}][]interface{}
 }
 
@@ -64,6 +65,11 @@ func (s *StateTransitionTable) SetState(state interface{}) bool {
 			s.CurrentState = state
 			return true
 		}
+	}
+	if s.AllowInvalid {
+		log.Printf("%s: Invalid state transition %s -> %s", s.Name, s.CurrentState, state)
+		s.CurrentState = state
+		return true
 	}
 	return false
 }
