@@ -24,4 +24,9 @@ func TestNodeCollection(t *testing.T) {
 	assert.True(n.Sync("A", "1", "2", "3", "4"), "Tricky sync")
 	assert.Equal(5, n.Size(), "Size should be 5")
 
+	assert.Contains(n.List(), "A")
+	assert.Contains(n.List(), "2")
+	assert.Contains(n.List(), "1")
+	assert.Contains(n.List(), "3")
+	assert.Contains(n.List(), "4")
 }
