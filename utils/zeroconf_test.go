@@ -1,27 +1,30 @@
 package utils
 
 import (
+	"fmt"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestZeroConf(t *testing.T) {
+	assert := require.New(t)
 
 	zr := NewZeroconfRegistry("test-cluster")
-	if err := zr.Register("some-node", 9999); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(zr.Register("some-node", 9999))
 
-	if err := zr.Register("another-node", 9998); err == nil {
-		t.Fatal("Should not be able to register two endpoints")
-	}
+	assert.Error(zr.Register("another-node", 9998), "Should not be able to register two endpoints")
+
 	defer zr.Shutdown()
 
 	results, err := zr.Resolve(250 * time.Millisecond)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(results) == 0 {
-		t.Fatal("No client found")
-	}
+	assert.NoError(err)
+	assert.True(len(results) > 1)
+
+	res, err := zr.ResolveFirst(250 * time.Millisecond)
+	assert.NoError(err)
+	ip, err := FindPublicIPv4()
+	assert.NoError(err)
+	assert.Equal(res, fmt.Sprintf("%s:9999", ip))
 }
