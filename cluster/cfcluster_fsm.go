@@ -161,18 +161,16 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 				if err != nil {
 					panic(fmt.Sprintf("Unable to marshal the log message containing shard map: %v", err))
 				}
-				timeCall(func() {
-					index, err := c.raftNode.AppendLogEntry(buf)
-					if err != nil {
-						// We might have lost the leadership here. Log and continue.
-						if err := c.raftNode.ra.VerifyLeader().Error(); err == nil {
-							panic("I'm the leader but I could not write the log")
-						}
-						// otherwise -- just log it and continue
-						log.WithError(err).Error("Could not write log entry for new shard map")
+				index, err := c.raftNode.AppendLogEntry(buf)
+				if err != nil {
+					// We might have lost the leadership here. Log and continue.
+					if err := c.raftNode.ra.VerifyLeader().Error(); err == nil {
+						panic("I'm the leader but I could not write the log")
 					}
-					atomic.StoreUint64(c.reshardingLogIndex, index)
-				}, "Appending shard map log entry")
+					// otherwise -- just log it and continue
+					log.WithError(err).Error("Could not write log entry for new shard map")
+				}
+				atomic.StoreUint64(c.reshardingLogIndex, index)
 				// This is the index we want commits for.
 				shardMapLogIndex = c.raftNode.LastIndex()
 				log.WithFields(log.Fields{"index": shardMapLogIndex}).Debugf("Shard map index")

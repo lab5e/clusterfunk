@@ -198,7 +198,8 @@ func (c *clusterfunkCluster) processReplicatedLog() {
 				"members": c.raftNode.Nodes.List(),
 			}).Debug("Node list updated from shard map")
 			c.setLocalState(Operational)
-			c.dumpShardMap()
+
+			dumpShardMap(c.shardManager)
 
 		default:
 			log.WithField("logType", msg.MessageType).Error("Unknown log type in replication log")
