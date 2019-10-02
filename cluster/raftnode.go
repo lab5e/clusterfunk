@@ -264,7 +264,7 @@ func (r *RaftNode) Stop() error {
 		return errors.New("raft cluster is already stopped")
 	}
 
-	if r.ra.VerifyLeader().Error() == nil {
+	if r.ra.VerifyLeader().Error() == nil && r.Nodes.Size() > 1 {
 		// I'm the leader. Transfer leadership away before stopping
 		if err := r.ra.RemoveServer(raft.ServerID(r.localNodeID), 0, 0).Error(); err != nil {
 			return err
