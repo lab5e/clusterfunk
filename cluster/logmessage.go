@@ -46,7 +46,7 @@ func (m *LogMessage) MarshalBinary() ([]byte, error) {
 
 // UnmarshalBinary unmarshals the byte array into this instance
 func (m *LogMessage) UnmarshalBinary(buf []byte) error {
-	if buf == nil || len(buf) < 2 {
+	if buf == nil || len(buf) < 3 {
 		return errors.New("buffer is too short to unmarshal")
 	}
 	m.MessageType = LogMessageType(buf[0])
