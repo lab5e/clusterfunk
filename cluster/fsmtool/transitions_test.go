@@ -2,6 +2,7 @@ package fsmtool
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -18,6 +19,7 @@ const (
 	fourOneState
 	fourTwoState
 	fourThreeState
+	deadEndState
 )
 
 func (s state) String() string {
@@ -38,6 +40,8 @@ func (s state) String() string {
 		return "fourTwoState"
 	case fourThreeState:
 		return "fourThreeState"
+	case deadEndState:
+		return "deadEndState"
 	default:
 		panic(fmt.Sprintf("Don't know how to state %d", s))
 	}
@@ -81,6 +85,13 @@ func TestTransitionTable(t *testing.T) {
 	assert.True(fsm.SetState(fourTwoState))
 	assert.False(fsm.SetState(fourOneState))
 
+	fsm.AllowInvalid = true
+	assert.True(fsm.SetState(fourOneState))
+
+	assert.Panics(func() {
+		fsm.SetState(deadEndState)
+		fsm.SetState(oneState)
+	})
 }
 
 func TestInvalidTransitions(t *testing.T) {
@@ -134,4 +145,19 @@ func TestDebugState(t *testing.T) {
 	assert.Panics(func() {
 		fsm.Apply(fourState, func(stt *StateTransitionTable) { t.Logf("State is %s", stt.CurrentState) })
 	})
+}
+
+func TestDump(t *testing.T) {
+	assert := require.New(t)
+
+	fsm := NewStateTransitionTable(initialState)
+	assert.True(fsm.AddTransitions(
+		oneState, oneState,
+		oneState, twoState,
+		twoState, threeState,
+		threeState, fourState,
+		fourState, oneState,
+	))
+
+	assert.NotPanics(func() { fsm.DumpTransitions(os.Stdout) })
 }
