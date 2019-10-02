@@ -6,10 +6,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNodeCollection(t *testing.T) {
+func TestStringSetSync(t *testing.T) {
 	assert := assert.New(t)
 
-	n := newNodeCollection()
+	n := NewStringSet()
 
 	// All this work just to make a silly naming joke. Oh my.
 	assert.True(n.Sync("A", "B", "C", "D"), "It's n*synced")
@@ -29,4 +29,32 @@ func TestNodeCollection(t *testing.T) {
 	assert.Contains(n.List(), "1")
 	assert.Contains(n.List(), "3")
 	assert.Contains(n.List(), "4")
+
+	n.Clear()
+
+	assert.Equal(n.Size(), 0)
+	assert.Len(n.Strings, 0)
+
+}
+
+func TestAddRemoveStringSet(t *testing.T) {
+	assert := assert.New(t)
+	s := NewStringSet()
+	assert.True(s.Add("1"))
+	assert.Len(s.Strings, 1)
+	assert.True(s.Add("2"))
+	assert.Len(s.Strings, 2)
+
+	assert.False(s.Add("1"))
+	assert.Len(s.Strings, 2)
+
+	assert.False(s.Remove("9"))
+	assert.Len(s.Strings, 2)
+
+	assert.True(s.Remove("1"))
+	assert.Len(s.Strings, 1)
+	assert.Contains(s.Strings, "2")
+	assert.False(s.Remove("1"))
+	assert.True(s.Remove("2"))
+	assert.Len(s.Strings, 0)
 }

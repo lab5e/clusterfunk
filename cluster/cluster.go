@@ -1,5 +1,7 @@
 package cluster
 
+import "fmt"
+
 // TODO: get rid of this (user supplied)
 const numberOfShards = 10000
 
@@ -17,6 +19,27 @@ const (
 	Stopping                     // Stopping the node
 )
 
+func (n NodeState) String() string {
+	switch n {
+	case Invalid:
+		return "Invalid"
+	case Joining:
+		return "Joining"
+	case Operational:
+		return "Operational"
+	case Voting:
+		return "Voting"
+	case Resharding:
+		return "Resharding"
+	case Starting:
+		return "Starting"
+	case Stopping:
+		return "Stopping"
+	default:
+		panic(fmt.Sprintf("Unknown state: %d", n))
+	}
+}
+
 // NodeRole is the roles the node can have in the cluster
 type NodeRole int32
 
@@ -28,6 +51,23 @@ const (
 	NonVoter                  // Non voting role in cluster
 	NonMember                 // NonMember nodes are part of the Serf cluster but not the Raft cluste
 )
+
+func (n NodeRole) String() string {
+	switch n {
+	case Unknown:
+		return "Unknown"
+	case Follower:
+		return "Follower"
+	case Leader:
+		return "Leader"
+	case NonMember:
+		return "NonMember"
+	case NonVoter:
+		return "NonVoter"
+	default:
+		panic(fmt.Sprintf("Unknown role: %d", n))
+	}
+}
 
 const (
 	// SerfStatusKey is the key for the serf status

@@ -147,7 +147,9 @@ func (s *SerfNode) PublishTags() error {
 	defer s.mutex.RUnlock()
 
 	if s.se == nil {
-		return errors.New("serf node not created")
+		// *technically* this should be an error but the tags will be published
+		// once the node goes live.
+		return nil
 	}
 	if !s.changedTags {
 		return nil

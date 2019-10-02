@@ -3,10 +3,11 @@ package cluster
 import (
 	"context"
 	"errors"
-	log "github.com/sirupsen/logrus"
 	"net"
 	"sync/atomic"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/stalehd/clusterfunk/cluster/clusterproto"
 	"google.golang.org/grpc"
@@ -57,6 +58,11 @@ func (c *clusterfunkCluster) ConfirmShardMap(ctx context.Context, req *clusterpr
 		return nil, errors.New("not a leader")
 	}
 	if c.LocalState() != Resharding {
+		log.WithFields(log.Fields{
+			"state": c.LocalState().String(),
+			"index": req.LogIndex,
+			"node":  req.NodeID,
+		}).Warning("not in resharding mode")
 		return nil, errors.New("not in resharding mode")
 	}
 
@@ -73,7 +79,7 @@ func (c *clusterfunkCluster) ConfirmShardMap(ctx context.Context, req *clusterpr
 	if req.LogIndex != int64(reshardIndex) {
 		return nil, errors.New("index is invalid")
 	}
-	c.setFSMState(ackReceived, req.NodeID)
+	c.handleAckReceived(req.NodeID)
 	return &clusterproto.ConfirmShardMapResponse{
 		Success:      true,
 		CurrentIndex: int64(reshardIndex),

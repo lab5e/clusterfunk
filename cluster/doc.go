@@ -1,2 +1,5 @@
-// Package cluster is the main entrypoint for the cluster types.
+// Package cluster contains the types needed to create a cluster using Raft
+// and serf.
+//
+// Examples
 package cluster

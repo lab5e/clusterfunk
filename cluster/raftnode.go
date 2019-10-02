@@ -69,13 +69,13 @@ type RaftNode struct {
 	events         chan RaftEventType            // Events from Raft
 	internalEvents chan RaftEventType            // Internal event queue
 	state          map[LogMessageType]LogMessage // The internal FSM state
-	Nodes          NodeCollection
+	Nodes          StringSet
 }
 
 // NewRaftNode creates a new RaftNode instance
 func NewRaftNode() *RaftNode {
 	return &RaftNode{
-		Nodes:          newNodeCollection(),
+		Nodes:          NewStringSet(),
 		localNodeID:    "",
 		mutex:          &sync.RWMutex{},
 		fsmMutex:       &sync.RWMutex{},
@@ -232,6 +232,11 @@ func (r *RaftNode) observerFunc(ch chan raft.Observation) {
 				r.sendInternalEvent(RaftBecameFollower)
 			case raft.Leader:
 				r.sendInternalEvent(RaftBecameLeader)
+				// This might look a bit weird but the cluster size does not
+				// change when there's only a single node becoming a leader
+				if r.Nodes.Size() == 1 {
+					r.sendInternalEvent(RaftClusterSizeChanged)
+				}
 			}
 		case raft.PeerLiveness:
 			lt, ok := k.Data.(raft.PeerLiveness)
@@ -264,14 +269,15 @@ func (r *RaftNode) Stop() error {
 		return errors.New("raft cluster is already stopped")
 	}
 
-	if r.ra.VerifyLeader().Error() == nil && r.Nodes.Size() > 1 {
-		// I'm the leader. Transfer leadership away before stopping
-		if err := r.ra.RemoveServer(raft.ServerID(r.localNodeID), 0, 0).Error(); err != nil {
-			return err
-		}
+	if r.ra.VerifyLeader().Error() == nil {
+		// Make sure all entries are replicated
+		r.ra.Barrier(2 * time.Second).Error()
+		r.ra.RemoveServer(raft.ServerID(r.localNodeID), 0, 2*time.Second).Error()
 	}
+
+	// Shutdown isn't graceful so this might be a problem.
 	if err := r.ra.Shutdown().Error(); err != nil {
-		return err
+		log.WithError(err).Info("Got error on shutdown")
 	}
 	r.ra = nil
 	r.localNodeID = ""
@@ -380,24 +386,20 @@ func (r *RaftNode) AppendLogEntry(data []byte) (uint64, error) {
 	if err := f.Error(); err != nil {
 		return 0, err
 	}
-	// TODO: Check if this is really necessary. Apply might do the job
-	if err := r.ra.Barrier(0).Error(); err != nil {
-		return 0, err
-	}
 	return f.Index(), nil
 }
 
 // -----------------------------------------------------------------------------
 // This is temporary methods that are used in the management code
 
-// LastIndex returns the last log index received
-func (r *RaftNode) LastIndex() uint64 {
+// LastLogIndex returns the last log index received
+func (r *RaftNode) LastLogIndex() uint64 {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	if r.ra == nil {
 		return 0
 	}
-	return r.ra.LastIndex()
+	return r.ra.AppliedIndex()
 }
 
 // Events returns the event channel. There is only one
@@ -492,7 +494,7 @@ func (r *RaftNode) Apply(l *raft.Log) interface{} {
 	msg.Index = l.Index
 	r.state[msg.MessageType] = msg
 	r.sendInternalEvent(RaftReceivedLog)
-	return nil
+	return l.Data
 }
 
 // Snapshot is used to support log compaction. This call should

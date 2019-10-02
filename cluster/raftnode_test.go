@@ -16,6 +16,7 @@ func randomEndpoint() string {
 	}
 	return fmt.Sprintf("127.0.0.1:%d", port)
 }
+
 func TestRaftCluster(t *testing.T) {
 	assert := require.New(t)
 
@@ -83,40 +84,29 @@ func TestRaftCluster(t *testing.T) {
 	_, err := node3.AppendLogEntry(dummyLogBuffer)
 	assert.Error(err, "Should get error when appending log entry and isn't leader")
 
-	_, err = node1.AppendLogEntry(dummyLogBuffer)
+	index, err := node1.AppendLogEntry(dummyLogBuffer)
+
 	assert.NoError(err, "No error when appending log on leader")
+
 	waitForEvent(RaftReceivedLog, evts1)
 	waitForEvent(RaftReceivedLog, evts2)
 	waitForEvent(RaftReceivedLog, evts3)
 
+	assert.Equal(index, node2.LastLogIndex())
+	assert.Equal(index, node3.LastLogIndex())
+
 	msgs := node3.GetLogMessages(0)
 	assert.Len(msgs, 1)
+
+	// Removing and adding node should work
+	assert.NoError(node1.RemoveClusterNode(id2, params2.RaftEndpoint))
+	assert.NoError(node1.AddClusterNode(id2, params2.RaftEndpoint))
 
 	assert.NoError(node1.Stop())
 
 	waitForEvent(RaftLeaderLost, evts2)
 	waitForEvent(RaftLeaderLost, evts3)
 
-	// One of the nodes should be leader
-
-	foundleader := false
-	for !foundleader {
-		select {
-		case e2 := <-evts2:
-			if e2 == RaftBecameLeader {
-				foundleader = true
-			}
-		case e3 := <-evts3:
-			if e3 == RaftBecameLeader {
-				foundleader = true
-			}
-		}
-	}
-	if node3.Leader() {
-		assert.NoError(node3.RemoveClusterNode(id2, params2.RaftEndpoint), "Node 2 should be removed successfully")
-	} else {
-		assert.NoError(node2.RemoveClusterNode(id3, params3.RaftEndpoint), "Node 2 should be removed successfully")
-	}
 	assert.NoError(node3.Stop())
 	assert.NoError(node2.Stop())
 

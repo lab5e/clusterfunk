@@ -35,6 +35,7 @@ func main() {
 	case "warn":
 		log.SetLevel(log.WarnLevel)
 	}
+	log.SetFormatter(&log.TextFormatter{FullTimestamp: true, TimestampFormat: "15:04:05.000"})
 	shards := sharding.NewShardManager()
 	if err := shards.Init(numShards, nil); err != nil {
 		panic(err)

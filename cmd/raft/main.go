@@ -47,6 +47,7 @@ func main() {
 		panic(err)
 	}
 
+	defer raftNode.Stop()
 	waitForExit()
 }
 
