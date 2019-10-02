@@ -1,7 +1,8 @@
 package cluster
 
 import (
-	"log"
+	log "github.com/sirupsen/logrus"
+
 	"time"
 )
 
@@ -11,13 +12,16 @@ func timeCall(f func(), desc string) {
 	start := time.Now()
 	f()
 	end := time.Now()
-	log.Printf("%s took %f ms", desc, float64(end.Sub(start))/float64(time.Millisecond))
+	log.WithFields(log.Fields{
+		"op": desc,
+		"ms": float64(end.Sub(start)) / float64(time.Millisecond),
+	}).Debug("Timed call")
 }
 
 // This is diagnostic functions. They can be removed.. Eventually
 
 func (c *clusterfunkCluster) dumpShardMap() {
-	log.Println("================== shard map ======================")
+	log.Info("================== shard map ======================")
 	nodes := make(map[string]int)
 	for _, v := range c.shardManager.Shards() {
 		n := nodes[v.NodeID()]
@@ -25,7 +29,7 @@ func (c *clusterfunkCluster) dumpShardMap() {
 		nodes[v.NodeID()] = n
 	}
 	for k, v := range nodes {
-		log.Printf("%-20s: %d shards", k, v)
+		log.Infof("%-20s: %d shards", k, v)
 	}
-	log.Println("===================================================")
+	log.Info("===================================================")
 }

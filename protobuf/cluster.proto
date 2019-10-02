@@ -16,6 +16,14 @@ message ConfirmShardMapResponse {
     int64 CurrentIndex = 2; // CurrentIndex is the currently active shard map. Any lower numbered shard maps can be ignored by the follower.
 };
 
+// CommitShardMapMessage is sent when the shard map is committed by the leader
+// and all nodes have acknowledged the new shard map. The message contains the
+// nodes in the cluster for the commited map.
+message CommitShardMapMessage {
+    int64 ShardMapLogIndex = 1;
+    repeated string Nodes = 2;
+}
+
 service ClusterLeaderService {
     rpc ConfirmShardMap(ConfirmShardMapRequest) returns (ConfirmShardMapResponse);
 }

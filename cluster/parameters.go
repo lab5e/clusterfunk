@@ -2,8 +2,9 @@ package cluster
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/stalehd/clusterfunk/utils"
 )
@@ -53,7 +54,7 @@ func (p *Parameters) Final() {
 		ip, err := utils.FindPublicIPv4()
 		p.Interface = ip.String()
 		if err != nil {
-			log.Printf("Unable to get public IP: %v", err)
+			log.WithError(err).Error("Unable to get public IP")
 			p.Interface = "localhost"
 		}
 	}
@@ -63,6 +64,6 @@ func (p *Parameters) Final() {
 	p.checkAndSetEndpoint(&p.LeaderEndpoint)
 
 	if p.Verbose {
-		log.Printf("Configuration: %+v", p)
+		log.Infof("Configuration: %+v", p)
 	}
 }

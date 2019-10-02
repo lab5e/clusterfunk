@@ -3,10 +3,14 @@ package cluster
 import (
 	"errors"
 	"fmt"
-	"log"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	log "github.com/sirupsen/logrus"
+
+	"github.com/golang/protobuf/proto"
+	"github.com/stalehd/clusterfunk/cluster/clusterproto"
 
 	"github.com/stalehd/clusterfunk/cluster/sharding"
 	"github.com/stalehd/clusterfunk/utils"
@@ -71,10 +75,10 @@ func (c *clusterfunkCluster) Start() error {
 
 	// Launch node management endpoint
 	if err := c.startManagementServices(); err != nil {
-		log.Printf("Error starting management endpoint: %v", err)
+		log.WithError(err).Error("Unable to start management endpoint")
 	}
 	if err := c.startLeaderService(); err != nil {
-		log.Printf("Error starting leader RPC: %v", err)
+		log.WithError(err).Error("Error starting leader gRPC interface")
 	}
 	if c.config.ZeroConf {
 		c.registry = utils.NewZeroconfRegistry(c.config.ClusterName)
@@ -125,10 +129,17 @@ func (c *clusterfunkCluster) raftEvents(ch <-chan RaftEventType) {
 	}
 
 	for e := range ch {
-		log.Printf("RAFT: %s (%f ms since last event)", e.String(), deltaT())
+		log.WithFields(log.Fields{
+			"eventType":      "raft",
+			"state":          e.String(),
+			"deltaSinceLast": deltaT(),
+		}).Debug("Event received")
 		switch e {
 		case RaftClusterSizeChanged:
-			log.Printf("%d members:  %+v ", c.raftNode.MemberCount(), c.raftNode.Members())
+			log.WithFields(log.Fields{
+				"count":   c.raftNode.Nodes.Size(),
+				"members": c.raftNode.Nodes.List(),
+			}).Debug("Member list")
 			c.setFSMState(clusterSizeChanged, "")
 		case RaftLeaderLost:
 			c.setFSMState(leaderLost, "")
@@ -139,7 +150,7 @@ func (c *clusterfunkCluster) raftEvents(ch <-chan RaftEventType) {
 		case RaftReceivedLog:
 			c.processReplicatedLog()
 		default:
-			log.Printf("Unknown event received: %+v", e)
+			log.WithField("eventType", e).Error("Unknown event received")
 		}
 	}
 }
@@ -161,36 +172,61 @@ func (c *clusterfunkCluster) processReplicatedLog() {
 		switch msg.MessageType {
 		case ProposedShardMap:
 			if c.Role() == Leader {
-				log.Printf("Already have an updated shard map")
-				// Ack to myself
+				// Ack to myself - this skips the whole gRPC call
 				c.setFSMState(ackReceived, c.raftNode.LocalNodeID())
-				return
+				continue
 			}
-			if err := c.shardManager.UnmarshalBinary(msg.Data); err != nil {
-				panic(fmt.Sprintf("Could not unmarshal shard map from log message: %v", err))
-			}
-			wantedIndex := atomic.LoadUint64(c.wantedShardLogIndex)
-			if wantedIndex > 0 && msg.Index != wantedIndex {
-				log.Printf("Ignoring shard map with index %d", msg.Index)
-				return
-			}
-			atomic.StoreUint64(c.reshardingLogIndex, msg.Index)
+			c.processProposedShardMap(&msg)
 			c.setFSMState(newShardMapReceived, "")
 			c.ackShardMap(msg.AckEndpoint)
+
 		case ShardMapCommitted:
+			if c.Role() == Leader {
+				// I'm the leader so the map is already committed
+				continue
+			}
 			wantedIndex := atomic.LoadUint64(c.wantedShardLogIndex)
 			if wantedIndex > 0 && msg.Index < wantedIndex {
-				log.Printf("Ignoring commit message with index %d", msg.Index)
-				return
+				continue
 			}
-			log.Printf("Shard map is comitted by leader. Start serving!")
+			// Update internal node list to reflect the list of nodes. Do a
+			// quick sanity check on the node list to make sure this node
+			// is a member (we really should)
+			c.processShardMapCommitMessage(&msg)
+			log.WithFields(log.Fields{
+				"size":    c.raftNode.Nodes.Size(),
+				"members": c.raftNode.Nodes.List(),
+			}).Debug("Node list updated from shard map")
+			c.setLocalState(Operational)
 			c.dumpShardMap()
 
 		default:
-			log.Printf("Don't know how to process log type %d", msg.MessageType)
+			log.WithField("logType", msg.MessageType).Error("Unknown log type in replication log")
 		}
 	}
 
+}
+
+func (c *clusterfunkCluster) processProposedShardMap(msg *LogMessage) {
+	if err := c.shardManager.UnmarshalBinary(msg.Data); err != nil {
+		panic(fmt.Sprintf("Could not unmarshal shard map from log message: %v", err))
+	}
+	wantedIndex := atomic.LoadUint64(c.wantedShardLogIndex)
+	if wantedIndex > 0 && msg.Index != wantedIndex {
+		return
+	}
+	atomic.StoreUint64(c.reshardingLogIndex, msg.Index)
+}
+func (c *clusterfunkCluster) processShardMapCommitMessage(msg *LogMessage) {
+	if c.raftNode.Leader() {
+		return
+	}
+	commitMsg := &clusterproto.CommitShardMapMessage{}
+	if err := proto.Unmarshal(msg.Data, commitMsg); err != nil {
+		panic(fmt.Sprintf("Unable to unmarshal commit message: %v", err))
+	}
+
+	c.raftNode.Nodes.Sync(commitMsg.Nodes...)
 }
 
 func (c *clusterfunkCluster) serfEvents(ch <-chan NodeEvent) {
@@ -200,14 +236,14 @@ func (c *clusterfunkCluster) serfEvents(ch <-chan NodeEvent) {
 				if ev.Joined {
 					if c.config.AutoJoin && c.raftNode.Leader() {
 						if err := c.raftNode.AddClusterNode(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
-							log.Printf("Error adding member: %v - %+v", err, ev)
+							log.WithError(err).WithField("event", ev).Error("Error adding member")
 						}
 					}
 					continue
 				}
 				if c.config.AutoJoin && c.raftNode.Leader() {
 					if err := c.raftNode.RemoveClusterNode(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
-						log.Printf("Error removing member: %v - %+v", err, ev)
+						log.WithError(err).WithField("event", ev).Error("Error removing member")
 					}
 				}
 			}
@@ -245,7 +281,7 @@ func (c *clusterfunkCluster) AddLocalEndpoint(name, endpoint string) {
 	}
 	c.serfNode.SetTag(name, endpoint)
 	if err := c.serfNode.PublishTags(); err != nil {
-		log.Printf("Error adding endpoint: %v", err)
+		log.WithError(err).Error("Error adding endpoint")
 	}
 }
 

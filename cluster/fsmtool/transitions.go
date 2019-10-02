@@ -3,7 +3,9 @@ package fsmtool
 import (
 	"fmt"
 	"io"
-	"log"
+
+	log "github.com/sirupsen/logrus"
+
 	"time"
 )
 
@@ -67,7 +69,7 @@ func (s *StateTransitionTable) SetState(state interface{}) bool {
 		}
 	}
 	if s.AllowInvalid {
-		log.Printf("%s: Invalid state transition %s -> %s", s.Name, s.CurrentState, state)
+		log.Errorf("%s: Invalid state transition %s -> %s", s.Name, s.CurrentState, state)
 		s.CurrentState = state
 		return true
 	}
@@ -78,12 +80,15 @@ func (s *StateTransitionTable) SetState(state interface{}) bool {
 func (s *StateTransitionTable) Apply(newState interface{}, code func(stt *StateTransitionTable)) bool {
 	oldState := s.CurrentState
 	if !s.SetState(newState) {
-		msg := fmt.Sprintf("%s: Invalid state assignment: Current state = %s, invalid state = %s", s.Name, s.CurrentState, newState)
 		if s.LogOnError {
-			log.Printf(msg)
+			log.WithFields(log.Fields{
+				"fsm":          s.Name,
+				"currentState": s.CurrentState,
+				"newState":     newState,
+			}).Error("Invalid state assignment")
 		}
 		if s.PanicOnError {
-			panic(msg)
+			panic(fmt.Sprintf("%s: Invalid state assignment: Current state = %s, invalid state = %s", s.Name, s.CurrentState, newState))
 		}
 		return false
 	}
@@ -97,7 +102,12 @@ func (s *StateTransitionTable) Apply(newState interface{}, code func(stt *StateT
 	if s.LogTransitions {
 		stop := time.Now()
 		execTime := float64(stop.Sub(start)) / float64(time.Millisecond)
-		log.Printf("%s: %s->%s took %f ms", s.Name, oldState, newState, execTime)
+		log.WithFields(log.Fields{
+			"fsm":          s.Name,
+			"currentState": oldState,
+			"newState":     newState,
+			"ms":           execTime,
+		}).Debug("Timing")
 	}
 	return true
 }

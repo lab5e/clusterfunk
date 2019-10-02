@@ -3,7 +3,6 @@ package sharding
 import (
 	"errors"
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/golang/protobuf/proto"
@@ -134,7 +133,6 @@ func (sm *weightedShardManager) UpdateNodes(nodeID ...string) {
 		sm.addNode(v)
 	}
 	for _, v := range removedNodes {
-		log.Printf("Removing node %s", v)
 		sm.removeNode(v)
 	}
 }

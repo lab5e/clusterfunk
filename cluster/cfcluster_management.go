@@ -3,7 +3,7 @@ package cluster
 import (
 	"context"
 	"errors"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"net"
 	"time"
 
@@ -47,7 +47,7 @@ func (c *clusterfunkCluster) startManagementServices() error {
 	fail := make(chan error)
 	go func(ch chan error) {
 		if err := c.mgmtServer.Serve(listener); err != nil {
-			log.Printf("Unable to launch node management gRPC server: %v", err)
+			log.WithError(err).Error("Unable to launch node management gRPC interface")
 			ch <- err
 		}
 	}(fail)

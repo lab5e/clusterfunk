@@ -3,7 +3,7 @@ package cluster
 import (
 	"context"
 	"errors"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"net"
 	"sync/atomic"
 	"time"
@@ -36,7 +36,7 @@ func (c *clusterfunkCluster) startLeaderService() error {
 	fail := make(chan error)
 	go func(ch chan error) {
 		if err := c.leaderServer.Serve(listener); err != nil {
-			log.Printf("Unable to launch leader gRPC server: %v", err)
+			log.WithError(err).Error("Unable to launch leader gRPC interface")
 			ch <- err
 		}
 	}(fail)
@@ -54,11 +54,9 @@ func (c *clusterfunkCluster) startLeaderService() error {
 func (c *clusterfunkCluster) ConfirmShardMap(ctx context.Context, req *clusterproto.ConfirmShardMapRequest) (*clusterproto.ConfirmShardMapResponse, error) {
 	// Ensure we're the leader and we're resharding the cluster
 	if c.Role() != Leader {
-		log.Printf("I'm not the leader... I think")
 		return nil, errors.New("not a leader")
 	}
 	if c.LocalState() != Resharding {
-		log.Printf("I'm not resharding now. Go away silly client")
 		return nil, errors.New("not in resharding mode")
 	}
 

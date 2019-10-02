@@ -2,12 +2,14 @@ package cluster
 
 import (
 	"errors"
-	"log"
+	golog "log"
 	"net"
 	"os"
 	"strconv"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/hashicorp/serf/serf"
 )
@@ -85,7 +87,7 @@ func (s *SerfNode) Start(nodeID string, verboseLogging bool, cfg SerfParameters)
 	config.EventCh = eventCh
 
 	if verboseLogging {
-		config.Logger = log.New(os.Stderr, "serf", log.LstdFlags)
+		config.Logger = golog.New(os.Stderr, "serf", golog.LstdFlags)
 	} else {
 		mutedLogger := newMutedLogger()
 		config.Logger = mutedLogger
@@ -278,7 +280,7 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 			}
 
 		default:
-			log.Printf("Unknown event: %+v", ev)
+			log.WithField("event", ev).Error("Unknown event")
 		}
 	}
 }
@@ -292,6 +294,6 @@ func (m *muteWriter) Write(buf []byte) (int, error) {
 
 // GetMutedLogger returns a pointer to a log.Logger instance that is logging
 // to the Big Bit Bucket In The Sky...or Cloud
-func newMutedLogger() *log.Logger {
-	return log.New(&muteWriter{}, "sssh", log.LstdFlags)
+func newMutedLogger() *golog.Logger {
+	return golog.New(&muteWriter{}, "sssh", golog.LstdFlags)
 }

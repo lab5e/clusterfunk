@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+
+	log "github.com/sirupsen/logrus"
+
 	"net"
 	"os"
 	"path/filepath"
@@ -60,28 +62,26 @@ func (r RaftEventType) String() string {
 // interact with the leader of the cluster.
 type RaftNode struct {
 	mutex          *sync.RWMutex                 // Mutex for the attributes
-	nodeMutex      *sync.RWMutex                 // Mutex for the node
 	fsmMutex       *sync.RWMutex                 // Mutex for the FSM
-	nodes          map[string]bool               // Map of nodes
 	localNodeID    string                        // The local node ID
 	raftEndpoint   string                        // Raft endpoint
 	ra             *raft.Raft                    // Raft instance
 	events         chan RaftEventType            // Events from Raft
 	internalEvents chan RaftEventType            // Internal event queue
 	state          map[LogMessageType]LogMessage // The internal FSM state
+	Nodes          NodeCollection
 }
 
 // NewRaftNode creates a new RaftNode instance
 func NewRaftNode() *RaftNode {
 	return &RaftNode{
+		Nodes:          newNodeCollection(),
 		localNodeID:    "",
 		mutex:          &sync.RWMutex{},
-		nodeMutex:      &sync.RWMutex{},
 		fsmMutex:       &sync.RWMutex{},
 		events:         make(chan RaftEventType, 10), // tiny buffer here to make multiple events feasable.
 		internalEvents: make(chan RaftEventType, 10),
-		nodes:          make(map[string]bool, 0), // Active nodes in the cluster
-		state: make(map[LogMessageType]LogMessage),
+		state:          make(map[LogMessageType]LogMessage),
 	}
 }
 
@@ -96,7 +96,6 @@ type RaftParameters struct {
 func (r *RaftNode) Start(nodeID string, verboseLog bool, cfg RaftParameters) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-
 	if r.ra != nil {
 		return errors.New("raft cluster is already started")
 	}
@@ -154,21 +153,21 @@ func (r *RaftNode) Start(nodeID string, verboseLog bool, cfg RaftParameters) err
 
 	if cfg.DiskStore {
 		raftdir := fmt.Sprintf("./%s", nodeID)
-		log.Printf("Using boltDB and snapshot store in %s", raftdir)
+		log.WithField("dbdir", raftdir).Info("Using boltDB and snapshot store")
 		if err := os.MkdirAll(raftdir, os.ModePerm); err != nil {
-			log.Printf("Unable to create store dir: %v", err)
+			log.WithError(err).WithField("dbdir", raftdir).Error("Unable to create store dir")
 			return err
 		}
 		boltDB, err := raftboltdb.NewBoltStore(filepath.Join(raftdir, fmt.Sprintf("%s.db", nodeID)))
 		if err != nil {
-			log.Printf("Unable to create boltDB: %v", err)
+			log.WithError(err).Error("Unable to create boltDB")
 			return err
 		}
 		logStore = boltDB
 		stableStore = boltDB
 		snapshotStore, err = raft.NewFileSnapshotStore(raftdir, 3, os.Stderr)
 		if err != nil {
-			log.Printf("Unable to create snapshot store: %v", err)
+			log.WithError(err).WithField("dbdir", raftdir).Error("Unable to create snapshot store")
 			return err
 		}
 	} else {
@@ -182,7 +181,7 @@ func (r *RaftNode) Start(nodeID string, verboseLog bool, cfg RaftParameters) err
 	}
 
 	if cfg.Bootstrap {
-		log.Printf("Bootstrapping new cluster")
+		log.Info("Bootstrapping new cluster")
 		configuration := raft.Configuration{
 			Servers: []raft.Server{
 				{
@@ -200,8 +199,10 @@ func (r *RaftNode) Start(nodeID string, verboseLog bool, cfg RaftParameters) err
 
 	// This node will - surprise - be a member of the cluster
 	r.addNode(nodeID)
+
 	go r.coalescingEvents()
 	go r.observerFunc(observerChan)
+
 	r.ra.RegisterObserver(raft.NewObserver(observerChan, true, func(*raft.Observation) bool { return true }))
 	r.localNodeID = nodeID
 	r.sendInternalEvent(RaftBecameFollower)
@@ -231,10 +232,6 @@ func (r *RaftNode) observerFunc(ch chan raft.Observation) {
 				r.sendInternalEvent(RaftBecameFollower)
 			case raft.Leader:
 				r.sendInternalEvent(RaftBecameLeader)
-				// Cluster size changed events will not be triggered when the
-				// node is the only member in the cluster. This is just to
-				// make sure the event is triggered for the first time.
-				r.sendInternalEvent(RaftClusterSizeChanged)
 			}
 		case raft.PeerLiveness:
 			lt, ok := k.Data.(raft.PeerLiveness)
@@ -250,7 +247,10 @@ func (r *RaftNode) observerFunc(ch chan raft.Observation) {
 			// Not using this at the moment
 
 		default:
-			log.Printf("Unknown Raft event: %+v (%T)", k, k.Data)
+			log.WithFields(log.Fields{
+				"event": k,
+				"data":  k.Data,
+			}).Error("Unknown Raft event")
 		}
 	}
 }
@@ -387,26 +387,8 @@ func (r *RaftNode) AppendLogEntry(data []byte) (uint64, error) {
 	return f.Index(), nil
 }
 
-// Members returns a list of the node IDs that are a member of the cluster
-func (r *RaftNode) Members() []string {
-	r.mutex.RLock()
-	defer r.mutex.RUnlock()
-	var ret []string
-	for k := range r.nodes {
-		ret = append(ret, k)
-	}
-	return ret
-}
-
 // -----------------------------------------------------------------------------
 // This is temporary methods that are used in the management code
-
-// MemberCount returns the number of members in the Raft cluster
-func (r *RaftNode) MemberCount() int {
-	r.mutex.RLock()
-	defer r.mutex.RUnlock()
-	return len(r.nodes)
-}
 
 // LastIndex returns the last log index received
 func (r *RaftNode) LastIndex() uint64 {
@@ -441,24 +423,13 @@ func (r *RaftNode) GetLogMessages(startingIndex uint64) []LogMessage {
 }
 
 func (r *RaftNode) addNode(id string) {
-	r.nodeMutex.Lock()
-	defer r.nodeMutex.Unlock()
-
-	_, exists := r.nodes[id]
-	if exists {
-		return
+	if r.Nodes.Add(id) {
+		r.sendInternalEvent(RaftClusterSizeChanged)
 	}
-	r.nodes[id] = true
-	r.sendInternalEvent(RaftClusterSizeChanged)
 }
 
 func (r *RaftNode) removeNode(id string) {
-	r.nodeMutex.Lock()
-	defer r.nodeMutex.Unlock()
-
-	_, exists := r.nodes[id]
-	if exists {
-		delete(r.nodes, id)
+	if r.Nodes.Remove(id) {
 		r.sendInternalEvent(RaftClusterSizeChanged)
 	}
 }
@@ -512,7 +483,6 @@ func (r *RaftNode) coalescingEvents() {
 // ApplyFuture returned by Raft.Apply method if that
 // method was called on the same Raft node as the FSM.
 func (r *RaftNode) Apply(l *raft.Log) interface{} {
-	//log.Printf("FSM: Apply, index = %d, term = %d", l.Index, l.Term)
 	msg := LogMessage{}
 	if err := msg.UnmarshalBinary(l.Data); err != nil {
 		panic(fmt.Sprintf(" ***** Error decoding log message: %v", err))
@@ -539,7 +509,7 @@ func (r *RaftNode) Snapshot() (raft.FSMSnapshot, error) {
 // concurrently with any other command. The FSM must discard all previous
 // state.
 func (r *RaftNode) Restore(io.ReadCloser) error {
-	log.Printf("FSM: Restore")
+	log.Info("FSMSnapshot Restore")
 	return nil
 }
 
@@ -549,7 +519,7 @@ type raftSnapshot struct {
 // Persist should dump all necessary state to the WriteCloser 'sink',
 // and call sink.Close() when finished or call sink.Cancel() on error.
 func (r *raftSnapshot) Persist(sink raft.SnapshotSink) error {
-	log.Printf("FSMSnapshot: Persist")
+	log.Info("FSMSnapshot Persist")
 	sink.Close()
 	return nil
 }
@@ -557,4 +527,5 @@ func (r *raftSnapshot) Persist(sink raft.SnapshotSink) error {
 // Release is invoked when we are finished with the snapshot.
 func (r *raftSnapshot) Release() {
 	// nothing happens here.
+	log.Info("FSMSnapshot Release")
 }

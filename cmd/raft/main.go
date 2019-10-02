@@ -3,10 +3,11 @@ package main
 import (
 	"errors"
 	"flag"
-	"log"
 	"os"
 	"os/signal"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/stalehd/clusterfunk/cluster"
 	"github.com/stalehd/clusterfunk/cluster/sharding"
@@ -96,22 +97,25 @@ func start(config cluster.Parameters) error {
 	if err := serfNode.Start(config.NodeID, config.Verbose, config.Serf); err != nil {
 		return err
 	}
-	log.Printf("Starting")
+	log.Info("Starting")
 	return nil
 }
 
 func raftEvents(ch <-chan cluster.RaftEventType) {
 	for e := range ch {
-		log.Printf("RAFT: %s", e.String())
+		log.WithField("event", e.String()).Info("raft event")
 		switch e {
 		case cluster.RaftClusterSizeChanged:
-			log.Printf("%d members:  %+v ", raftNode.MemberCount(), raftNode.Members())
+			log.WithFields(log.Fields{
+				"size":    raftNode.Nodes.Size(),
+				"members": raftNode.Nodes.List(),
+			}).Info("Cluster")
 		case cluster.RaftLeaderLost:
 		case cluster.RaftBecameLeader:
 		case cluster.RaftBecameFollower:
 		case cluster.RaftReceivedLog:
 		default:
-			log.Printf("Unknown event received: %+v", e)
+			log.WithField("event", e).Info("Unknown event received")
 		}
 	}
 }
@@ -121,14 +125,14 @@ func serfEvents(ch <-chan cluster.NodeEvent) {
 		if ev.Joined {
 			if raftNode.Leader() {
 				if err := raftNode.AddClusterNode(ev.NodeID, ev.Tags[cluster.RaftEndpoint]); err != nil {
-					log.Printf("Error adding member: %v - %+v", err, ev)
+					log.WithError(err).WithField("member", ev.NodeID).Error("Error adding member")
 				}
 			}
 			continue
 		}
 		if raftNode.Leader() {
 			if err := raftNode.RemoveClusterNode(ev.NodeID, ev.Tags[cluster.RaftEndpoint]); err != nil {
-				log.Printf("Error removing member: %v - %+v", err, ev)
+				log.WithError(err).WithField("member", ev.NodeID).Error("Error removing member")
 			}
 		}
 	}

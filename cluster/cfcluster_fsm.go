@@ -3,9 +3,12 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync/atomic"
 	"time"
+
+	log "github.com/sirupsen/logrus"
+
+	"github.com/golang/protobuf/proto"
 
 	"github.com/stalehd/clusterfunk/cluster/clusterproto"
 	"github.com/stalehd/clusterfunk/cluster/fsmtool"
@@ -72,23 +75,24 @@ func (c *clusterfunkCluster) setFSMState(newState internalFSMState, nodeID strin
 	select {
 	case c.stateChannel <- fsmEvent{State: newState, NodeID: nodeID}:
 	case <-time.After(1 * time.Second):
-		log.Printf("Unable to set cluster FSM state (%d) after 1 second", newState)
+		log.Errorf("Unable to set cluster FSM state (%d) after 1 second", newState)
 		// channel is already full - skip
 	}
 }
 
 // clusterStateMachine is the FSM for
 func (c *clusterfunkCluster) clusterStateMachine() {
-	log.Printf("STATE: Launching")
 	state := fsmtool.NewStateTransitionTable(initialClusterState)
 	state.LogOnError = true
-	state.LogTransitions = true
+	state.LogTransitions = false
 	state.PanicOnError = false
-	state.AllowInvalid = true
+	state.AllowInvalid = true // Allow invalid transitions between states (but log error)
+
 	state.AddTransitions(
 		initialClusterState, assumeLeadership,
 		initialClusterState, assumeFollower,
 		initialClusterState, leaderLost,
+		initialClusterState, clusterSizeChanged,
 
 		assumeLeadership, leaderLost,
 		assumeLeadership, reshardCluster,
@@ -101,8 +105,10 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 
 		clusterSizeChanged, reshardCluster,
 
-		reshardCluster, ackReceived,
+		ackCompleted, clusterSizeChanged,
 
+		reshardCluster, ackReceived,
+		reshardCluster, assumeFollower,
 		ackReceived, ackReceived,
 		ackReceived, ackCompleted,
 
@@ -110,12 +116,14 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 
 		newShardMapReceived, commitLogReceived,
 		newShardMapReceived, leaderLost,
+		newShardMapReceived, newShardMapReceived,
 
 		commitLogReceived, leaderLost,
+		ackCompleted, leaderLost,
+		ackReceived, clusterSizeChanged, // Triggered if there's a cluster size change right after the leader is elected. It happens.
 
-		// Sketchy transitions below. We're doing both the client and
-		// server FSM at the same time. Split into two different FSMs
-		// to make cleaner interfaces.
+		clusterSizeChanged, assumeFollower,
+		reshardCluster, leaderLost,
 	)
 
 	var unacknowledgedNodes []string
@@ -128,14 +136,14 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 				c.setFSMState(reshardCluster, "")
 
 			case clusterSizeChanged:
-				c.setLocalState(Resharding)
 				c.setFSMState(reshardCluster, "")
 
 			case reshardCluster:
+				c.setLocalState(Resharding)
 				// reshard cluster, distribute via replicated log.
 
 				// Reset the list of acked nodes.
-				list := c.raftNode.Members()
+				list := c.raftNode.Nodes.List()
 
 				c.shardManager.UpdateNodes(list...)
 				proposedShardMap, err := c.shardManager.MarshalBinary()
@@ -161,13 +169,13 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 							panic("I'm the leader but I could not write the log")
 						}
 						// otherwise -- just log it and continue
-						log.Printf("Could not write log entry for new shard map")
+						log.WithError(err).Error("Could not write log entry for new shard map")
 					}
 					atomic.StoreUint64(c.reshardingLogIndex, index)
 				}, "Appending shard map log entry")
 				// This is the index we want commits for.
 				shardMapLogIndex = c.raftNode.LastIndex()
-				log.Printf("Shard map index = %d", shardMapLogIndex)
+				log.WithFields(log.Fields{"index": shardMapLogIndex}).Debugf("Shard map index")
 				//c.updateNodes(c.shardManager.NodeList())
 				// Next messages will be ackReceived when the changes has replicated
 				// out to the other nodes.
@@ -182,7 +190,7 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 						unacknowledgedNodes = append(unacknowledgedNodes[:i], unacknowledgedNodes[i+1:]...)
 					}
 				}
-				log.Printf("STATE: ack received from %s, %d nodes remaining", newState.NodeID, len(unacknowledgedNodes))
+				log.WithFields(log.Fields{"nodeid": newState.NodeID, "remaining": len(unacknowledgedNodes)}).Debug("STATE: Ack received")
 				// Timeouts are handled when calling the other nodes via gRPC
 				allNodesHaveAcked := false
 				if len(unacknowledgedNodes) == 0 {
@@ -195,24 +203,10 @@ func (c *clusterfunkCluster) clusterStateMachine() {
 				return // continue
 
 			case ackCompleted:
-				// TODO: Log final commit message, establishing the new state in the cluster
 				// ack is completed. Enable the new shard map for the cluster by
 				// sending a commit log message. No further processing is required
 				// here.
-				commitMessage := NewLogMessage(ShardMapCommitted, c.raftNode.LocalNodeID(), []byte{})
-				buf, err := commitMessage.MarshalBinary()
-				if err != nil {
-					panic(fmt.Sprintf("Unable to marshal commit message: %v", err))
-				}
-				if _, err := c.raftNode.AppendLogEntry(buf); err != nil {
-					// We might have lost the leadership here. Panic if we're still
-					// the leader
-					if err := c.raftNode.ra.VerifyLeader().Error(); err == nil {
-						panic("I'm the leader but I could not write the log")
-					}
-					// otherwise -- just log it and continue
-					log.Printf("Could not write log entry for new shard map: %v", err)
-				}
+				c.sendCommitMessage(shardMapLogIndex)
 				c.setLocalState(Operational)
 				return // continue
 
@@ -256,13 +250,12 @@ func (c *clusterfunkCluster) ackShardMap(endpoint string) {
 	opts, err := utils.GetGRPCDialOpts(clientParam)
 	if err != nil {
 		//panic(fmt.Sprintf("Unable to acknowledge gRPC client parameters: %v", err))
-		log.Printf("Unable to acknowledge gRPC client parameters: %v", err)
+		log.WithError(err).Error("Unable to acknowledge gRPC client parameters")
 		return
 	}
 	conn, err := grpc.Dial(clientParam.ServerEndpoint, opts...)
 	if err != nil {
-		//panic(fmt.Sprintf("Unable to dial server when acking shard map: %v", err))
-		log.Printf("Unable to dial server when acking shard map: %v", err)
+		log.WithError(err).Error("Unable to dial server when acking shard map")
 		return
 	}
 	defer conn.Close()
@@ -277,14 +270,47 @@ func (c *clusterfunkCluster) ackShardMap(endpoint string) {
 	})
 	if err != nil {
 		//panic(fmt.Sprintf("Unable to confirm shard map: %v", err))
-		log.Printf("Unable to confirm shard map: %v", err)
+		log.WithError(err).Error("Unable to confirm shard map")
 		return
 	}
 	if !resp.Success {
-		log.Printf("Leader rejected ack. I got index %d and leader wants %d", logIndex, resp.CurrentIndex)
+		log.WithFields(log.Fields{
+			"index":       logIndex,
+			"leaderIndex": resp.CurrentIndex,
+		}).Info("Leader rejected ack")
 		atomic.StoreUint64(c.wantedShardLogIndex, uint64(resp.CurrentIndex))
 		return
 	}
-	log.Printf("Shard map ack successfully sent to leader (leader=%s, index=%d)", endpoint, logIndex)
+	log.WithFields(log.Fields{
+		"leaderEndpoint": endpoint,
+		"logIndex":       logIndex,
+	}).Debug("Shard map ack successfully sent to leader")
 	atomic.StoreUint64(c.wantedShardLogIndex, 0)
+}
+
+func (c *clusterfunkCluster) sendCommitMessage(index uint64) {
+	commitMsg := clusterproto.CommitShardMapMessage{
+		ShardMapLogIndex: int64(index),
+	}
+	for _, v := range c.raftNode.Nodes.List() {
+		commitMsg.Nodes = append(commitMsg.Nodes, v)
+	}
+	commitBuf, err := proto.Marshal(&commitMsg)
+	if err != nil {
+		panic(fmt.Sprintf("Unable to marshal commit message buffer: %v", err))
+	}
+	commitMessage := NewLogMessage(ShardMapCommitted, c.raftNode.LocalNodeID(), commitBuf)
+	buf, err := commitMessage.MarshalBinary()
+	if err != nil {
+		panic(fmt.Sprintf("Unable to marshal commit message: %v", err))
+	}
+	if _, err := c.raftNode.AppendLogEntry(buf); err != nil {
+		// We might have lost the leadership here. Panic if we're still
+		// the leader
+		if err := c.raftNode.ra.VerifyLeader().Error(); err == nil {
+			panic("I'm the leader but I could not write the log")
+		}
+		// otherwise -- just log it and continue
+		log.WithError(err).Error("Could not write log entry for new shard map")
+	}
 }
