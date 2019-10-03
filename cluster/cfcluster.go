@@ -159,19 +159,19 @@ func (c *clusterfunkCluster) raftEventLoop(ch <-chan RaftEventType) {
 	for e := range ch {
 		switch e {
 		case RaftClusterSizeChanged:
-			timeCall(func() { c.handleClusterSizeChanged() }, "ClusterSizeChanged")
+			utils.TimeCall(func() { c.handleClusterSizeChanged() }, "ClusterSizeChanged")
 
 		case RaftLeaderLost:
-			timeCall(func() { c.handleLeaderLost() }, "LeaderLost")
+			utils.TimeCall(func() { c.handleLeaderLost() }, "LeaderLost")
 
 		case RaftBecameLeader:
-			timeCall(func() { c.handleLeaderEvent() }, "BecameLeader")
+			utils.TimeCall(func() { c.handleLeaderEvent() }, "BecameLeader")
 
 		case RaftBecameFollower:
-			timeCall(func() { c.handleFollowerEvent() }, "BecameFollower")
+			utils.TimeCall(func() { c.handleFollowerEvent() }, "BecameFollower")
 
 		case RaftReceivedLog:
-			timeCall(func() { c.handleReceiveLog() }, "ReceivedLog")
+			utils.TimeCall(func() { c.handleReceiveLog() }, "ReceivedLog")
 
 		default:
 			log.WithField("eventType", e).Error("Unknown event received")

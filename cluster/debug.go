@@ -1,8 +1,6 @@
 package cluster
 
 import (
-	"time"
-
 	log "github.com/sirupsen/logrus"
 	"github.com/stalehd/clusterfunk/cluster/sharding"
 )
@@ -21,11 +19,4 @@ func dumpShardMap(shardManager sharding.ShardManager) {
 		log.Infof("%-20s: %d shards", k, v)
 	}
 	log.Info("===================================================")
-}
-
-func timeCall(call func(), description string) {
-	start := time.Now()
-	call()
-	diff := time.Now().Sub(start)
-	log.WithField("ms", float64(diff)/float64(time.Millisecond)).Debugf("%s execution time", description)
 }
