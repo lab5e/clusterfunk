@@ -2,12 +2,11 @@ package main
 
 import (
 	"flag"
-	"os"
-	"os/signal"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/stalehd/clusterfunk/cluster/sharding"
+	"github.com/stalehd/clusterfunk/utils"
 
 	"github.com/stalehd/clusterfunk/cluster"
 )
@@ -55,17 +54,6 @@ func main() {
 		return
 	}
 
-	waitForExit(c)
+	utils.WaitForCtrlC()
 	log.Info("I'm done")
-}
-
-func waitForExit(c cluster.Cluster) {
-	terminate := make(chan os.Signal, 1)
-	signal.Notify(terminate, os.Interrupt)
-	for {
-		select {
-		case <-terminate:
-			return
-		}
-	}
 }
