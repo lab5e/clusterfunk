@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net"
-	"sync/atomic"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -66,22 +65,26 @@ func (c *clusterfunkCluster) ConfirmShardMap(ctx context.Context, req *clusterpr
 		return nil, errors.New("not in resharding mode")
 	}
 
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-	reshardIndex := atomic.LoadUint64(c.reshardingLogIndex)
-	if req.LogIndex < int64(reshardIndex) {
+	logIndex := c.state.CurrentShardMapIndex()
+	if uint64(req.LogIndex) != logIndex {
 		// This is not the ack we're looking for
 		return &clusterproto.ConfirmShardMapResponse{
 			Success:      false,
-			CurrentIndex: int64(reshardIndex),
+			CurrentIndex: int64(logIndex),
 		}, nil
 	}
-	if req.LogIndex != int64(reshardIndex) {
+	if req.LogIndex != int64(logIndex) {
 		return nil, errors.New("index is invalid")
 	}
-	c.handleAckReceived(req.NodeID)
+
+	if c.handleAckReceived(req.NodeID, uint64(req.LogIndex)) {
+		return &clusterproto.ConfirmShardMapResponse{
+			Success:      true,
+			CurrentIndex: int64(logIndex),
+		}, nil
+	}
 	return &clusterproto.ConfirmShardMapResponse{
-		Success:      true,
-		CurrentIndex: int64(reshardIndex),
+		Success:      false,
+		CurrentIndex: int64(c.state.CurrentShardMapIndex()),
 	}, nil
 }

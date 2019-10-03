@@ -24,7 +24,7 @@ func main() {
 	flag.BoolVar(&config.ZeroConf, "zeroconf", true, "Use zeroconf (mDNS) to discover nodes")
 	flag.StringVar(&config.ClusterName, "name", "demo", "Name of cluster")
 	flag.BoolVar(&config.AutoJoin, "autojoin", true, "Autojoin via Serf Events")
-	flag.StringVar(&ll, "loglevel", "info", "Logging level")
+	flag.StringVar(&ll, "loglevel", "debug", "Logging level")
 	flag.Parse()
 
 	switch ll {
@@ -44,7 +44,7 @@ func main() {
 	c := cluster.NewCluster(config, shards)
 	defer c.Stop()
 
-	go func(ch <-chan cluster.Event) {
+	/*	go func(ch <-chan cluster.Event) {
 		for ev := range ch {
 			switch ev.LocalState {
 			case cluster.Invalid:
@@ -65,7 +65,7 @@ func main() {
 				log.Error("DEMO STATE *** Unknown state", ev.LocalState)
 			}
 		}
-	}(c.Events())
+	}(c.Events())*/
 
 	if err := c.Start(); err != nil {
 		log.WithError(err).Error("Error starting cluster")
