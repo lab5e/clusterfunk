@@ -17,81 +17,12 @@ import (
 	"google.golang.org/grpc"
 )
 
-// This is the internal state protected by a single mutex
-type internalState struct {
-}
-
-func (c *clusterfunkCluster) logStateChange() {
-	log.WithFields(log.Fields{
-		"state": c.state.String(),
-		"role":  c.role.String()}).Debug("State changed")
-}
-
-func (c *clusterfunkCluster) setState(newState NodeState) {
-	c.stateMutex.Lock()
-	defer c.stateMutex.Unlock()
-	if c.state != newState {
-		c.state = newState
-		c.logStateChange()
-		c.sendEvent(Event{State: newState, Role: c.role})
-	}
-}
-
-func (c *clusterfunkCluster) State() NodeState {
-	c.stateMutex.RLock()
-	defer c.stateMutex.RUnlock()
-	return c.state
-}
-
-func (c *clusterfunkCluster) Role() NodeRole {
-	c.stateMutex.RLock()
-	defer c.stateMutex.RUnlock()
-	return c.role
-}
-
-func (c *clusterfunkCluster) setRole(newRole NodeRole) {
-	c.stateMutex.Lock()
-	defer c.stateMutex.Unlock()
-	c.role = newRole
-	c.logStateChange()
-}
-
-func (c *clusterfunkCluster) ProcessedIndex() uint64 {
-	c.stateMutex.RLock()
-	defer c.stateMutex.RUnlock()
-	return c.processedIndex
-}
-
-// SetProcessedIndex sets the last processed index. The returned value is
-// the current value of the processed index.
-func (c *clusterfunkCluster) setProcessedIndex(index uint64) uint64 {
-	c.stateMutex.Lock()
-	defer c.stateMutex.Unlock()
-	if index > c.processedIndex {
-		c.processedIndex = index
-	}
-	return c.processedIndex
-}
-
-func (c *clusterfunkCluster) CurrentShardMapIndex() uint64 {
-	c.stateMutex.RLock()
-	defer c.stateMutex.RUnlock()
-	return c.currentShardMapIndex
-}
-
-func (c *clusterfunkCluster) setCurrentShardMapIndex(index uint64) {
-	c.stateMutex.Lock()
-	defer c.stateMutex.Unlock()
-	c.currentShardMapIndex = index
-}
-
 // clusterfunkClusterß implements the Cluster interface
 type clusterfunkCluster struct {
+	name                 string
 	serfNode             *SerfNode
 	raftNode             *RaftNode
 	config               Parameters
-	registry             *utils.ZeroconfRegistry
-	name                 string
 	mgmtServer           *grpc.Server // gRPC server for management
 	leaderServer         *grpc.Server // gRPC server for leader
 	eventChannels        []chan Event
@@ -102,7 +33,8 @@ type clusterfunkCluster struct {
 	processedIndex       uint64 // The last processed index in the replicated log
 	state                NodeState
 	role                 NodeRole
-	Unacknowledged       StringSet
+	unacknowledged       utils.StringSet
+	registry             *utils.ZeroconfRegistry
 }
 
 // NewCluster returns a new cluster (client)
@@ -117,8 +49,54 @@ func NewCluster(params Parameters, shardManager sharding.ShardManager) Cluster {
 		role:                 NonVoter,
 		stateMutex:           &sync.RWMutex{},
 		currentShardMapIndex: 0,
-		Unacknowledged:       NewStringSet(),
+		unacknowledged:       utils.NewStringSet(),
 	}
+	return ret
+}
+
+func (c *clusterfunkCluster) Stop() {
+	c.setState(Stopping)
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	if c.raftNode != nil {
+		c.raftNode.Stop()
+		c.raftNode = nil
+	}
+	if c.serfNode != nil {
+		c.serfNode.Stop()
+		c.serfNode = nil
+	}
+
+	c.setRole(Unknown)
+	c.setState(Invalid)
+
+	for _, v := range c.eventChannels {
+		close(v)
+	}
+}
+
+func (c *clusterfunkCluster) Name() string {
+	return c.name
+}
+
+func (c *clusterfunkCluster) AddLocalEndpoint(name, endpoint string) {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	if c.serfNode == nil {
+		return
+	}
+	c.serfNode.SetTag(name, endpoint)
+	if err := c.serfNode.PublishTags(); err != nil {
+		log.WithError(err).Error("Error adding endpoint")
+	}
+}
+
+func (c *clusterfunkCluster) Events() <-chan Event {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	ret := make(chan Event)
+	c.eventChannels = append(c.eventChannels, ret)
 	return ret
 }
 
@@ -224,7 +202,7 @@ func (c *clusterfunkCluster) handleClusterSizeChanged() {
 
 	// Reset the list of acked nodes.
 	list := c.raftNode.Nodes.List()
-	c.Unacknowledged.Sync(list...)
+	c.unacknowledged.Sync(list...)
 
 	c.setState(Resharding)
 	// reshard cluster, distribute via replicated log.
@@ -262,12 +240,12 @@ func (c *clusterfunkCluster) handleClusterSizeChanged() {
 func (c *clusterfunkCluster) handleAckReceived(nodeID string, shardIndex uint64) bool {
 	// when a new ack message is received the ack is noted for the node and
 	// until all nodes have acked the state will stay the same.
-	if !c.Unacknowledged.Remove(nodeID) {
+	if !c.unacknowledged.Remove(nodeID) {
 		return false
 	}
 	// Timeouts are handled when calling the other nodes via gRPC
 
-	if c.Unacknowledged.Size() == 0 {
+	if c.unacknowledged.Size() == 0 {
 		// ack is completed. Enable the new shard map for the cluster by
 		// sending a commit log message. No further processing is required
 		// here.
@@ -454,62 +432,5 @@ func (c *clusterfunkCluster) serfEventLoop(ch <-chan NodeEvent) {
 				}
 			}
 		}(c.serfNode.Events())
-	}
-}
-
-func (c *clusterfunkCluster) Stop() {
-	c.setState(Stopping)
-
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	if c.raftNode != nil {
-		c.raftNode.Stop()
-		c.raftNode = nil
-	}
-	if c.serfNode != nil {
-		c.serfNode.Stop()
-		c.serfNode = nil
-	}
-
-	c.setRole(Unknown)
-	c.setState(Invalid)
-
-	for _, v := range c.eventChannels {
-		close(v)
-	}
-}
-
-func (c *clusterfunkCluster) Name() string {
-	return c.name
-}
-
-func (c *clusterfunkCluster) AddLocalEndpoint(name, endpoint string) {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-	if c.serfNode == nil {
-		return
-	}
-	c.serfNode.SetTag(name, endpoint)
-	if err := c.serfNode.PublishTags(); err != nil {
-		log.WithError(err).Error("Error adding endpoint")
-	}
-}
-
-func (c *clusterfunkCluster) Events() <-chan Event {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	ret := make(chan Event)
-	c.eventChannels = append(c.eventChannels, ret)
-	return ret
-}
-
-func (c *clusterfunkCluster) sendEvent(ev Event) {
-	for _, v := range c.eventChannels {
-		select {
-		case v <- ev:
-			// great success
-		case <-time.After(1 * time.Second):
-			// drop event
-		}
 	}
 }

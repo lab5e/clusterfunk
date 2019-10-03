@@ -6,6 +6,7 @@ import (
 	"io"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/stalehd/clusterfunk/utils"
 
 	"net"
 	"os"
@@ -71,13 +72,13 @@ type RaftNode struct {
 	events         chan RaftEventType            // Events from Raft
 	internalEvents chan RaftEventType            // Internal event queue
 	state          map[LogMessageType]LogMessage // The internal FSM state
-	Nodes          StringSet
+	Nodes          utils.StringSet
 }
 
 // NewRaftNode creates a new RaftNode instance
 func NewRaftNode() *RaftNode {
 	return &RaftNode{
-		Nodes:          NewStringSet(),
+		Nodes:          utils.NewStringSet(),
 		localNodeID:    "",
 		mutex:          &sync.RWMutex{},
 		fsmMutex:       &sync.RWMutex{},
