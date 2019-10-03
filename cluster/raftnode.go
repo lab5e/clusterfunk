@@ -61,8 +61,10 @@ func (r RaftEventType) String() string {
 // be up to date or correct for the followers. The followers will only
 // interact with the leader of the cluster.
 type RaftNode struct {
-	mutex          *sync.RWMutex                 // Mutex for the attributes
-	fsmMutex       *sync.RWMutex                 // Mutex for the FSM
+	mutex          *sync.RWMutex // Mutex for the attributes
+	fsmMutex       *sync.RWMutex // Mutex for the FSM
+	scheduledMutex *sync.Mutex   // Mutex for scheduled events
+	scheduled      map[RaftEventType]time.Time
 	localNodeID    string                        // The local node ID
 	raftEndpoint   string                        // Raft endpoint
 	ra             *raft.Raft                    // Raft instance
@@ -79,6 +81,8 @@ func NewRaftNode() *RaftNode {
 		localNodeID:    "",
 		mutex:          &sync.RWMutex{},
 		fsmMutex:       &sync.RWMutex{},
+		scheduledMutex: &sync.Mutex{},
+		scheduled:      make(map[RaftEventType]time.Time),
 		events:         make(chan RaftEventType, 10), // tiny buffer here to make multiple events feasable.
 		internalEvents: make(chan RaftEventType, 10),
 		state:          make(map[LogMessageType]LogMessage),
@@ -228,15 +232,15 @@ func (r *RaftNode) observerFunc(ch chan raft.Observation) {
 			switch v {
 			case raft.Candidate:
 				r.sendInternalEvent(RaftLeaderLost)
+
 			case raft.Follower:
 				r.sendInternalEvent(RaftBecameFollower)
+
 			case raft.Leader:
 				r.sendInternalEvent(RaftBecameLeader)
 				// This might look a bit weird but the cluster size does not
 				// change when there's only a single node becoming a leader
-				if r.Nodes.Size() == 1 {
-					r.sendInternalEvent(RaftClusterSizeChanged)
-				}
+				r.scheduleInternalEvent(RaftClusterSizeChanged, 500*time.Millisecond)
 			}
 		case raft.PeerLiveness:
 			lt, ok := k.Data.(raft.PeerLiveness)
@@ -439,13 +443,41 @@ func (r *RaftNode) removeNode(id string) {
 func (r *RaftNode) sendInternalEvent(ev RaftEventType) {
 	select {
 	case r.internalEvents <- ev:
+		// Remove aync scheduled events of this type.
+		r.scheduledMutex.Lock()
+		if _, ok := r.scheduled[ev]; ok {
+			delete(r.scheduled, ev)
+		}
+		r.scheduledMutex.Unlock()
 	case <-time.After(10 * time.Millisecond):
 		panic("Unable to send internal event. Channel full?")
 	}
 }
 
-// TODO(stalehd): Ordering is important. Emit in same order as they came,
-// remove duplicates of clusterSizeChanged and friends.
+func (r *RaftNode) scheduleInternalEvent(ev RaftEventType, timeout time.Duration) {
+	r.scheduledMutex.Lock()
+	r.scheduled[ev] = time.Now().Add(timeout)
+	r.scheduledMutex.Unlock()
+	go func() {
+		time.Sleep(timeout)
+		r.scheduledMutex.Lock()
+		_, ok := r.scheduled[ev]
+		r.scheduledMutex.Unlock()
+		if ok {
+			// send the event. Log for now since it happens only in certain
+			// circumstances. In most circumstances a change in leadership
+			// happens because a node goes down or fails and then a
+			// cluster size notification is sent but on rare occasions when
+			// a node silently fails it won't trigger a size change event.
+			log.WithFields(log.Fields{
+				"event":     ev.String(),
+				"timeoutMs": timeout / time.Millisecond,
+			}).Warn("Scheduled event sent")
+			r.sendInternalEvent(ev)
+		}
+	}()
+}
+
 func (r *RaftNode) coalescingEvents() {
 	eventsToGenerate := make([]RaftEventType, 0)
 	for {

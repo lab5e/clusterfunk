@@ -27,11 +27,16 @@ type internalState struct {
 	Unacknowledged       StringSet
 }
 
+func (i *internalState) logStateChange() {
+	log.WithFields(log.Fields{
+		"state": i.state.String(),
+		"role":  i.role.String()}).Debug("State changed")
+}
 func (i *internalState) SetState(newState NodeState) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
-	log.Infof("**** Set state %s", newState.String())
 	i.state = newState
+	i.logStateChange()
 }
 
 func (i *internalState) State() NodeState {
@@ -50,6 +55,7 @@ func (i *internalState) SetRole(newRole NodeRole) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 	i.role = newRole
+	i.logStateChange()
 }
 
 func (i *internalState) ProcessedIndex() uint64 {
@@ -181,19 +187,19 @@ func (c *clusterfunkCluster) raftEventLoop(ch <-chan RaftEventType) {
 	for e := range ch {
 		switch e {
 		case RaftClusterSizeChanged:
-			c.handleClusterSizeChanged()
+			timeCall(func() { c.handleClusterSizeChanged() }, "ClusterSizeChanged")
 
 		case RaftLeaderLost:
-			c.handleLeaderLost()
+			timeCall(func() { c.handleLeaderLost() }, "LeaderLost")
 
 		case RaftBecameLeader:
-			c.handleLeaderEvent()
+			timeCall(func() { c.handleLeaderEvent() }, "BecameLeader")
 
 		case RaftBecameFollower:
-			c.handleFollowerEvent()
+			timeCall(func() { c.handleFollowerEvent() }, "BecameFollower")
 
 		case RaftReceivedLog:
-			c.handleReceiveLog()
+			timeCall(func() { c.handleReceiveLog() }, "ReceivedLog")
 
 		default:
 			log.WithField("eventType", e).Error("Unknown event received")
@@ -225,7 +231,6 @@ func (c *clusterfunkCluster) handleClusterSizeChanged() {
 	// Reset the list of acked nodes.
 	list := c.raftNode.Nodes.List()
 	c.state.Unacknowledged.Sync(list...)
-	log.Debugf("Unacknowledged nodes: %+v", c.state.Unacknowledged.List())
 
 	c.state.SetState(Resharding)
 	// reshard cluster, distribute via replicated log.
@@ -261,17 +266,14 @@ func (c *clusterfunkCluster) handleClusterSizeChanged() {
 }
 
 func (c *clusterfunkCluster) handleAckReceived(nodeID string, shardIndex uint64) bool {
-	log.Infof("Ack from nodeid = %s, index = %d. List = %+v", nodeID, shardIndex, c.state.Unacknowledged.List())
 	// when a new ack message is received the ack is noted for the node and
 	// until all nodes have acked the state will stay the same.
 	if !c.state.Unacknowledged.Remove(nodeID) {
 		return false
 	}
-	log.Infof("After ack list = %+v.", c.state.Unacknowledged.List())
 	// Timeouts are handled when calling the other nodes via gRPC
 
 	if c.state.Unacknowledged.Size() == 0 {
-		log.Infof("Unacknowledged nodes = %+v. Operational next", c.state.Unacknowledged.Strings)
 		// ack is completed. Enable the new shard map for the cluster by
 		// sending a commit log message. No further processing is required
 		// here.
@@ -290,7 +292,6 @@ func (c *clusterfunkCluster) handleReceiveLog() {
 		case ProposedShardMap:
 			if c.state.Role() == Leader {
 				// Ack to myself - this skips the whole gRPC call
-				log.Infof("Acking myself (%s)", c.raftNode.LocalNodeID())
 				c.handleAckReceived(c.raftNode.LocalNodeID(), c.state.CurrentShardMapIndex())
 				continue
 			}
@@ -308,15 +309,12 @@ func (c *clusterfunkCluster) handleReceiveLog() {
 			// Update internal node list to reflect the list of nodes. Do a
 			// quick sanity check on the node list to make sure this node
 			// is a member (we really should)
-			if c.processShardMapCommitMessage(&msg) {
-				c.state.SetState(Operational)
-			}
+			c.processShardMapCommitMessage(&msg)
 
 		default:
 			log.WithField("logType", msg.MessageType).Error("Unknown log type in replication log")
 		}
 	}
-
 }
 
 func (c *clusterfunkCluster) processProposedShardMap(msg *LogMessage) {
@@ -350,30 +348,24 @@ func (c *clusterfunkCluster) processProposedShardMap(msg *LogMessage) {
 
 // processShardMapCommitMessage processes the commit message from the leader.
 // if this matches the previously acked shard map index.
-func (c *clusterfunkCluster) processShardMapCommitMessage(msg *LogMessage) bool {
+func (c *clusterfunkCluster) processShardMapCommitMessage(msg *LogMessage) {
 	if c.raftNode.Leader() {
-		return false
+		return
 	}
 	commitMsg := &clusterproto.CommitShardMapMessage{}
 	if err := proto.Unmarshal(msg.Data, commitMsg); err != nil {
 		panic(fmt.Sprintf("Unable to unmarshal commit message: %v", err))
 	}
 	if c.state.CurrentShardMapIndex() == 0 {
-		log.Infof("Haven't received a shard map. Ignoring message")
-		return false
+		return
 	}
 	if uint64(commitMsg.ShardMapLogIndex) != c.state.CurrentShardMapIndex() {
-		return false
+		return
 	}
-	log.Infof("Log index is %d and I expected %d", commitMsg.ShardMapLogIndex, c.state.CurrentShardMapIndex())
 	c.raftNode.Nodes.Sync(commitMsg.Nodes...)
-	log.WithFields(log.Fields{
-		"size":    c.raftNode.Nodes.Size(),
-		"members": c.raftNode.Nodes.List(),
-	}).Debug("Node list updated from commit message")
 	// Reset state here
 	c.state.SetCurrentShardMapIndex(0)
-	return true
+	c.state.SetState(Operational)
 }
 
 func (c *clusterfunkCluster) ackShardMap(index uint64, endpoint string) {
@@ -396,7 +388,6 @@ func (c *clusterfunkCluster) ackShardMap(index uint64, endpoint string) {
 		return
 	}
 	defer conn.Close()
-	log.Debugf("Acking shard map with ID %d", index)
 	client := clusterproto.NewClusterLeaderServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
@@ -405,7 +396,6 @@ func (c *clusterfunkCluster) ackShardMap(index uint64, endpoint string) {
 		LogIndex: int64(index),
 	})
 	if err != nil {
-		log.WithError(err).Error("Unable to confirm shard map")
 		return
 	}
 	// Set the currently acked and expected map index
@@ -419,16 +409,9 @@ func (c *clusterfunkCluster) ackShardMap(index uint64, endpoint string) {
 				"leaderIndex": resp.CurrentIndex,
 			}).Error("Leader rejected ack")
 		}
-		log.Debugf("Leader wants index %d", resp.CurrentIndex)
 		return
 	}
-
-	// Successful ack. Set the ack to the last one.
-	log.WithFields(log.Fields{
-		"leaderEndpoint": endpoint,
-		"logIndex":       index,
-	}).Debug("Shard map ack successfully sent to leader")
-	return
+	c.state.SetState(Resharding)
 }
 
 func (c *clusterfunkCluster) sendCommitMessage(index uint64) {
