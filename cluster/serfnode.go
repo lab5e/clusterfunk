@@ -19,6 +19,7 @@ type NodeEvent struct {
 	NodeID string
 	Joined bool
 	Update bool
+	Left   bool
 	Tags   map[string]string
 }
 
@@ -235,6 +236,7 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 					Tags:   v.Tags,
 					Joined: true,
 					Update: false,
+					Left:   false,
 				})
 			}
 		case serf.EventMemberLeave:
@@ -248,6 +250,7 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 					Tags:   v.Tags,
 					Joined: false,
 					Update: false,
+					Left:   true,
 				})
 			}
 		case serf.EventMemberReap:
@@ -263,6 +266,7 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 					Tags:   v.Tags,
 					Joined: false,
 					Update: true,
+					Left:   false,
 				})
 			}
 		case serf.EventUser:
@@ -277,7 +281,8 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 					NodeID: v.Name,
 					Tags:   v.Tags,
 					Joined: false,
-					Update: true,
+					Update: false,
+					Left:   true,
 				})
 			}
 

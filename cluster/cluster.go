@@ -87,6 +87,8 @@ type Event struct {
 // Cluster is a wrapper for the Serf and Raft libraries. It will handle typical
 // cluster operations.
 type Cluster interface {
+	// NodeID is the local cluster node's ID
+	NodeID() string
 
 	// Name returns the cluster's name
 	Name() string
@@ -107,6 +109,14 @@ type Cluster interface {
 	// Events returns an event channel for the cluster. The channel will
 	// be closed when the cluster is stopped. Events are for information only
 	Events() <-chan Event
+
+	// SetEndpoint registers an endpoint on the local node
+	SetEndpoint(name string, endpoint string)
+
+	// GetEndpoint returns the endpoint for a particular node. If the node
+	// or endpoint isn't found it will return a blank. The endpoint is
+	// retrieved from the Serf cluster.
+	GetEndpoint(nodeID string, endpointName string) string
 }
 
 // The following are internal tags and values for nodes

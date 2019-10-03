@@ -54,6 +54,24 @@ func NewCluster(params Parameters, shardManager sharding.ShardManager) Cluster {
 	return ret
 }
 
+func (c *clusterfunkCluster) NodeID() string {
+	return c.config.NodeID
+}
+
+func (c *clusterfunkCluster) SetEndpoint(name, endpoint string) {
+	c.serfNode.SetTag(name, endpoint)
+	c.serfNode.PublishTags()
+}
+
+func (c *clusterfunkCluster) GetEndpoint(nodeID string, endpointName string) string {
+	for _, v := range c.serfNode.Members() {
+		if v.NodeID == nodeID {
+			return v.Tags[endpointName]
+		}
+	}
+	return ""
+}
+
 func (c *clusterfunkCluster) Stop() {
 	c.setState(Stopping)
 
@@ -414,18 +432,26 @@ func (c *clusterfunkCluster) sendCommitMessage(index uint64) {
 }
 
 func (c *clusterfunkCluster) serfEventLoop(ch <-chan NodeEvent) {
+	knownNodes := toolbox.NewStringSet()
 	if c.config.AutoJoin {
 		go func(ch <-chan NodeEvent) {
 			for ev := range ch {
-				if ev.Joined {
-					if c.config.AutoJoin && c.Role() == Leader {
-						if err := c.raftNode.AddClusterNode(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
-							log.WithError(err).WithField("event", ev).Error("Error adding member")
-						}
-					}
-					continue
+				joined := false
+				if !ev.Left && knownNodes.Add(ev.NodeID) {
+					joined = true
 				}
-				if c.config.AutoJoin && c.Role() == Leader {
+				left := false
+				if !ev.Joined && !ev.Update && knownNodes.Remove(ev.NodeID) {
+					left = true
+				}
+				if joined && c.config.AutoJoin && c.Role() == Leader {
+					log.Warnf("Adding serf node %s to cluster", ev.NodeID)
+					if err := c.raftNode.AddClusterNode(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
+						log.WithError(err).WithField("event", ev).Error("Error adding member")
+					}
+				}
+				if left && c.config.AutoJoin && c.Role() == Leader {
+					log.Warnf("Removing serf node %s from cluster", ev.NodeID)
 					if err := c.raftNode.RemoveClusterNode(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
 						log.WithError(err).WithField("event", ev).Error("Error removing member")
 					}
