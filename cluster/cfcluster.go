@@ -13,7 +13,7 @@ import (
 	"github.com/stalehd/clusterfunk/cluster/clusterproto"
 
 	"github.com/stalehd/clusterfunk/cluster/sharding"
-	"github.com/stalehd/clusterfunk/utils"
+	"github.com/stalehd/clusterfunk/toolbox"
 	"google.golang.org/grpc"
 )
 
@@ -33,8 +33,8 @@ type clusterfunkCluster struct {
 	processedIndex       uint64 // The last processed index in the replicated log
 	state                NodeState
 	role                 NodeRole
-	unacknowledged       utils.StringSet
-	registry             *utils.ZeroconfRegistry
+	unacknowledged       toolbox.StringSet
+	registry             *toolbox.ZeroconfRegistry
 }
 
 // NewCluster returns a new cluster (client)
@@ -49,7 +49,7 @@ func NewCluster(params Parameters, shardManager sharding.ShardManager) Cluster {
 		role:                 NonVoter,
 		stateMutex:           &sync.RWMutex{},
 		currentShardMapIndex: 0,
-		unacknowledged:       utils.NewStringSet(),
+		unacknowledged:       toolbox.NewStringSet(),
 	}
 	return ret
 }
@@ -117,7 +117,7 @@ func (c *clusterfunkCluster) Start() error {
 		log.WithError(err).Error("Error starting leader gRPC interface")
 	}
 	if c.config.ZeroConf {
-		c.registry = utils.NewZeroconfRegistry(c.config.ClusterName)
+		c.registry = toolbox.NewZeroconfRegistry(c.config.ClusterName)
 
 		if !c.config.Raft.Bootstrap && c.config.Serf.JoinAddress == "" {
 			var err error
@@ -130,7 +130,7 @@ func (c *clusterfunkCluster) Start() error {
 			}
 			c.config.Serf.JoinAddress = addrs[0]
 		}
-		if err := c.registry.Register(c.config.NodeID, utils.PortOfHostPort(c.config.Serf.Endpoint)); err != nil {
+		if err := c.registry.Register(c.config.NodeID, toolbox.PortOfHostPort(c.config.Serf.Endpoint)); err != nil {
 			return err
 		}
 
@@ -159,19 +159,19 @@ func (c *clusterfunkCluster) raftEventLoop(ch <-chan RaftEventType) {
 	for e := range ch {
 		switch e {
 		case RaftClusterSizeChanged:
-			utils.TimeCall(func() { c.handleClusterSizeChanged() }, "ClusterSizeChanged")
+			toolbox.TimeCall(func() { c.handleClusterSizeChanged() }, "ClusterSizeChanged")
 
 		case RaftLeaderLost:
-			utils.TimeCall(func() { c.handleLeaderLost() }, "LeaderLost")
+			toolbox.TimeCall(func() { c.handleLeaderLost() }, "LeaderLost")
 
 		case RaftBecameLeader:
-			utils.TimeCall(func() { c.handleLeaderEvent() }, "BecameLeader")
+			toolbox.TimeCall(func() { c.handleLeaderEvent() }, "BecameLeader")
 
 		case RaftBecameFollower:
-			utils.TimeCall(func() { c.handleFollowerEvent() }, "BecameFollower")
+			toolbox.TimeCall(func() { c.handleFollowerEvent() }, "BecameFollower")
 
 		case RaftReceivedLog:
-			utils.TimeCall(func() { c.handleReceiveLog() }, "ReceivedLog")
+			toolbox.TimeCall(func() { c.handleReceiveLog() }, "ReceivedLog")
 
 		default:
 			log.WithField("eventType", e).Error("Unknown event received")
@@ -343,12 +343,12 @@ func (c *clusterfunkCluster) processShardMapCommitMessage(msg *LogMessage) {
 func (c *clusterfunkCluster) ackShardMap(index uint64, endpoint string) {
 	// Step 1 Leader ID
 	// Confirm the shard map
-	clientParam := utils.GRPCClientParam{
+	clientParam := toolbox.GRPCClientParam{
 		ServerEndpoint: endpoint,
 		TLS:            false,
 		CAFile:         "",
 	}
-	opts, err := utils.GetGRPCDialOpts(clientParam)
+	opts, err := toolbox.GetGRPCDialOpts(clientParam)
 	if err != nil {
 		//panic(fmt.Sprintf("Unable to acknowledge gRPC client parameters: %v", err))
 		log.WithError(err).Error("Unable to acknowledge gRPC client parameters")

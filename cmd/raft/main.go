@@ -11,7 +11,7 @@ import (
 
 	"github.com/stalehd/clusterfunk/cluster"
 	"github.com/stalehd/clusterfunk/cluster/sharding"
-	"github.com/stalehd/clusterfunk/utils"
+	"github.com/stalehd/clusterfunk/toolbox"
 )
 
 const numShards = 10000
@@ -53,7 +53,7 @@ func main() {
 
 var serfNode *cluster.SerfNode
 var raftNode *cluster.RaftNode
-var registry *utils.ZeroconfRegistry
+var registry *toolbox.ZeroconfRegistry
 
 func start(config cluster.Parameters) error {
 	config.Final()
@@ -64,7 +64,7 @@ func start(config cluster.Parameters) error {
 	serfNode = cluster.NewSerfNode()
 
 	if config.ZeroConf {
-		registry = utils.NewZeroconfRegistry(config.ClusterName)
+		registry = toolbox.NewZeroconfRegistry(config.ClusterName)
 
 		if !config.Raft.Bootstrap && config.Serf.JoinAddress == "" {
 			var err error
@@ -77,7 +77,7 @@ func start(config cluster.Parameters) error {
 			}
 			config.Serf.JoinAddress = addrs[0]
 		}
-		if err := registry.Register(config.NodeID, utils.PortOfHostPort(config.Serf.Endpoint)); err != nil {
+		if err := registry.Register(config.NodeID, toolbox.PortOfHostPort(config.Serf.Endpoint)); err != nil {
 			return err
 		}
 

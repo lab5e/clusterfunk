@@ -11,7 +11,7 @@ import (
 
 	"github.com/stalehd/clusterfunk/cluster"
 	"github.com/stalehd/clusterfunk/cluster/clustermgmt"
-	"github.com/stalehd/clusterfunk/utils"
+	"github.com/stalehd/clusterfunk/toolbox"
 )
 
 type parameters struct {
@@ -21,7 +21,7 @@ type parameters struct {
 	ConnectLeader bool   `param:"desc=Attempt to connect to the leader node in the Raft cluster;default=false"`
 	Command       string `param:"desc=Command to execute;option=get-state,list-ndoes"`
 	ShowInactive  bool   `param:"desc=Show inactive nodes;default=false"`
-	GRPCClient    utils.GRPCClientParam
+	GRPCClient    toolbox.GRPCClientParam
 }
 
 const (
@@ -103,7 +103,7 @@ func main() {
 }
 
 func findSerfNode(clusterName string) (string, error) {
-	zr := utils.NewZeroconfRegistry(clusterName)
+	zr := toolbox.NewZeroconfRegistry(clusterName)
 	nodes, err := zr.ResolveFirst(1 * time.Second)
 	if err != nil {
 		return "", err
@@ -115,11 +115,11 @@ func findSerfNode(clusterName string) (string, error) {
 }
 
 func randomHostPort() string {
-	addr, err := utils.FindPublicIPv4()
+	addr, err := toolbox.FindPublicIPv4()
 	if err != nil {
 		return ":0"
 	}
-	port, _ := utils.FreeUDPPort()
+	port, _ := toolbox.FreeUDPPort()
 	return fmt.Sprintf("%s:%d", addr, port)
 }
 
@@ -127,7 +127,7 @@ func randomHostPort() string {
 func findRaftNode(joinEndpoint string) (string, error) {
 
 	serfNode := cluster.NewSerfNode()
-	if err := serfNode.Start(utils.RandomID(), false, cluster.SerfParameters{
+	if err := serfNode.Start(toolbox.RandomID(), false, cluster.SerfParameters{
 		Endpoint:    randomHostPort(),
 		JoinAddress: joinEndpoint,
 	}); err != nil {
@@ -143,9 +143,9 @@ func findRaftNode(joinEndpoint string) (string, error) {
 	return "", errors.New("no nodes with management endpoint found")
 }
 
-func connectToRaftNode(config utils.GRPCClientParam) (clustermgmt.ClusterManagementClient, error) {
+func connectToRaftNode(config toolbox.GRPCClientParam) (clustermgmt.ClusterManagementClient, error) {
 
-	opts, err := utils.GetGRPCDialOpts(config)
+	opts, err := toolbox.GetGRPCDialOpts(config)
 	if err != nil {
 		return nil, err
 	}

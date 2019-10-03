@@ -5,12 +5,12 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stalehd/clusterfunk/utils"
+	"github.com/stalehd/clusterfunk/toolbox"
 	"github.com/stretchr/testify/require"
 )
 
 func randomEndpoint() string {
-	port, err := utils.FreeTCPPort()
+	port, err := toolbox.FreeTCPPort()
 	if err != nil {
 		panic(err)
 	}

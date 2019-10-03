@@ -6,7 +6,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/stalehd/clusterfunk/cluster/sharding"
-	"github.com/stalehd/clusterfunk/utils"
+	"github.com/stalehd/clusterfunk/toolbox"
 
 	"github.com/stalehd/clusterfunk/cluster"
 )
@@ -54,6 +54,6 @@ func main() {
 		return
 	}
 
-	utils.WaitForCtrlC()
+	toolbox.WaitForCtrlC()
 	log.Info("I'm done")
 }

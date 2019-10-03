@@ -6,7 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/stalehd/clusterfunk/utils"
+	"github.com/stalehd/clusterfunk/toolbox"
 )
 
 // GRPCServerParameters is a parameter struct for gRPC services
@@ -38,7 +38,7 @@ func (p *Parameters) checkAndSetEndpoint(hostport *string) {
 	if *hostport != "" {
 		return
 	}
-	port, err := utils.FreeTCPPort()
+	port, err := toolbox.FreeTCPPort()
 	if err != nil {
 		port = int(rand.Int31n(31000) + 1024)
 	}
@@ -48,10 +48,10 @@ func (p *Parameters) checkAndSetEndpoint(hostport *string) {
 // Final sets the defaults for the parameters
 func (p *Parameters) Final() {
 	if p.NodeID == "" {
-		p.NodeID = utils.RandomID()
+		p.NodeID = toolbox.RandomID()
 	}
 	if p.Interface == "" {
-		ip, err := utils.FindPublicIPv4()
+		ip, err := toolbox.FindPublicIPv4()
 		p.Interface = ip.String()
 		if err != nil {
 			log.WithError(err).Error("Unable to get public IP")
