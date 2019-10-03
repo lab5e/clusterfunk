@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package demoproto;
+
+
+message LiffRequest {
+    int64 ID = 1;
+};
+
+message LiffResponse {
+    int64 ID =1;
+    string Definition = 2;
+};
+
+message EncryptRequest {
+    int64 ID = 1;
+    bytes Key = 2;
+    bytes Data = 3;
+};
+
+message EncryptResponse {
+    int64 ID = 1;
+    bytes Encrypted = 2;
+};
+
+message SlowRequest {
+    int64 ID = 1;
+}
+
+message SlowResponse {
+    int64 ID = 1;
+}
+
+// DemoService is the service used by the demo client.
+service DemoService {
+    // This explains the Deeper Meaning of Liff. It is a fairly light-weight
+    // process.
+    rpc Liff(LiffRequest) returns (LiffResponse);
+
+    // This is a CPU-intensive request
+    rpc Encrypt(EncryptRequest) returns (EncryptResponse);
+
+    // This is a request that will respond slowly.
+    rpc Slow(SlowRequest) returns (SlowResponse);
+}

@@ -1,4 +1,5 @@
 # TODOs
+
 * Corner case: Client gets parts of replicated log and latest index points to acked shard map (needs two pointers for leader's wanted index and my acked shardmap index)
 
 * Make SerfNode more user friendly, keep node state local w/ accessors. Also make events more concise. Allow endpoints to be added
