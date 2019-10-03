@@ -279,7 +279,6 @@ func (r *RaftNode) Stop() error {
 		r.ra.RemoveServer(raft.ServerID(r.localNodeID), 0, 2*time.Second).Error()
 	}
 
-	// Shutdown isn't graceful so this might be a problem.
 	if err := r.ra.Shutdown().Error(); err != nil {
 		log.WithError(err).Info("Got error on shutdown")
 	}

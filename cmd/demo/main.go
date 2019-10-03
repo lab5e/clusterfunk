@@ -44,28 +44,11 @@ func main() {
 	c := cluster.NewCluster(config, shards)
 	defer c.Stop()
 
-	/*	go func(ch <-chan cluster.Event) {
+	go func(ch <-chan cluster.Event) {
 		for ev := range ch {
-			switch ev.LocalState {
-			case cluster.Invalid:
-				log.Info("DEMO STATE Cluster node is in invalid state")
-			case cluster.Joining:
-				log.Info("DEMO STATE Cluster node is joining a cluster")
-			case cluster.Voting:
-				log.Info("DEMO STATE Cluster node is voting")
-			case cluster.Operational:
-				log.Info("DEMO STATE Cluster node is operational")
-			case cluster.Resharding:
-				log.Info("DEMO STATE Cluster node is resharding")
-			case cluster.Starting:
-				log.Info("DEMO STATE Cluster node is starting")
-			case cluster.Stopping:
-				log.Info("DEMO STATE Cluster node is operational")
-			default:
-				log.Error("DEMO STATE *** Unknown state", ev.LocalState)
-			}
+			log.Infof("Cluster state: %s  role: %s", ev.State.String(), ev.Role.String())
 		}
-	}(c.Events())*/
+	}(c.Events())
 
 	if err := c.Start(); err != nil {
 		log.WithError(err).Error("Error starting cluster")

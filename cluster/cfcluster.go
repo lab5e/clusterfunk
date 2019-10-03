@@ -19,7 +19,85 @@ import (
 
 // This is the internal state protected by a single mutex
 type internalState struct {
+}
+
+func (c *clusterfunkCluster) logStateChange() {
+	log.WithFields(log.Fields{
+		"state": c.state.String(),
+		"role":  c.role.String()}).Debug("State changed")
+}
+
+func (c *clusterfunkCluster) setState(newState NodeState) {
+	c.stateMutex.Lock()
+	defer c.stateMutex.Unlock()
+	if c.state != newState {
+		c.state = newState
+		c.logStateChange()
+		c.sendEvent(Event{State: newState, Role: c.role})
+	}
+}
+
+func (c *clusterfunkCluster) State() NodeState {
+	c.stateMutex.RLock()
+	defer c.stateMutex.RUnlock()
+	return c.state
+}
+
+func (c *clusterfunkCluster) Role() NodeRole {
+	c.stateMutex.RLock()
+	defer c.stateMutex.RUnlock()
+	return c.role
+}
+
+func (c *clusterfunkCluster) setRole(newRole NodeRole) {
+	c.stateMutex.Lock()
+	defer c.stateMutex.Unlock()
+	c.role = newRole
+	c.logStateChange()
+}
+
+func (c *clusterfunkCluster) ProcessedIndex() uint64 {
+	c.stateMutex.RLock()
+	defer c.stateMutex.RUnlock()
+	return c.processedIndex
+}
+
+// SetProcessedIndex sets the last processed index. The returned value is
+// the current value of the processed index.
+func (c *clusterfunkCluster) setProcessedIndex(index uint64) uint64 {
+	c.stateMutex.Lock()
+	defer c.stateMutex.Unlock()
+	if index > c.processedIndex {
+		c.processedIndex = index
+	}
+	return c.processedIndex
+}
+
+func (c *clusterfunkCluster) CurrentShardMapIndex() uint64 {
+	c.stateMutex.RLock()
+	defer c.stateMutex.RUnlock()
+	return c.currentShardMapIndex
+}
+
+func (c *clusterfunkCluster) setCurrentShardMapIndex(index uint64) {
+	c.stateMutex.Lock()
+	defer c.stateMutex.Unlock()
+	c.currentShardMapIndex = index
+}
+
+// clusterfunkClusterß implements the Cluster interface
+type clusterfunkCluster struct {
+	serfNode             *SerfNode
+	raftNode             *RaftNode
+	config               Parameters
+	registry             *utils.ZeroconfRegistry
+	name                 string
+	mgmtServer           *grpc.Server // gRPC server for management
+	leaderServer         *grpc.Server // gRPC server for leader
+	eventChannels        []chan Event
 	mutex                *sync.RWMutex
+	shardManager         sharding.ShardManager
+	stateMutex           *sync.RWMutex
 	currentShardMapIndex uint64
 	processedIndex       uint64 // The last processed index in the replicated log
 	state                NodeState
@@ -27,114 +105,30 @@ type internalState struct {
 	Unacknowledged       StringSet
 }
 
-func (i *internalState) logStateChange() {
-	log.WithFields(log.Fields{
-		"state": i.state.String(),
-		"role":  i.role.String()}).Debug("State changed")
-}
-func (i *internalState) SetState(newState NodeState) {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
-	i.state = newState
-	i.logStateChange()
-}
-
-func (i *internalState) State() NodeState {
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
-	return i.state
-}
-
-func (i *internalState) Role() NodeRole {
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
-	return i.role
-}
-
-func (i *internalState) SetRole(newRole NodeRole) {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
-	i.role = newRole
-	i.logStateChange()
-}
-
-func (i *internalState) ProcessedIndex() uint64 {
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
-	return i.processedIndex
-}
-
-// SetProcessedIndex sets the last processed index. The returned value is
-// the current value of the processed index.
-func (i *internalState) SetProcessedIndex(index uint64) uint64 {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
-	if index > i.processedIndex {
-		i.processedIndex = index
-	}
-	return i.processedIndex
-}
-
-func (i *internalState) CurrentShardMapIndex() uint64 {
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
-	return i.currentShardMapIndex
-}
-
-func (i *internalState) SetCurrentShardMapIndex(index uint64) {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
-	i.currentShardMapIndex = index
-}
-
-// clusterfunkClusterß implements the Cluster interface
-type clusterfunkCluster struct {
-	serfNode      *SerfNode
-	raftNode      *RaftNode
-	config        Parameters
-	registry      *utils.ZeroconfRegistry
-	name          string
-	mgmtServer    *grpc.Server // gRPC server for management
-	leaderServer  *grpc.Server // gRPC server for leader
-	eventChannels []chan Event
-	mutex         *sync.RWMutex
-	shardManager  sharding.ShardManager
-	state         internalState
-}
-
 // NewCluster returns a new cluster (client)
 func NewCluster(params Parameters, shardManager sharding.ShardManager) Cluster {
 	ret := &clusterfunkCluster{
-		config:        params,
-		name:          params.ClusterName,
-		eventChannels: make([]chan Event, 0),
-		mutex:         &sync.RWMutex{},
-		shardManager:  shardManager,
-		state: internalState{
-			state:                Invalid,
-			role:                 NonVoter,
-			mutex:                &sync.RWMutex{},
-			currentShardMapIndex: 0,
-			Unacknowledged:       NewStringSet(),
-		},
+		config:               params,
+		name:                 params.ClusterName,
+		eventChannels:        make([]chan Event, 0),
+		mutex:                &sync.RWMutex{},
+		shardManager:         shardManager,
+		state:                Invalid,
+		role:                 NonVoter,
+		stateMutex:           &sync.RWMutex{},
+		currentShardMapIndex: 0,
+		Unacknowledged:       NewStringSet(),
 	}
 	return ret
 }
 
-func (c *clusterfunkCluster) Role() NodeRole {
-	return c.state.Role()
-}
-
-func (c *clusterfunkCluster) LocalState() NodeState {
-	return c.state.State()
-}
 func (c *clusterfunkCluster) Start() error {
 	c.config.Final()
 	if c.config.ClusterName == "" {
 		return errors.New("cluster name not specified")
 	}
 
-	c.state.SetState(Starting)
+	c.setState(Starting)
 	c.serfNode = NewSerfNode()
 
 	// Launch node management endpoint
@@ -208,31 +202,31 @@ func (c *clusterfunkCluster) raftEventLoop(ch <-chan RaftEventType) {
 }
 
 func (c *clusterfunkCluster) handleLeaderEvent() {
-	c.state.SetRole(Leader)
+	c.setRole(Leader)
 	// A clustersizechanged-event is emitted by the Raft library when
 	// leader is announced. This will force a reshard
 }
 
 func (c *clusterfunkCluster) handleLeaderLost() {
-	c.state.SetState(Voting)
-	c.state.SetCurrentShardMapIndex(0)
+	c.setState(Voting)
+	c.setCurrentShardMapIndex(0)
 }
 
 func (c *clusterfunkCluster) handleFollowerEvent() {
-	c.state.SetRole(Follower)
+	c.setRole(Follower)
 }
 
 func (c *clusterfunkCluster) handleClusterSizeChanged() {
-	if c.state.Role() != Leader {
+	if c.Role() != Leader {
 		// I'm not the leader. Won't do anything.
 		return
 	}
 
 	// Reset the list of acked nodes.
 	list := c.raftNode.Nodes.List()
-	c.state.Unacknowledged.Sync(list...)
+	c.Unacknowledged.Sync(list...)
 
-	c.state.SetState(Resharding)
+	c.setState(Resharding)
 	// reshard cluster, distribute via replicated log.
 
 	c.shardManager.UpdateNodes(list...)
@@ -256,7 +250,7 @@ func (c *clusterfunkCluster) handleClusterSizeChanged() {
 		// otherwise -- just log it and continue
 		log.WithError(err).Error("Could not write log entry for new shard map")
 	}
-	c.state.SetCurrentShardMapIndex(index)
+	c.setCurrentShardMapIndex(index)
 	log.WithFields(log.Fields{"index": index}).Debugf("Shard map index")
 
 	// Next messages will be ackReceived when the changes has replicated
@@ -268,41 +262,41 @@ func (c *clusterfunkCluster) handleClusterSizeChanged() {
 func (c *clusterfunkCluster) handleAckReceived(nodeID string, shardIndex uint64) bool {
 	// when a new ack message is received the ack is noted for the node and
 	// until all nodes have acked the state will stay the same.
-	if !c.state.Unacknowledged.Remove(nodeID) {
+	if !c.Unacknowledged.Remove(nodeID) {
 		return false
 	}
 	// Timeouts are handled when calling the other nodes via gRPC
 
-	if c.state.Unacknowledged.Size() == 0 {
+	if c.Unacknowledged.Size() == 0 {
 		// ack is completed. Enable the new shard map for the cluster by
 		// sending a commit log message. No further processing is required
 		// here.
 		c.sendCommitMessage(shardIndex)
-		c.state.SetState(Operational)
+		c.setState(Operational)
 
 	}
 	return true
 
 }
 func (c *clusterfunkCluster) handleReceiveLog() {
-	messages := c.raftNode.GetLogMessages(c.state.ProcessedIndex())
+	messages := c.raftNode.GetLogMessages(c.ProcessedIndex())
 	for _, msg := range messages {
-		c.state.SetProcessedIndex(msg.Index)
+		c.setProcessedIndex(msg.Index)
 		switch msg.MessageType {
 		case ProposedShardMap:
-			if c.state.Role() == Leader {
+			if c.Role() == Leader {
 				// Ack to myself - this skips the whole gRPC call
-				c.handleAckReceived(c.raftNode.LocalNodeID(), c.state.CurrentShardMapIndex())
+				c.handleAckReceived(c.raftNode.LocalNodeID(), c.CurrentShardMapIndex())
 				continue
 			}
 			c.processProposedShardMap(&msg)
 
 		case ShardMapCommitted:
-			if c.state.Role() == Leader {
+			if c.Role() == Leader {
 				// I'm the leader so the map is already committed
 				continue
 			}
-			wantedIndex := c.state.CurrentShardMapIndex()
+			wantedIndex := c.CurrentShardMapIndex()
 			if wantedIndex > 0 && msg.Index < wantedIndex {
 				continue
 			}
@@ -320,7 +314,7 @@ func (c *clusterfunkCluster) handleReceiveLog() {
 func (c *clusterfunkCluster) processProposedShardMap(msg *LogMessage) {
 	// Check if this is the index we're looking for. If this isn't the index
 	// we want or the index is bigger than the one we expected we can ignore it.
-	wantedIndex := c.state.CurrentShardMapIndex()
+	wantedIndex := c.CurrentShardMapIndex()
 	if wantedIndex > 0 && msg.Index < wantedIndex {
 		return
 	}
@@ -356,16 +350,16 @@ func (c *clusterfunkCluster) processShardMapCommitMessage(msg *LogMessage) {
 	if err := proto.Unmarshal(msg.Data, commitMsg); err != nil {
 		panic(fmt.Sprintf("Unable to unmarshal commit message: %v", err))
 	}
-	if c.state.CurrentShardMapIndex() == 0 {
+	if c.CurrentShardMapIndex() == 0 {
 		return
 	}
-	if uint64(commitMsg.ShardMapLogIndex) != c.state.CurrentShardMapIndex() {
+	if uint64(commitMsg.ShardMapLogIndex) != c.CurrentShardMapIndex() {
 		return
 	}
 	c.raftNode.Nodes.Sync(commitMsg.Nodes...)
 	// Reset state here
-	c.state.SetCurrentShardMapIndex(0)
-	c.state.SetState(Operational)
+	c.setCurrentShardMapIndex(0)
+	c.setState(Operational)
 }
 
 func (c *clusterfunkCluster) ackShardMap(index uint64, endpoint string) {
@@ -399,7 +393,7 @@ func (c *clusterfunkCluster) ackShardMap(index uint64, endpoint string) {
 		return
 	}
 	// Set the currently acked and expected map index
-	c.state.SetCurrentShardMapIndex(uint64(resp.CurrentIndex))
+	c.setCurrentShardMapIndex(uint64(resp.CurrentIndex))
 
 	if !resp.Success {
 		if uint64(resp.CurrentIndex) == index {
@@ -411,7 +405,7 @@ func (c *clusterfunkCluster) ackShardMap(index uint64, endpoint string) {
 		}
 		return
 	}
-	c.state.SetState(Resharding)
+	c.setState(Resharding)
 }
 
 func (c *clusterfunkCluster) sendCommitMessage(index uint64) {
@@ -446,14 +440,14 @@ func (c *clusterfunkCluster) serfEventLoop(ch <-chan NodeEvent) {
 		go func(ch <-chan NodeEvent) {
 			for ev := range ch {
 				if ev.Joined {
-					if c.config.AutoJoin && c.state.Role() == Leader {
+					if c.config.AutoJoin && c.Role() == Leader {
 						if err := c.raftNode.AddClusterNode(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
 							log.WithError(err).WithField("event", ev).Error("Error adding member")
 						}
 					}
 					continue
 				}
-				if c.config.AutoJoin && c.state.Role() == Leader {
+				if c.config.AutoJoin && c.Role() == Leader {
 					if err := c.raftNode.RemoveClusterNode(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
 						log.WithError(err).WithField("event", ev).Error("Error removing member")
 					}
@@ -464,7 +458,7 @@ func (c *clusterfunkCluster) serfEventLoop(ch <-chan NodeEvent) {
 }
 
 func (c *clusterfunkCluster) Stop() {
-	c.state.SetState(Stopping)
+	c.setState(Stopping)
 
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -477,8 +471,12 @@ func (c *clusterfunkCluster) Stop() {
 		c.serfNode = nil
 	}
 
-	c.state.SetRole(Unknown)
-	c.state.SetState(Invalid)
+	c.setRole(Unknown)
+	c.setState(Invalid)
+
+	for _, v := range c.eventChannels {
+		close(v)
+	}
 }
 
 func (c *clusterfunkCluster) Name() string {
@@ -506,10 +504,7 @@ func (c *clusterfunkCluster) Events() <-chan Event {
 }
 
 func (c *clusterfunkCluster) sendEvent(ev Event) {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
 	for _, v := range c.eventChannels {
-
 		select {
 		case v <- ev:
 			// great success

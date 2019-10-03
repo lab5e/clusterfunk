@@ -56,16 +56,16 @@ func (c *clusterfunkCluster) ConfirmShardMap(ctx context.Context, req *clusterpr
 	if c.Role() != Leader {
 		return nil, errors.New("not a leader")
 	}
-	if c.LocalState() != Resharding {
+	if c.State() != Resharding {
 		log.WithFields(log.Fields{
-			"state": c.LocalState().String(),
+			"state": c.State().String(),
 			"index": req.LogIndex,
 			"node":  req.NodeID,
 		}).Warning("not in resharding mode")
 		return nil, errors.New("not in resharding mode")
 	}
 
-	logIndex := c.state.CurrentShardMapIndex()
+	logIndex := c.CurrentShardMapIndex()
 	if uint64(req.LogIndex) != logIndex {
 		// This is not the ack we're looking for
 		return &clusterproto.ConfirmShardMapResponse{
@@ -85,6 +85,6 @@ func (c *clusterfunkCluster) ConfirmShardMap(ctx context.Context, req *clusterpr
 	}
 	return &clusterproto.ConfirmShardMapResponse{
 		Success:      false,
-		CurrentIndex: int64(c.state.CurrentShardMapIndex()),
+		CurrentIndex: int64(c.CurrentShardMapIndex()),
 	}, nil
 }

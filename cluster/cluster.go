@@ -74,10 +74,14 @@ const (
 	SerfStatusKey = "serf.status"
 )
 
-// Event is the interface for cluster events that are triggered
+// Event is the interface for cluster events that are triggered. The events are
+// triggered by changes in the node state. The Role field is informational.
+// When the cluster is in state Operational the shard map contains the
+// current shard mapping. If the State field is different from Operational
+// the shard map may contain an invalid or outdated mapping.
 type Event struct {
-	// State is the current cluster state
-	LocalState NodeState
+	State NodeState // State is the state of the local cluster node
+	Role  NodeRole  // Role is the role (leader, follower...) of the local cluster node
 }
 
 // Cluster is a wrapper for the Serf and Raft libraries. It will handle typical
@@ -98,7 +102,7 @@ type Cluster interface {
 	Role() NodeRole
 
 	// State is the current cluster state
-	LocalState() NodeState
+	State() NodeState
 
 	// Events returns an event channel for the cluster. The channel will
 	// be closed when the cluster is stopped. Events are for information only
