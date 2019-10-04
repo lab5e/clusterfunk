@@ -26,13 +26,14 @@ func main() {
 		return
 	}
 	defer conn.Close()
-
 	client := demo.NewDemoServiceClient(conn)
+
+	// Seed is quite important here
+	rand.Seed(time.Now().UnixNano())
 	requestid := int64(rand.Int())
 
 	ctx, done := context.WithTimeout(context.Background(), 10*time.Second)
 	defer done()
-
 	start := time.Now()
 	var end time.Time
 	var nodeid string
@@ -62,6 +63,10 @@ func main() {
 			return
 		}
 		nodeid = resp.NodeID
+	}
+	end.Sub(start)
+	if nodeid == "" {
+		panic("no node id")
 	}
 	fmt.Printf("Time to call %s on %s: %f ms\n", cmd, nodeid, float64(end.Sub(start))/float64(time.Millisecond))
 }

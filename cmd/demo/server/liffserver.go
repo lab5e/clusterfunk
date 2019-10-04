@@ -15,9 +15,9 @@ import (
 
 // This is the core demo service. It's not particuarly interesting.
 
-func startDemoServer(endpoint string, nodeID string) {
+func startDemoServer(endpoint string, liffServer demo.DemoServiceServer) {
 	server := grpc.NewServer()
-	demo.RegisterDemoServiceServer(server, newLiffServer(nodeID))
+	demo.RegisterDemoServiceServer(server, liffServer)
 	listener, err := net.Listen("tcp", endpoint)
 	if err != nil {
 		log.WithError(err).

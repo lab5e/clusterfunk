@@ -71,7 +71,8 @@ func main() {
 		return
 	}
 
-	go startDemoServer(demoServerEndpoint, c.NodeID())
+	liffServer := newLiffProxy(newLiffServer(c.NodeID()), shards, c, demoEndpoint)
+	go startDemoServer(demoServerEndpoint, liffServer)
 	c.SetEndpoint(demoEndpoint, demoServerEndpoint)
 
 	toolbox.WaitForCtrlC()
