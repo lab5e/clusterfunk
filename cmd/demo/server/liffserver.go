@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
-	"errors"
 	"math/rand"
 	"net"
-	"time"
 
 	"github.com/stalehd/clusterfunk/cmd/demo"
 
@@ -13,7 +11,8 @@ import (
 	"google.golang.org/grpc"
 )
 
-// This is the core demo service. It's not particuarly interesting.
+// This is the core demo service. It's a simple gRPC service with a single
+// method.
 
 func startDemoServer(endpoint string, liffServer demo.DemoServiceServer) {
 	server := grpc.NewServer()
@@ -46,21 +45,6 @@ func (l *liffServer) Liff(ctx context.Context, req *demo.LiffRequest) (*demo.Lif
 		ID:         req.ID,
 		Definition: liffs[rand.Intn(len(liffs))],
 		NodeID:     l.nodeID,
-	}, nil
-}
-
-func (l *liffServer) MakeKeyPair(ctx context.Context, req *demo.KeyPairRequest) (*demo.KeyPairResponse, error) {
-
-	return nil, errors.New("not implemented")
-}
-
-func (l *liffServer) Slow(ctx context.Context, req *demo.SlowRequest) (*demo.SlowResponse, error) {
-	const execTime = 1500 * time.Millisecond
-	offset := time.Duration(rand.Intn(5000)) * time.Millisecond
-	time.Sleep(execTime + offset)
-	return &demo.SlowResponse{
-		ID:     req.ID,
-		NodeID: l.nodeID,
 	}, nil
 }
 

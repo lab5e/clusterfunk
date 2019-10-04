@@ -10,35 +10,9 @@ message LiffResponse {
   string NodeID = 3;     // This is the node running the service
 };
 
-message KeyPairRequest {
-  int64 ID = 1;
-  bytes Key = 2;
-  bytes Data = 3;
-  string NodeID = 4; // This is the node running the service
-};
-
-message KeyPairResponse {
-  int64 ID = 1;
-  bytes Encrypted = 2;
-  string NodeID = 3; // This is the node running the service
-};
-
-message SlowRequest { int64 ID = 1; }
-
-message SlowResponse {
-  int64 ID = 1;
-  string NodeID = 2; // This is the node running the service
-}
-
 // DemoService is the service used by the demo client.
 service DemoService {
-  // This explains the Deeper Meaning of Liff. It is a fairly light-weight
-  // process.
+  // This method returns a line from one of the Liff books.
   rpc Liff(LiffRequest) returns (LiffResponse);
 
-  // This is a CPU-intensive request
-  rpc MakeKeyPair(KeyPairRequest) returns (KeyPairResponse);
-
-  // This is a request that will respond slowly.
-  rpc Slow(SlowRequest) returns (SlowResponse);
 }

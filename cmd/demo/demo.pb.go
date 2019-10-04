@@ -4,9 +4,9 @@
 package demo
 
 import (
-	context "context"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
+	context "golang.org/x/net/context"
 	grpc "google.golang.org/grpc"
 	math "math"
 )
@@ -20,7 +20,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
 type LiffRequest struct {
 	ID                   int64    `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
@@ -116,242 +116,26 @@ func (m *LiffResponse) GetNodeID() string {
 	return ""
 }
 
-type KeyPairRequest struct {
-	ID                   int64    `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
-	Key                  []byte   `protobuf:"bytes,2,opt,name=Key,proto3" json:"Key,omitempty"`
-	Data                 []byte   `protobuf:"bytes,3,opt,name=Data,proto3" json:"Data,omitempty"`
-	NodeID               string   `protobuf:"bytes,4,opt,name=NodeID,proto3" json:"NodeID,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *KeyPairRequest) Reset()         { *m = KeyPairRequest{} }
-func (m *KeyPairRequest) String() string { return proto.CompactTextString(m) }
-func (*KeyPairRequest) ProtoMessage()    {}
-func (*KeyPairRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ca53982754088a9d, []int{2}
-}
-
-func (m *KeyPairRequest) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_KeyPairRequest.Unmarshal(m, b)
-}
-func (m *KeyPairRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_KeyPairRequest.Marshal(b, m, deterministic)
-}
-func (m *KeyPairRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_KeyPairRequest.Merge(m, src)
-}
-func (m *KeyPairRequest) XXX_Size() int {
-	return xxx_messageInfo_KeyPairRequest.Size(m)
-}
-func (m *KeyPairRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_KeyPairRequest.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_KeyPairRequest proto.InternalMessageInfo
-
-func (m *KeyPairRequest) GetID() int64 {
-	if m != nil {
-		return m.ID
-	}
-	return 0
-}
-
-func (m *KeyPairRequest) GetKey() []byte {
-	if m != nil {
-		return m.Key
-	}
-	return nil
-}
-
-func (m *KeyPairRequest) GetData() []byte {
-	if m != nil {
-		return m.Data
-	}
-	return nil
-}
-
-func (m *KeyPairRequest) GetNodeID() string {
-	if m != nil {
-		return m.NodeID
-	}
-	return ""
-}
-
-type KeyPairResponse struct {
-	ID                   int64    `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
-	Encrypted            []byte   `protobuf:"bytes,2,opt,name=Encrypted,proto3" json:"Encrypted,omitempty"`
-	NodeID               string   `protobuf:"bytes,3,opt,name=NodeID,proto3" json:"NodeID,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *KeyPairResponse) Reset()         { *m = KeyPairResponse{} }
-func (m *KeyPairResponse) String() string { return proto.CompactTextString(m) }
-func (*KeyPairResponse) ProtoMessage()    {}
-func (*KeyPairResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ca53982754088a9d, []int{3}
-}
-
-func (m *KeyPairResponse) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_KeyPairResponse.Unmarshal(m, b)
-}
-func (m *KeyPairResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_KeyPairResponse.Marshal(b, m, deterministic)
-}
-func (m *KeyPairResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_KeyPairResponse.Merge(m, src)
-}
-func (m *KeyPairResponse) XXX_Size() int {
-	return xxx_messageInfo_KeyPairResponse.Size(m)
-}
-func (m *KeyPairResponse) XXX_DiscardUnknown() {
-	xxx_messageInfo_KeyPairResponse.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_KeyPairResponse proto.InternalMessageInfo
-
-func (m *KeyPairResponse) GetID() int64 {
-	if m != nil {
-		return m.ID
-	}
-	return 0
-}
-
-func (m *KeyPairResponse) GetEncrypted() []byte {
-	if m != nil {
-		return m.Encrypted
-	}
-	return nil
-}
-
-func (m *KeyPairResponse) GetNodeID() string {
-	if m != nil {
-		return m.NodeID
-	}
-	return ""
-}
-
-type SlowRequest struct {
-	ID                   int64    `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *SlowRequest) Reset()         { *m = SlowRequest{} }
-func (m *SlowRequest) String() string { return proto.CompactTextString(m) }
-func (*SlowRequest) ProtoMessage()    {}
-func (*SlowRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ca53982754088a9d, []int{4}
-}
-
-func (m *SlowRequest) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SlowRequest.Unmarshal(m, b)
-}
-func (m *SlowRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SlowRequest.Marshal(b, m, deterministic)
-}
-func (m *SlowRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SlowRequest.Merge(m, src)
-}
-func (m *SlowRequest) XXX_Size() int {
-	return xxx_messageInfo_SlowRequest.Size(m)
-}
-func (m *SlowRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_SlowRequest.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SlowRequest proto.InternalMessageInfo
-
-func (m *SlowRequest) GetID() int64 {
-	if m != nil {
-		return m.ID
-	}
-	return 0
-}
-
-type SlowResponse struct {
-	ID                   int64    `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
-	NodeID               string   `protobuf:"bytes,2,opt,name=NodeID,proto3" json:"NodeID,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *SlowResponse) Reset()         { *m = SlowResponse{} }
-func (m *SlowResponse) String() string { return proto.CompactTextString(m) }
-func (*SlowResponse) ProtoMessage()    {}
-func (*SlowResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ca53982754088a9d, []int{5}
-}
-
-func (m *SlowResponse) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SlowResponse.Unmarshal(m, b)
-}
-func (m *SlowResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SlowResponse.Marshal(b, m, deterministic)
-}
-func (m *SlowResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SlowResponse.Merge(m, src)
-}
-func (m *SlowResponse) XXX_Size() int {
-	return xxx_messageInfo_SlowResponse.Size(m)
-}
-func (m *SlowResponse) XXX_DiscardUnknown() {
-	xxx_messageInfo_SlowResponse.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SlowResponse proto.InternalMessageInfo
-
-func (m *SlowResponse) GetID() int64 {
-	if m != nil {
-		return m.ID
-	}
-	return 0
-}
-
-func (m *SlowResponse) GetNodeID() string {
-	if m != nil {
-		return m.NodeID
-	}
-	return ""
-}
-
 func init() {
 	proto.RegisterType((*LiffRequest)(nil), "demo.LiffRequest")
 	proto.RegisterType((*LiffResponse)(nil), "demo.LiffResponse")
-	proto.RegisterType((*KeyPairRequest)(nil), "demo.KeyPairRequest")
-	proto.RegisterType((*KeyPairResponse)(nil), "demo.KeyPairResponse")
-	proto.RegisterType((*SlowRequest)(nil), "demo.SlowRequest")
-	proto.RegisterType((*SlowResponse)(nil), "demo.SlowResponse")
 }
 
 func init() { proto.RegisterFile("demo.proto", fileDescriptor_ca53982754088a9d) }
 
 var fileDescriptor_ca53982754088a9d = []byte{
-	// 289 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x74, 0x92, 0x4f, 0x4b, 0xc3, 0x40,
-	0x10, 0xc5, 0xc9, 0x1f, 0x0a, 0x9d, 0x84, 0xaa, 0x83, 0x4a, 0x28, 0x56, 0x4a, 0x4e, 0xbd, 0xb4,
-	0x07, 0x05, 0x0f, 0x9e, 0xd7, 0x43, 0xa8, 0x8a, 0xa4, 0xa0, 0x37, 0x21, 0x36, 0x13, 0x58, 0xb4,
-	0xd9, 0x98, 0xac, 0x4a, 0x3e, 0x91, 0x5f, 0x53, 0xb2, 0xd9, 0xda, 0x6d, 0x61, 0x6f, 0x93, 0xf7,
-	0x92, 0xdf, 0x9b, 0x3f, 0x01, 0xc8, 0x69, 0x23, 0x16, 0x55, 0x2d, 0xa4, 0x40, 0xbf, 0xab, 0xe3,
-	0x09, 0x04, 0xf7, 0xbc, 0x28, 0x52, 0xfa, 0xfc, 0xa2, 0x46, 0xe2, 0x08, 0xdc, 0x84, 0x45, 0xce,
-	0xd4, 0x99, 0x79, 0xa9, 0x9b, 0xb0, 0xf8, 0x19, 0xc2, 0xde, 0x6e, 0x2a, 0x51, 0x36, 0x74, 0xe8,
-	0xe3, 0x25, 0x00, 0xa3, 0x82, 0x97, 0x5c, 0x72, 0x51, 0x46, 0xee, 0xd4, 0x99, 0x0d, 0x53, 0x43,
-	0xc1, 0x73, 0x18, 0x3c, 0x8a, 0x9c, 0x12, 0x16, 0x79, 0xca, 0xd3, 0x4f, 0xf1, 0x2b, 0x8c, 0x96,
-	0xd4, 0x3e, 0x65, 0xbc, 0xb6, 0x24, 0xe3, 0x31, 0x78, 0x4b, 0x6a, 0x15, 0x32, 0x4c, 0xbb, 0x12,
-	0x11, 0x7c, 0x96, 0xc9, 0x4c, 0x91, 0xc2, 0x54, 0xd5, 0x06, 0xdf, 0xdf, 0xe3, 0xbf, 0xc0, 0xd1,
-	0x3f, 0xdf, 0xd2, 0xfa, 0x05, 0x0c, 0xef, 0xca, 0x75, 0xdd, 0x56, 0x92, 0x72, 0x1d, 0xb3, 0x13,
-	0xac, 0x8d, 0x4f, 0x20, 0x58, 0x7d, 0x88, 0x1f, 0xdb, 0xbe, 0x6e, 0x20, 0xec, 0x6d, 0x4b, 0xe8,
-	0x0e, 0xeb, 0x9a, 0xd8, 0xab, 0x5f, 0x07, 0x02, 0x46, 0x1b, 0xb1, 0xa2, 0xfa, 0x9b, 0xaf, 0x09,
-	0xe7, 0xe0, 0x77, 0x7b, 0xc7, 0x93, 0x85, 0xba, 0x98, 0x71, 0xa2, 0x31, 0x9a, 0x92, 0x8e, 0xb9,
-	0x85, 0xe0, 0x21, 0x7b, 0x27, 0x3d, 0x32, 0x9e, 0xf6, 0xaf, 0xec, 0x6f, 0x78, 0x7c, 0x76, 0xa0,
-	0xea, 0x6f, 0xe7, 0xe0, 0x77, 0x2d, 0x6f, 0xa3, 0x8c, 0xe9, 0xb6, 0x51, 0xe6, 0x44, 0x6f, 0x03,
-	0xf5, 0xf7, 0x5c, 0xff, 0x05, 0x00, 0x00, 0xff, 0xff, 0x1b, 0x2e, 0xc9, 0xab, 0x4b, 0x02, 0x00,
-	0x00,
+	// 164 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0x4a, 0x49, 0xcd, 0xcd,
+	0xd7, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x01, 0xb1, 0x95, 0x64, 0xb9, 0xb8, 0x7d, 0x32,
+	0xd3, 0xd2, 0x82, 0x52, 0x0b, 0x4b, 0x53, 0x8b, 0x4b, 0x84, 0xf8, 0xb8, 0x98, 0x3c, 0x5d, 0x24,
+	0x18, 0x15, 0x18, 0x35, 0x98, 0x83, 0x98, 0x3c, 0x5d, 0x94, 0xc2, 0xb8, 0x78, 0x20, 0xd2, 0xc5,
+	0x05, 0xf9, 0x79, 0xc5, 0xa9, 0xe8, 0xf2, 0x42, 0x72, 0x5c, 0x5c, 0x2e, 0xa9, 0x69, 0x99, 0x79,
+	0x99, 0x25, 0x99, 0xf9, 0x79, 0x12, 0x4c, 0x0a, 0x8c, 0x1a, 0x9c, 0x41, 0x48, 0x22, 0x42, 0x62,
+	0x5c, 0x6c, 0x7e, 0xf9, 0x29, 0xa9, 0x9e, 0x2e, 0x12, 0xcc, 0x60, 0x39, 0x28, 0xcf, 0xc8, 0x86,
+	0x8b, 0xdb, 0x25, 0x35, 0x37, 0x3f, 0x38, 0xb5, 0xa8, 0x2c, 0x33, 0x39, 0x55, 0x48, 0x97, 0x8b,
+	0x05, 0x64, 0x8d, 0x90, 0xa0, 0x1e, 0xd8, 0x81, 0x48, 0x2e, 0x92, 0x12, 0x42, 0x16, 0x82, 0xb8,
+	0x22, 0x89, 0x0d, 0xec, 0x03, 0x63, 0x40, 0x00, 0x00, 0x00, 0xff, 0xff, 0x08, 0xa7, 0xd8, 0x9e,
+	0xcf, 0x00, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -369,10 +153,6 @@ type DemoServiceClient interface {
 	// This explains the Deeper Meaning of Liff. It is a fairly light-weight
 	// process.
 	Liff(ctx context.Context, in *LiffRequest, opts ...grpc.CallOption) (*LiffResponse, error)
-	// This is a CPU-intensive request
-	MakeKeyPair(ctx context.Context, in *KeyPairRequest, opts ...grpc.CallOption) (*KeyPairResponse, error)
-	// This is a request that will respond slowly.
-	Slow(ctx context.Context, in *SlowRequest, opts ...grpc.CallOption) (*SlowResponse, error)
 }
 
 type demoServiceClient struct {
@@ -392,33 +172,11 @@ func (c *demoServiceClient) Liff(ctx context.Context, in *LiffRequest, opts ...g
 	return out, nil
 }
 
-func (c *demoServiceClient) MakeKeyPair(ctx context.Context, in *KeyPairRequest, opts ...grpc.CallOption) (*KeyPairResponse, error) {
-	out := new(KeyPairResponse)
-	err := c.cc.Invoke(ctx, "/demo.DemoService/MakeKeyPair", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *demoServiceClient) Slow(ctx context.Context, in *SlowRequest, opts ...grpc.CallOption) (*SlowResponse, error) {
-	out := new(SlowResponse)
-	err := c.cc.Invoke(ctx, "/demo.DemoService/Slow", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // DemoServiceServer is the server API for DemoService service.
 type DemoServiceServer interface {
 	// This explains the Deeper Meaning of Liff. It is a fairly light-weight
 	// process.
 	Liff(context.Context, *LiffRequest) (*LiffResponse, error)
-	// This is a CPU-intensive request
-	MakeKeyPair(context.Context, *KeyPairRequest) (*KeyPairResponse, error)
-	// This is a request that will respond slowly.
-	Slow(context.Context, *SlowRequest) (*SlowResponse, error)
 }
 
 func RegisterDemoServiceServer(s *grpc.Server, srv DemoServiceServer) {
@@ -443,42 +201,6 @@ func _DemoService_Liff_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DemoService_MakeKeyPair_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(KeyPairRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DemoServiceServer).MakeKeyPair(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/demo.DemoService/MakeKeyPair",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DemoServiceServer).MakeKeyPair(ctx, req.(*KeyPairRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _DemoService_Slow_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SlowRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DemoServiceServer).Slow(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/demo.DemoService/Slow",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DemoServiceServer).Slow(ctx, req.(*SlowRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 var _DemoService_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "demo.DemoService",
 	HandlerType: (*DemoServiceServer)(nil),
@@ -486,14 +208,6 @@ var _DemoService_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Liff",
 			Handler:    _DemoService_Liff_Handler,
-		},
-		{
-			MethodName: "MakeKeyPair",
-			Handler:    _DemoService_MakeKeyPair_Handler,
-		},
-		{
-			MethodName: "Slow",
-			Handler:    _DemoService_Slow_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -27,3 +27,6 @@
   for each node. Might be an idea to implement a similar scheme (or just add to
   the existing management gRPC since it's already running on all nodes. Make
   utility functions to discover.
+
+* Make sure bootstrapping a cluster with the same names as an existing one
+  returns an error.
