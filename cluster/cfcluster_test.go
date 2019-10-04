@@ -33,12 +33,12 @@ func TestCfCluster(t *testing.T) {
 
 	params1 := Parameters{
 		Raft: RaftParameters{
-			RaftEndpoint: randomEndpoint(),
+			RaftEndpoint: toolbox.RandomLocalEndpoint(),
 			DiskStore:    false,
 			Bootstrap:    true,
 		},
 		Serf: SerfParameters{
-			Endpoint:    randomEndpoint(),
+			Endpoint:    toolbox.RandomLocalEndpoint(),
 			JoinAddress: "",
 		},
 		AutoJoin:    true,

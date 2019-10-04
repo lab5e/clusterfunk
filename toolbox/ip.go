@@ -1,6 +1,7 @@
 package toolbox
 
 import (
+	"fmt"
 	"net"
 	"strconv"
 )
@@ -77,4 +78,26 @@ func PortOfHostPort(hostport string) int {
 	}
 	ret, err := strconv.ParseInt(port, 10, 32)
 	return int(ret)
+}
+
+// RandomPublicEndpoint returns a random public endpoint on the host. It will use the first IPv4 address found on the host.
+func RandomPublicEndpoint() string {
+	port, err := FreeTCPPort()
+	if err != nil {
+		panic(err)
+	}
+	ip, err := FindPublicIPv4()
+	if err != nil {
+		panic(err)
+	}
+	return fmt.Sprintf("%s:%d", ip, port)
+}
+
+// RandomLocalEndpoint returns a random endpoint on the loppback interface.
+func RandomLocalEndpoint() string {
+	port, err := FreeTCPPort()
+	if err != nil {
+		panic(err)
+	}
+	return fmt.Sprintf("127.0.0.1:%d", port)
 }

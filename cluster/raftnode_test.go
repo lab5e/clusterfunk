@@ -1,21 +1,12 @@
 package cluster
 
 import (
-	"fmt"
 	"sync"
 	"testing"
 
 	"github.com/stalehd/clusterfunk/toolbox"
 	"github.com/stretchr/testify/require"
 )
-
-func randomEndpoint() string {
-	port, err := toolbox.FreeTCPPort()
-	if err != nil {
-		panic(err)
-	}
-	return fmt.Sprintf("127.0.0.1:%d", port)
-}
 
 func TestRaftCluster(t *testing.T) {
 	assert := require.New(t)
@@ -30,9 +21,9 @@ func TestRaftCluster(t *testing.T) {
 	id1 := "node1"
 	id2 := "node2"
 	id3 := "node3"
-	params1 := RaftParameters{Bootstrap: true, DiskStore: false, RaftEndpoint: randomEndpoint()}
-	params2 := RaftParameters{Bootstrap: false, DiskStore: false, RaftEndpoint: randomEndpoint()}
-	params3 := RaftParameters{Bootstrap: false, DiskStore: false, RaftEndpoint: randomEndpoint()}
+	params1 := RaftParameters{Bootstrap: true, DiskStore: false, RaftEndpoint: toolbox.RandomLocalEndpoint()}
+	params2 := RaftParameters{Bootstrap: false, DiskStore: false, RaftEndpoint: toolbox.RandomLocalEndpoint()}
+	params3 := RaftParameters{Bootstrap: false, DiskStore: false, RaftEndpoint: toolbox.RandomLocalEndpoint()}
 
 	// Make a three-node cluster
 	node1 := NewRaftNode()
