@@ -14,12 +14,21 @@ import (
 	"github.com/hashicorp/serf/serf"
 )
 
+// SerfEventType is the type of events the SerfNode emits
+type SerfEventType int
+
+// Serf event types.
+const (
+	SerfNodeJoined  SerfEventType = iota // A node joins the cluster
+	SerfNodeLeft                         // A node has left the cluster
+	SerfNodeUpdated                      // A node's tags are updated
+	SerfNodeFailed                       // A node has failed
+)
+
 // NodeEvent is used for channel notifications
 type NodeEvent struct {
+	Event  SerfEventType
 	NodeID string
-	Joined bool
-	Update bool
-	Left   bool
 	Tags   map[string]string
 }
 
@@ -232,11 +241,9 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 			}
 			for _, v := range e.Members {
 				s.sendEvent(NodeEvent{
+					Event:  SerfNodeJoined,
 					NodeID: v.Name,
 					Tags:   v.Tags,
-					Joined: true,
-					Update: false,
-					Left:   false,
 				})
 			}
 		case serf.EventMemberLeave:
@@ -246,11 +253,9 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 			}
 			for _, v := range e.Members {
 				s.sendEvent(NodeEvent{
+					Event:  SerfNodeLeft,
 					NodeID: v.Name,
 					Tags:   v.Tags,
-					Joined: false,
-					Update: false,
-					Left:   true,
 				})
 			}
 		case serf.EventMemberReap:
@@ -262,11 +267,9 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 			}
 			for _, v := range e.Members {
 				s.sendEvent(NodeEvent{
+					Event:  SerfNodeUpdated,
 					NodeID: v.Name,
 					Tags:   v.Tags,
-					Joined: false,
-					Update: true,
-					Left:   false,
 				})
 			}
 		case serf.EventUser:
@@ -278,11 +281,9 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 			}
 			for _, v := range e.Members {
 				s.sendEvent(NodeEvent{
+					Event:  SerfNodeFailed,
 					NodeID: v.Name,
 					Tags:   v.Tags,
-					Joined: false,
-					Update: false,
-					Left:   true,
 				})
 			}
 

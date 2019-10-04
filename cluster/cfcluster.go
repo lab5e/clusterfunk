@@ -431,25 +431,32 @@ func (c *clusterfunkCluster) serfEventLoop(ch <-chan NodeEvent) {
 	if c.config.AutoJoin {
 		go func(ch <-chan NodeEvent) {
 			for ev := range ch {
-				joined := false
-				if !ev.Left && knownNodes.Add(ev.NodeID) {
-					joined = true
+				if ev.Tags[RaftEndpoint] == "" {
+					// ignore this node
+					continue
 				}
-				left := false
-				if !ev.Joined && !ev.Update && knownNodes.Remove(ev.NodeID) {
-					left = true
-				}
-				if joined && c.config.AutoJoin && c.Role() == Leader {
-					log.Warnf("Adding serf node %s to cluster", ev.NodeID)
-					if err := c.raftNode.AddClusterNode(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
-						log.WithError(err).WithField("event", ev).Error("Error adding member")
+				switch ev.Event {
+				case SerfNodeJoined:
+					fallthrough
+				case SerfNodeUpdated:
+					if knownNodes.Add(ev.NodeID) && c.config.AutoJoin && c.Role() == Leader {
+						log.Warnf("Adding serf node %s to cluster", ev.NodeID)
+						if err := c.raftNode.AddClusterNode(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
+							log.WithError(err).WithField("event", ev).Error("Error adding member")
+						}
 					}
-				}
-				if left && c.config.AutoJoin && c.Role() == Leader {
-					log.Warnf("Removing serf node %s from cluster", ev.NodeID)
-					if err := c.raftNode.RemoveClusterNode(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
-						log.WithError(err).WithField("event", ev).Error("Error removing member")
+				case SerfNodeFailed:
+					fallthrough
+				case SerfNodeLeft:
+					if knownNodes.Remove(ev.NodeID) && c.config.AutoJoin && c.Role() == Leader {
+						log.Warnf("Removing serf node %s from cluster", ev.NodeID)
+						if err := c.raftNode.RemoveClusterNode(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
+							log.WithError(err).WithField("event", ev).Error("Error removing member")
+						}
 					}
+
+				default:
+					log.WithField("event", ev.Event).Warn("Unknown SerfNode event type")
 				}
 			}
 		}(c.serfNode.Events())

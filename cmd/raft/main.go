@@ -123,18 +123,21 @@ func raftEvents(ch <-chan cluster.RaftEventType) {
 
 func serfEvents(ch <-chan cluster.NodeEvent) {
 	for ev := range ch {
-		if ev.Joined {
+		switch ev.Event {
+		case cluster.SerfNodeJoined:
 			if raftNode.Leader() {
 				if err := raftNode.AddClusterNode(ev.NodeID, ev.Tags[cluster.RaftEndpoint]); err != nil {
 					log.WithError(err).WithField("member", ev.NodeID).Error("Error adding member")
 				}
 			}
 			continue
-		}
-		if raftNode.Leader() {
-			if err := raftNode.RemoveClusterNode(ev.NodeID, ev.Tags[cluster.RaftEndpoint]); err != nil {
-				log.WithError(err).WithField("member", ev.NodeID).Error("Error removing member")
+		case cluster.SerfNodeLeft:
+			if raftNode.Leader() {
+				if err := raftNode.RemoveClusterNode(ev.NodeID, ev.Tags[cluster.RaftEndpoint]); err != nil {
+					log.WithError(err).WithField("member", ev.NodeID).Error("Error removing member")
+				}
 			}
+			// Ignoring updates and failed nodes. Failed nodes are handled by Raft. Updates aren't used
 		}
 	}
 }
