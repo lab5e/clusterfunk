@@ -9,8 +9,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/stalehd/clusterfunk/cluster"
-	"github.com/stalehd/clusterfunk/cluster/sharding"
+	"github.com/stalehd/clusterfunk/funk"
+	"github.com/stalehd/clusterfunk/funk/sharding"
 	"github.com/stalehd/clusterfunk/toolbox"
 )
 
@@ -28,7 +28,7 @@ func waitForExit() {
 }
 
 func main() {
-	var config cluster.Parameters
+	var config funk.Parameters
 	flag.StringVar(&config.Serf.JoinAddress, "join", "", "Join address for cluster")
 	flag.BoolVar(&config.Raft.Bootstrap, "bootstrap", false, "Bootstrap a new cluster")
 	flag.BoolVar(&config.Raft.DiskStore, "disk", false, "Use disk store")
@@ -51,17 +51,17 @@ func main() {
 	waitForExit()
 }
 
-var serfNode *cluster.SerfNode
-var raftNode *cluster.RaftNode
+var serfNode *funk.SerfNode
+var raftNode *funk.RaftNode
 var registry *toolbox.ZeroconfRegistry
 
-func start(config cluster.Parameters) error {
+func start(config funk.Parameters) error {
 	config.Final()
 	if config.ClusterName == "" {
 		return errors.New("cluster name not specified")
 	}
 
-	serfNode = cluster.NewSerfNode()
+	serfNode = funk.NewSerfNode()
 
 	if config.ZeroConf {
 		registry = toolbox.NewZeroconfRegistry(config.ClusterName)
@@ -82,7 +82,7 @@ func start(config cluster.Parameters) error {
 		}
 
 	}
-	raftNode = cluster.NewRaftNode()
+	raftNode = funk.NewRaftNode()
 
 	go raftEvents(raftNode.Events())
 
@@ -90,8 +90,8 @@ func start(config cluster.Parameters) error {
 		return err
 	}
 
-	serfNode.SetTag(cluster.RaftEndpoint, raftNode.Endpoint())
-	serfNode.SetTag(cluster.SerfEndpoint, config.Serf.Endpoint)
+	serfNode.SetTag(funk.RaftEndpoint, raftNode.Endpoint())
+	serfNode.SetTag(funk.SerfEndpoint, config.Serf.Endpoint)
 
 	go serfEvents(serfNode.Events())
 
@@ -102,38 +102,38 @@ func start(config cluster.Parameters) error {
 	return nil
 }
 
-func raftEvents(ch <-chan cluster.RaftEventType) {
+func raftEvents(ch <-chan funk.RaftEventType) {
 	for e := range ch {
 		log.WithField("event", e.String()).Info("raft event")
 		switch e {
-		case cluster.RaftClusterSizeChanged:
+		case funk.RaftClusterSizeChanged:
 			log.WithFields(log.Fields{
 				"size":    raftNode.Nodes.Size(),
 				"members": raftNode.Nodes.List(),
 			}).Info("Cluster")
-		case cluster.RaftLeaderLost:
-		case cluster.RaftBecameLeader:
-		case cluster.RaftBecameFollower:
-		case cluster.RaftReceivedLog:
+		case funk.RaftLeaderLost:
+		case funk.RaftBecameLeader:
+		case funk.RaftBecameFollower:
+		case funk.RaftReceivedLog:
 		default:
 			log.WithField("event", e).Info("Unknown event received")
 		}
 	}
 }
 
-func serfEvents(ch <-chan cluster.NodeEvent) {
+func serfEvents(ch <-chan funk.NodeEvent) {
 	for ev := range ch {
 		switch ev.Event {
-		case cluster.SerfNodeJoined:
+		case funk.SerfNodeJoined:
 			if raftNode.Leader() {
-				if err := raftNode.AddClusterNode(ev.NodeID, ev.Tags[cluster.RaftEndpoint]); err != nil {
+				if err := raftNode.AddClusterNode(ev.NodeID, ev.Tags[funk.RaftEndpoint]); err != nil {
 					log.WithError(err).WithField("member", ev.NodeID).Error("Error adding member")
 				}
 			}
 			continue
-		case cluster.SerfNodeLeft:
+		case funk.SerfNodeLeft:
 			if raftNode.Leader() {
-				if err := raftNode.RemoveClusterNode(ev.NodeID, ev.Tags[cluster.RaftEndpoint]); err != nil {
+				if err := raftNode.RemoveClusterNode(ev.NodeID, ev.Tags[funk.RaftEndpoint]); err != nil {
 					log.WithError(err).WithField("member", ev.NodeID).Error("Error removing member")
 				}
 			}

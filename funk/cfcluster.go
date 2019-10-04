@@ -1,4 +1,4 @@
-package cluster
+package funk
 
 import (
 	"context"
@@ -10,9 +10,9 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/stalehd/clusterfunk/cluster/clusterproto"
+	"github.com/stalehd/clusterfunk/funk/clusterproto"
 
-	"github.com/stalehd/clusterfunk/cluster/sharding"
+	"github.com/stalehd/clusterfunk/funk/sharding"
 	"github.com/stalehd/clusterfunk/toolbox"
 	"google.golang.org/grpc"
 )

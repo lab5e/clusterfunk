@@ -9,8 +9,8 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/stalehd/clusterfunk/cluster"
-	"github.com/stalehd/clusterfunk/cluster/clustermgmt"
+	"github.com/stalehd/clusterfunk/funk"
+	"github.com/stalehd/clusterfunk/funk/clustermgmt"
 	"github.com/stalehd/clusterfunk/toolbox"
 )
 
@@ -126,8 +126,8 @@ func randomHostPort() string {
 // findRaftNode uses the serf endpoint to find a raft node
 func findRaftNode(joinEndpoint string) (string, error) {
 
-	serfNode := cluster.NewSerfNode()
-	if err := serfNode.Start(toolbox.RandomID(), false, cluster.SerfParameters{
+	serfNode := funk.NewSerfNode()
+	if err := serfNode.Start(toolbox.RandomID(), false, funk.SerfParameters{
 		Endpoint:    randomHostPort(),
 		JoinAddress: joinEndpoint,
 	}); err != nil {
@@ -136,7 +136,7 @@ func findRaftNode(joinEndpoint string) (string, error) {
 	defer serfNode.Stop()
 
 	for _, v := range serfNode.Members() {
-		if ep, exists := v.Tags[cluster.ManagementEndpoint]; exists {
+		if ep, exists := v.Tags[funk.ManagementEndpoint]; exists {
 			return ep, nil
 		}
 	}

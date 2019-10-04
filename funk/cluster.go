@@ -1,4 +1,4 @@
-package cluster
+package funk
 
 import "fmt"
 
@@ -115,7 +115,8 @@ type Cluster interface {
 
 	// GetEndpoint returns the endpoint for a particular node. If the node
 	// or endpoint isn't found it will return a blank. The endpoint is
-	// retrieved from the Serf cluster.
+	// retrieved from the Serf cluster. Note that there's no guarantee
+	// that the node will be responding on that endpoint.
 	GetEndpoint(nodeID string, endpointName string) string
 }
 

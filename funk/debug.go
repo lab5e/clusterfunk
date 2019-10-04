@@ -1,8 +1,8 @@
-package cluster
+package funk
 
 import (
 	log "github.com/sirupsen/logrus"
-	"github.com/stalehd/clusterfunk/cluster/sharding"
+	"github.com/stalehd/clusterfunk/funk/sharding"
 )
 
 // This is diagnostic functions. They can be removed.. Eventually

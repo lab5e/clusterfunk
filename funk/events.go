@@ -1,4 +1,4 @@
-package cluster
+package funk
 
 // This file contains events emitted by the cluster.
 //

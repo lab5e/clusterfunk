@@ -1,4 +1,4 @@
-package cluster
+package funk
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/stalehd/clusterfunk/cluster/clusterproto"
+	"github.com/stalehd/clusterfunk/funk/clusterproto"
 	"google.golang.org/grpc"
 )
 

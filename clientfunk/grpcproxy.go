@@ -1,12 +1,13 @@
-package main
+package clientfunk
 
 import (
 	"errors"
 	"sync"
 
-	log "github.com/sirupsen/logrus"
-	"github.com/stalehd/clusterfunk/cluster"
-	"github.com/stalehd/clusterfunk/cluster/sharding"
+	"github.com/stalehd/clusterfunk/funk"
+
+	"github.com/sirupsen/logrus"
+	"github.com/stalehd/clusterfunk/funk/sharding"
 	"google.golang.org/grpc"
 )
 
@@ -16,7 +17,7 @@ type ClientFactoryFunc func(*grpc.ClientConn) interface{}
 // GRPCClientProxy can automatically resolve the client proxying
 type GRPCClientProxy struct {
 	Shards           sharding.ShardManager
-	Cluster          cluster.Cluster
+	Cluster          funk.Cluster
 	EndpointName     string
 	mutex            *sync.Mutex
 	grpcClients      map[string]interface{}
@@ -25,30 +26,30 @@ type GRPCClientProxy struct {
 }
 
 // NewGRPCClientProxy creates a new GRPCClientProxy
-func NewGRPCClientProxy(endpointName string, clientFactory ClientFactoryFunc, shards sharding.ShardManager, c cluster.Cluster) *GRPCClientProxy {
+func NewGRPCClientProxy(endpointName string, clientFactory ClientFactoryFunc, shards sharding.ShardManager, cluster funk.Cluster) *GRPCClientProxy {
 	ret := &GRPCClientProxy{
 		Shards:           shards,
-		Cluster:          c,
+		Cluster:          cluster,
 		EndpointName:     endpointName,
 		mutex:            &sync.Mutex{},
 		grpcClients:      make(map[string]interface{}),
 		clientFactory:    clientFactory,
 		operationalMutex: &sync.RWMutex{},
 	}
-	go ret.clusterEventListener(c.Events())
+	go ret.clusterEventListener(cluster.Events())
 	return ret
 }
 
-func (p *GRPCClientProxy) clusterEventListener(evts <-chan cluster.Event) {
+func (p *GRPCClientProxy) clusterEventListener(evts <-chan funk.Event) {
 	once := &sync.Once{}
 	for ev := range evts {
-		if ev.State == cluster.Operational {
-			log.Warn("Unlocking operational mutex since we're operational")
+		if ev.State == funk.Operational {
+			logrus.Warn("Unlocking operational mutex since we're operational")
 			p.operationalMutex.Unlock()
 			once = &sync.Once{}
 		} else {
 			once.Do(func() {
-				log.Warnf("Locking operational mutex since state is %s", ev.State)
+				logrus.Warnf("Locking operational mutex since state is %s", ev.State)
 				p.operationalMutex.Lock()
 			})
 		}
@@ -67,7 +68,7 @@ func (p *GRPCClientProxy) GetProxyClient(shard int) (interface{}, error) {
 	}
 	endpoint := p.Cluster.GetEndpoint(nodeID, p.EndpointName)
 	if endpoint == "" {
-		log.WithFields(log.Fields{
+		logrus.WithFields(logrus.Fields{
 			"nodeid":   nodeID,
 			"endpoint": p.EndpointName}).Error("Can't find endpoint for node")
 		return nil, errors.New("can't map request to node")

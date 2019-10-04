@@ -1,11 +1,11 @@
-package cluster
+package funk
 
 import (
 	"context"
 	"testing"
 	"time"
 
-	"github.com/stalehd/clusterfunk/cluster/sharding"
+	"github.com/stalehd/clusterfunk/funk/sharding"
 	"github.com/stalehd/clusterfunk/toolbox"
 	"github.com/stretchr/testify/require"
 )

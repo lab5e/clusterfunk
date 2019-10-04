@@ -1,15 +1,14 @@
 package main
 
 import (
+	"github.com/stalehd/clusterfunk/funk"
 	"flag"
 
 	golog "log"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/stalehd/clusterfunk/cluster/sharding"
+	"github.com/stalehd/clusterfunk/funk/sharding"
 	"github.com/stalehd/clusterfunk/toolbox"
-
-	"github.com/stalehd/clusterfunk/cluster"
 )
 
 const numShards = 10000
@@ -18,7 +17,7 @@ const demoEndpoint = "ep.demo"
 
 func main() {
 	ll := "info"
-	var config cluster.Parameters
+	var config funk.Parameters
 	flag.StringVar(&config.Serf.JoinAddress, "join", "", "Join address for cluster")
 	flag.BoolVar(&config.Raft.Bootstrap, "bootstrap", false, "Bootstrap a new cluster")
 	flag.BoolVar(&config.Raft.DiskStore, "disk", false, "Use disk store")
@@ -54,13 +53,13 @@ func main() {
 
 	demoServerEndpoint := toolbox.RandomPublicEndpoint()
 
-	c := cluster.NewCluster(config, shards)
+	c := funk.NewCluster(config, shards)
 	defer c.Stop()
 
-	go func(ch <-chan cluster.Event) {
+	go func(ch <-chan funk.Event) {
 		for ev := range ch {
 			log.Infof("Cluster state: %s  role: %s", ev.State.String(), ev.Role.String())
-			if ev.State == cluster.Operational {
+			if ev.State == funk.Operational {
 				printShardMap(shards, c, demoEndpoint)
 			}
 		}
@@ -79,7 +78,7 @@ func main() {
 	log.Info("I'm done")
 }
 
-func printShardMap(shards sharding.ShardManager, c cluster.Cluster, endpoint string) {
+func printShardMap(shards sharding.ShardManager, c funk.Cluster, endpoint string) {
 	allShards := shards.Shards()
 	myShards := 0
 	for _, v := range allShards {
