@@ -52,6 +52,8 @@ func main() {
 		panic(err)
 	}
 
+	demoServerEndpoint := toolbox.RandomPublicEndpoint()
+
 	c := cluster.NewCluster(config, shards)
 	defer c.Stop()
 
@@ -64,13 +66,13 @@ func main() {
 		}
 	}(c.Events())
 
-	// TODO: Add endpoint to cluster node, launch gRPC service
-	// c.AddLocalEndpoint(demoEndpoint, grpcEndpoint)
 	if err := c.Start(); err != nil {
 		log.WithError(err).Error("Error starting cluster")
 		return
 	}
-	c.SetEndpoint(demoEndpoint, "0.0.0.0:0")
+
+	go startDemoServer(demoServerEndpoint, c.NodeID())
+	c.SetEndpoint(demoEndpoint, demoServerEndpoint)
 
 	toolbox.WaitForCtrlC()
 	log.Info("I'm done")

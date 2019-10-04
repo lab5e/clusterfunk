@@ -1,5 +1,69 @@
 package main
 
+import (
+	"context"
+	"errors"
+	"math/rand"
+	"net"
+	"time"
+
+	"github.com/stalehd/clusterfunk/cmd/demo"
+
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
+)
+
+// This is the core demo service. It's not particuarly interesting.
+
+func startDemoServer(endpoint string, nodeID string) {
+	server := grpc.NewServer()
+	demo.RegisterDemoServiceServer(server, newLiffServer(nodeID))
+	listener, err := net.Listen("tcp", endpoint)
+	if err != nil {
+		log.WithError(err).
+			WithField("endpoint", endpoint).
+			Panic("Unable to create TCP listener")
+	}
+	log.WithField("endpoint", endpoint).Info("Lauching gRPC demo server")
+
+	if err := server.Serve(listener); err != nil {
+		log.WithError(err).
+			WithField("endpoint", endpoint).
+			Panic("Unable to launch node management gRPC interface")
+	}
+}
+
+type liffServer struct {
+	nodeID string
+}
+
+func newLiffServer(nodeID string) demo.DemoServiceServer {
+	return &liffServer{nodeID: nodeID}
+}
+
+func (l *liffServer) Liff(ctx context.Context, req *demo.LiffRequest) (*demo.LiffResponse, error) {
+	return &demo.LiffResponse{
+		ID:         req.ID,
+		Definition: liffs[rand.Intn(len(liffs))],
+		NodeID:     l.nodeID,
+	}, nil
+}
+
+func (l *liffServer) MakeKeyPair(ctx context.Context, req *demo.KeyPairRequest) (*demo.KeyPairResponse, error) {
+
+	return nil, errors.New("not implemented")
+}
+
+func (l *liffServer) Slow(ctx context.Context, req *demo.SlowRequest) (*demo.SlowResponse, error) {
+	const execTime = 1500 * time.Millisecond
+	offset := time.Duration(rand.Intn(5000)) * time.Millisecond
+	time.Sleep(execTime + offset)
+	return &demo.SlowResponse{
+		ID:     req.ID,
+		NodeID: l.nodeID,
+	}, nil
+}
+
 // Copied from http://liff.hivemind.net/ which again have copied them from
 // "The Meaning of Liff" and "The Deeper Meaning of Liff" by Douglas Adams.
 // If you do not own any works of Douglas Adams now is the time to get one.
