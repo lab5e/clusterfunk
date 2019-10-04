@@ -47,7 +47,7 @@ func (c *clusterfunkCluster) startLeaderService() error {
 	case <-time.After(250 * time.Millisecond):
 		// ok
 	}
-	c.AddLocalEndpoint(LeaderEndpoint, listener.Addr().String())
+	c.SetEndpoint(LeaderEndpoint, listener.Addr().String())
 	return nil
 }
 

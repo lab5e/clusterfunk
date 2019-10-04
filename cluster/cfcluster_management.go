@@ -3,9 +3,10 @@ package cluster
 import (
 	"context"
 	"errors"
-	log "github.com/sirupsen/logrus"
 	"net"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/stalehd/clusterfunk/cluster/clustermgmt"
 
@@ -58,7 +59,7 @@ func (c *clusterfunkCluster) startManagementServices() error {
 	case <-time.After(250 * time.Millisecond):
 		// ok
 	}
-	c.AddLocalEndpoint(ManagementEndpoint, listener.Addr().String())
+	c.SetEndpoint(ManagementEndpoint, listener.Addr().String())
 	return nil
 }
 

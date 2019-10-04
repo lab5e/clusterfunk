@@ -59,8 +59,15 @@ func (c *clusterfunkCluster) NodeID() string {
 }
 
 func (c *clusterfunkCluster) SetEndpoint(name, endpoint string) {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	if c.serfNode == nil {
+		return
+	}
 	c.serfNode.SetTag(name, endpoint)
-	c.serfNode.PublishTags()
+	if err := c.serfNode.PublishTags(); err != nil {
+		log.WithError(err).Error("Error adding endpoint")
+	}
 }
 
 func (c *clusterfunkCluster) GetEndpoint(nodeID string, endpointName string) string {
@@ -96,18 +103,6 @@ func (c *clusterfunkCluster) Stop() {
 
 func (c *clusterfunkCluster) Name() string {
 	return c.name
-}
-
-func (c *clusterfunkCluster) AddLocalEndpoint(name, endpoint string) {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-	if c.serfNode == nil {
-		return
-	}
-	c.serfNode.SetTag(name, endpoint)
-	if err := c.serfNode.PublishTags(); err != nil {
-		log.WithError(err).Error("Error adding endpoint")
-	}
 }
 
 func (c *clusterfunkCluster) Events() <-chan Event {
