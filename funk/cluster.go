@@ -2,9 +2,6 @@ package funk
 
 import "fmt"
 
-// TODO: get rid of this (user supplied)
-const numberOfShards = 10000
-
 // NodeState is the enumeration of different states a node can be in.
 type NodeState int32
 

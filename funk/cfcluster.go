@@ -19,32 +19,34 @@ import (
 
 // clusterfunkClusterß implements the Cluster interface
 type clusterfunkCluster struct {
-	name                 string
-	serfNode             *SerfNode
-	raftNode             *RaftNode
-	config               Parameters
-	mgmtServer           *grpc.Server // gRPC server for management
-	leaderServer         *grpc.Server // gRPC server for leader
-	eventChannels        []chan Event
-	mutex                *sync.RWMutex
-	shardManager         sharding.ShardManager
-	stateMutex           *sync.RWMutex
-	currentShardMapIndex uint64
-	processedIndex       uint64 // The last processed index in the replicated log
-	state                NodeState
-	role                 NodeRole
-	unacknowledged       toolbox.StringSet
-	registry             *toolbox.ZeroconfRegistry
+	name                 string                    // Name of cluster
+	shardManager         sharding.ShardManager     // Shard map
+	config               Parameters                // Configuration
+	serfNode             *SerfNode                 // Serf
+	raftNode             *RaftNode                 // Raft
+	eventChannels        []chan Event              // Event channels for subscribers
+	mgmtServer           *grpc.Server              // gRPC server for management
+	leaderServer         *grpc.Server              // gRPC server for leader
+	mutex                *sync.RWMutex             // Mutex for events
+	stateMutex           *sync.RWMutex             // Mutex for state and role
+	currentShardMapIndex uint64                    // The current acked, wanted or sent shard map index
+	processedIndex       uint64                    // The last processed index in the replicated log
+	state                NodeState                 // Current cluster state for this node. Set based on events from Raft
+	role                 NodeRole                  // Current cluster role for this node. Set based on events from Raft-
+	unacknowledged       toolbox.StringSet         // The list of unacknowledged nodes. Only used by the leader.
+	registry             *toolbox.ZeroconfRegistry // Zeroconf lookups. Used when joining
 }
 
 // NewCluster returns a new cluster (client)
 func NewCluster(params Parameters, shardManager sharding.ShardManager) Cluster {
 	ret := &clusterfunkCluster{
-		config:               params,
 		name:                 params.ClusterName,
+		shardManager:         shardManager,
+		config:               params,
+		serfNode:             NewSerfNode(),
+		raftNode:             NewRaftNode(),
 		eventChannels:        make([]chan Event, 0),
 		mutex:                &sync.RWMutex{},
-		shardManager:         shardManager,
 		state:                Invalid,
 		role:                 NonVoter,
 		stateMutex:           &sync.RWMutex{},
@@ -59,11 +61,6 @@ func (c *clusterfunkCluster) NodeID() string {
 }
 
 func (c *clusterfunkCluster) SetEndpoint(name, endpoint string) {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-	if c.serfNode == nil {
-		return
-	}
 	c.serfNode.SetTag(name, endpoint)
 	if err := c.serfNode.PublishTags(); err != nil {
 		log.WithError(err).Error("Error adding endpoint")
@@ -82,19 +79,13 @@ func (c *clusterfunkCluster) GetEndpoint(nodeID string, endpointName string) str
 func (c *clusterfunkCluster) Stop() {
 	c.setState(Stopping)
 
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	if c.raftNode != nil {
-		c.raftNode.Stop()
-		c.raftNode = nil
-	}
-	if c.serfNode != nil {
-		c.serfNode.Stop()
-		c.serfNode = nil
-	}
+	c.raftNode.Stop()
+	c.serfNode.Stop()
 
 	c.setRole(Unknown)
 	c.setState(Invalid)
+
+	// TODO: stop gRPC services
 
 	for _, v := range c.eventChannels {
 		close(v)
@@ -120,7 +111,6 @@ func (c *clusterfunkCluster) Start() error {
 	}
 
 	c.setState(Starting)
-	c.serfNode = NewSerfNode()
 
 	// Launch node management endpoint
 	if err := c.startManagementServices(); err != nil {
@@ -148,7 +138,6 @@ func (c *clusterfunkCluster) Start() error {
 		}
 
 	}
-	c.raftNode = NewRaftNode()
 
 	go c.raftEventLoop(c.raftNode.Events())
 
@@ -232,7 +221,6 @@ func (c *clusterfunkCluster) handleClusterSizeChanged() {
 	if err != nil {
 		panic(fmt.Sprintf("Unable to marshal the log message containing shard map: %v", err))
 	}
-	// TODO: Clients might have acked at this point.
 	index, err := c.raftNode.AppendLogEntry(buf)
 	if err != nil {
 		if c.raftNode.Leader() {

@@ -16,9 +16,13 @@ const numShards = 10000
 
 const demoEndpoint = "ep.demo"
 
-func main() {
-	ll := "info"
-	var config funk.Parameters
+var logLevel = "info"
+var config funk.Parameters
+var defaultLogger = log.New()
+var cluster funk.Cluster
+var shards sharding.ShardManager
+
+func init() {
 	flag.StringVar(&config.Serf.JoinAddress, "join", "", "Join address for cluster")
 	flag.BoolVar(&config.Raft.Bootstrap, "bootstrap", false, "Bootstrap a new cluster")
 	flag.BoolVar(&config.Raft.DiskStore, "disk", false, "Use disk store")
@@ -26,71 +30,52 @@ func main() {
 	flag.BoolVar(&config.ZeroConf, "zeroconf", true, "Use zeroconf (mDNS) to discover nodes")
 	flag.StringVar(&config.ClusterName, "name", "demo", "Name of cluster")
 	flag.BoolVar(&config.AutoJoin, "autojoin", true, "Autojoin via Serf Events")
-	flag.StringVar(&ll, "loglevel", "info", "Logging level")
+	flag.StringVar(&logLevel, "loglevel", "info", "Logging level")
 	flag.Parse()
-
-	defaultLogger := log.New()
-
-	// This mutes the logs from the log package in go. The default log level
-	// for these are "info" so anything logged by the default logger will be
-	// muted.
-	defaultLogger.SetLevel(log.WarnLevel)
-	defaultLogger.Formatter = &log.TextFormatter{FullTimestamp: true, TimestampFormat: "15:04:05.000"}
-	w := defaultLogger.Writer()
-	defer w.Close()
-	golog.SetOutput(w)
-
-	// Set log level for logrus. The default level is Debug. The demo client will
-	// log everything at Info or above.
-	switch ll {
-	case "info":
-		log.SetLevel(log.InfoLevel)
-	case "debug":
-		log.SetLevel(log.DebugLevel)
-	case "warn":
-		log.SetLevel(log.WarnLevel)
-	}
-
-	log.SetFormatter(&log.TextFormatter{FullTimestamp: true, TimestampFormat: "15:04:05.000"})
-
+}
+func main() {
 	// Set up the shard map.
-	shards := sharding.NewShardManager()
+	shards = sharding.NewShardManager()
 	if err := shards.Init(numShards, nil); err != nil {
 		panic(err)
 	}
 
+	cluster = funk.NewCluster(config, shards)
+
+	setupLogging()
+
 	// This is the demo gRPC service we'll run on each node.
 	demoServerEndpoint := toolbox.RandomPublicEndpoint()
 
-	c := funk.NewCluster(config, shards)
-	defer c.Stop()
+	// Set up the local gRPC server.
+	liffServer := newLiffProxy(newLiffServer(cluster.NodeID()), shards, cluster, demoEndpoint)
+	go startDemoServer(demoServerEndpoint, liffServer)
 
 	// This logs a message every time the cluster changes state.
-	go func(ch <-chan funk.Event) {
-		for ev := range ch {
-			log.Infof("Cluster state: %s  role: %s", ev.State.String(), ev.Role.String())
-			if ev.State == funk.Operational {
-				printShardMap(shards, c, demoEndpoint)
-			}
-		}
-	}(c.Events())
+	go clusterEventListener(cluster.Events())
 
 	// ...and start the cluster node. If the bootstrap flag is set a new cluster
 	// will be launched.
-	if err := c.Start(); err != nil {
+	if err := cluster.Start(); err != nil {
 		log.WithError(err).Error("Error starting cluster")
 		return
 	}
-
-	// Set up the local gRPC server.
-	liffServer := newLiffProxy(newLiffServer(c.NodeID()), shards, c, demoEndpoint)
-	go startDemoServer(demoServerEndpoint, liffServer)
+	defer cluster.Stop()
 
 	// ...and announce the endpoint
-	c.SetEndpoint(demoEndpoint, demoServerEndpoint)
+	cluster.SetEndpoint(demoEndpoint, demoServerEndpoint)
 
 	// Nothing blocks here so wait for an interrupt signal.
 	toolbox.WaitForCtrlC()
+}
+
+func clusterEventListener(ch <-chan funk.Event) {
+	for ev := range ch {
+		log.Infof("Cluster state: %s  role: %s", ev.State.String(), ev.Role.String())
+		if ev.State == funk.Operational {
+			printShardMap(shards, cluster, demoEndpoint)
+		}
+	}
 }
 
 // This prints the shard map and nodes in the cluster with the endpoint for
@@ -114,4 +99,28 @@ func printShardMap(shards sharding.ShardManager, c funk.Cluster, endpoint string
 		log.Infof("%s Node %15s is serving at %s", m, v, c.GetEndpoint(v, endpoint))
 	}
 	log.Infof("--- End ---")
+}
+
+func setupLogging() {
+	// This mutes the logs from the log package in go. The default log level
+	// for these are "info" so anything logged by the default logger will be
+	// muted.
+	defaultLogger.SetLevel(log.WarnLevel)
+	defaultLogger.Formatter = &log.TextFormatter{FullTimestamp: true, TimestampFormat: "15:04:05.000"}
+	w := defaultLogger.Writer()
+	defer w.Close()
+	golog.SetOutput(w)
+
+	// Set log level for logrus. The default level is Debug. The demo client will
+	// log everything at Info or above.
+	switch logLevel {
+	case "info":
+		log.SetLevel(log.InfoLevel)
+	case "debug":
+		log.SetLevel(log.DebugLevel)
+	case "warn":
+		log.SetLevel(log.WarnLevel)
+	}
+
+	log.SetFormatter(&log.TextFormatter{FullTimestamp: true, TimestampFormat: "15:04:05.000"})
 }
