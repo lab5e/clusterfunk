@@ -32,6 +32,8 @@ func init() {
 	flag.BoolVar(&config.AutoJoin, "autojoin", true, "Autojoin via Serf Events")
 	flag.StringVar(&logLevel, "loglevel", "info", "Logging level")
 	flag.Parse()
+	config.NodeID = toolbox.RandomID()
+	config.Final()
 }
 func main() {
 	// Set up the shard map.

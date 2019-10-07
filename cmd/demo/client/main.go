@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"math/rand"
 	"os"
-	"strconv"
+	"strings"
 	"time"
 
 	"github.com/stalehd/clusterfunk/cmd/demo"
@@ -21,92 +22,104 @@ type parameters struct {
 	Sleep        time.Duration
 	LogTiming    bool
 	PrintSummary bool
-	PrintResult  bool
 }
 
-func main() {
-	if len(os.Args) < 2 {
-		fmt.Printf("Usage: %s [endpoint] [repeats, default 10]\n", os.Args[0])
-		return
-	}
-	ep := os.Args[1]
+var config parameters
 
-	repeats := 10
-	if len(os.Args) > 2 {
-		v, err := strconv.ParseInt(os.Args[2], 10, 32)
+func init() {
+	flag.StringVar(&config.Endpoints, "endpoints", "", "Comma-separated list of host:port pairs to use")
+	flag.IntVar(&config.Repeats, "repeat", 10, "Number of times to repeat the command")
+	flag.DurationVar(&config.Sleep, "sleep", 100*time.Millisecond, "Time to sleep between calls")
+	flag.BoolVar(&config.LogTiming, "log", true, "Log timings to a CSV file")
+	flag.BoolVar(&config.PrintSummary, "print-summary", true, "Print summary when finished")
+	flag.Parse()
+
+}
+func main() {
+
+	endpoints := strings.Split(config.Endpoints, ",")
+	clients := make([]demo.DemoServiceClient, 0)
+
+	for _, v := range endpoints {
+		opts := []grpc.DialOption{grpc.WithInsecure()}
+		conn, err := grpc.Dial(v, opts...)
 		if err != nil {
-			fmt.Println("Invalid number of repeats")
+			fmt.Printf("Error dialing to client: %v\n", err)
 			return
 		}
-		repeats = int(v)
+		defer conn.Close()
+		newClient := demo.NewDemoServiceClient(conn)
+		if newClient == nil {
+			panic("Client is nil")
+		}
+		clients = append(clients, newClient)
 	}
-	opts := []grpc.DialOption{grpc.WithInsecure()}
-	conn, err := grpc.Dial(ep, opts...)
-	if err != nil {
-		fmt.Printf("Error dialing to client: %v\n", err)
+	if len(clients) == 0 {
+		fmt.Printf("No endpoints specified")
 		return
 	}
-	defer conn.Close()
-
-	client := demo.NewDemoServiceClient(conn)
 
 	nodes := make(map[string]int)
 	totals := make(map[string]float64)
-	sleepTime := time.Second * 1
-	if repeats >= 100 {
-		sleepTime = 100 * time.Millisecond
-	}
-	csvFile, err := os.Create("timing.csv")
-	if err != nil {
-		fmt.Printf("Can't create file timing.csv: %v\n", err)
-		return
-	}
-	fmt.Fprintf(csvFile, "Num,Node,Time\n")
 
-	for i := 0; i < repeats; i++ {
-		if i > 0 {
-			time.Sleep(sleepTime)
+	var csvFile *os.File
+	if config.LogTiming {
+		var err error
+		csvFile, err = os.Create("timing.csv")
+		if err != nil {
+			fmt.Printf("Can't create file timing.csv: %v\n", err)
+			return
 		}
-		// Seed is quite important here
-		rand.Seed(time.Now().UnixNano())
+		fmt.Fprintf(csvFile, "Num,Node,Time\n")
+		defer csvFile.Close()
+	}
+
+	success := 0
+	clientNum := 0
+	// Seed is quite important here
+	rand.Seed(time.Now().UnixNano())
+
+	for i := 0; i < config.Repeats; i++ {
+		if i > 0 {
+			time.Sleep(config.Sleep)
+		}
 		requestid := int64(rand.Int())
 
-		ctx, done := context.WithTimeout(context.Background(), 10*time.Second)
-		defer done()
+		ctx, done := context.WithTimeout(context.Background(), 2*time.Second)
 		start := time.Now()
 		var end time.Time
-		var nodeid string
 
+		client := clients[clientNum%len(clients)]
+		clientNum++
 		resp, err := client.Liff(ctx, &demo.LiffRequest{ID: requestid})
 		end = time.Now()
+		done()
 		if err != nil {
 			fmt.Printf("Error calling Liff: %v\n", err)
-			if repeats == 1 {
+			if config.Repeats == 1 {
 				return
 			}
-		} else {
-			nodeid = resp.NodeID
-			if repeats == 1 {
-				fmt.Println(resp.Definition)
-			}
+			continue
 		}
-
 		end.Sub(start)
 		callTime := float64(end.Sub(start)) / float64(time.Millisecond)
-		if nodeid != "" {
-			fmt.Printf("Time on %s: %f ms\n", nodeid, callTime)
+		if resp != nil {
+			success++
+			fmt.Printf("Time on %s: %f ms\n", resp.NodeID, callTime)
 
-			nodes[nodeid]++
-			totals[nodeid] += callTime
+			nodes[resp.NodeID]++
+			totals[resp.NodeID] += callTime
 			// Log call time to CSV
-			fmt.Fprintf(csvFile, "%d,%s,%f\n", i, nodeid, callTime)
+			fmt.Fprintf(csvFile, "%d,%s,%f\n", i, resp.NodeID, callTime)
 		}
 	}
-	fmt.Println("=================================================")
-	for k, v := range nodes {
-		fmt.Printf("%20s: %d calls - %f ms average\n", k, v, totals[k]/float64(v))
+	if config.PrintSummary {
+		fmt.Println("=================================================")
+		fmt.Printf("%d calls in total, %d successful, %d failed\n", config.Repeats, success, config.Repeats-success)
+		for k, v := range nodes {
+			fmt.Printf("%20s: %d calls - %f ms average\n", k, v, totals[k]/float64(v))
+		}
 	}
-	csvFile.Close()
 }
 
 // No need to test the conversion since we're providing both lists but if you
