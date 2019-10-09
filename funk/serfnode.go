@@ -2,6 +2,7 @@ package funk
 
 import (
 	"errors"
+	"fmt"
 	golog "log"
 	"net"
 	"os"
@@ -23,6 +24,19 @@ const (
 	SerfNodeLeft                         // A node has left the cluster
 	SerfNodeUpdated                      // A node's tags are updated
 )
+
+func (s SerfEventType) String() string {
+	switch s {
+	case SerfNodeJoined:
+		return "SerfNodeJoined"
+	case SerfNodeLeft:
+		return "SerfNodeLeft"
+	case SerfNodeUpdated:
+		return "SerfNodeUpdated"
+	default:
+		panic(fmt.Sprintf("Unknown serf node type %d", s))
+	}
+}
 
 // NodeEvent is used for channel notifications
 type NodeEvent struct {
@@ -110,7 +124,7 @@ func (s *SerfNode) Start(nodeID string, verboseLogging bool, cfg SerfParameters)
 		config.MemberlistConfig.Logger = mutedLogger
 	}
 
-	// Assign tags and default endpoint
+	// Assign tags
 	config.Tags = s.tags
 
 	go s.serfEventHandler(eventCh)
@@ -224,7 +238,8 @@ func (s *SerfNode) addMember(nodeID string, tags map[string]string) {
 	defer s.mutex.Unlock()
 	existing, ok := s.members[nodeID]
 	if !ok {
-		s.members[nodeID] = SerfMember{NodeID: nodeID, Tags: tags}
+		existing = SerfMember{NodeID: nodeID, Tags: tags}
+		s.members[nodeID] = existing
 		s.sendEvent(NodeEvent{
 			Event: SerfNodeJoined,
 			Node:  existing,
