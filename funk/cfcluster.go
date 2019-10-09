@@ -68,12 +68,7 @@ func (c *clusterfunkCluster) SetEndpoint(name, endpoint string) {
 }
 
 func (c *clusterfunkCluster) GetEndpoint(nodeID string, endpointName string) string {
-	for _, v := range c.serfNode.Members() {
-		if v.NodeID == nodeID {
-			return v.Tags[endpointName]
-		}
-	}
-	return ""
+	return c.serfNode.Node(nodeID).Tags[endpointName]
 }
 
 func (c *clusterfunkCluster) Stop() {
@@ -419,7 +414,7 @@ func (c *clusterfunkCluster) serfEventLoop(ch <-chan NodeEvent) {
 	if c.config.AutoJoin {
 		go func(ch <-chan NodeEvent) {
 			for ev := range ch {
-				if ev.Tags[RaftEndpoint] == "" {
+				if ev.Node.Tags[RaftEndpoint] == "" {
 					// ignore this node
 					continue
 				}
@@ -427,18 +422,16 @@ func (c *clusterfunkCluster) serfEventLoop(ch <-chan NodeEvent) {
 				case SerfNodeJoined:
 					fallthrough
 				case SerfNodeUpdated:
-					if knownNodes.Add(ev.NodeID) && c.config.AutoJoin && c.Role() == Leader {
-						log.Warnf("Adding serf node %s to cluster", ev.NodeID)
-						if err := c.raftNode.AddClusterNode(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
+					if knownNodes.Add(ev.Node.NodeID) && c.config.AutoJoin && c.Role() == Leader {
+						log.Warnf("Adding serf node %s to cluster", ev.Node.NodeID)
+						if err := c.raftNode.AddClusterNode(ev.Node.NodeID, ev.Node.Tags[RaftEndpoint]); err != nil {
 							log.WithError(err).WithField("event", ev).Error("Error adding member")
 						}
 					}
-				case SerfNodeFailed:
-					fallthrough
 				case SerfNodeLeft:
-					if knownNodes.Remove(ev.NodeID) && c.config.AutoJoin && c.Role() == Leader {
-						log.Warnf("Removing serf node %s from cluster", ev.NodeID)
-						if err := c.raftNode.RemoveClusterNode(ev.NodeID, ev.Tags[RaftEndpoint]); err != nil {
+					if knownNodes.Remove(ev.Node.NodeID) && c.config.AutoJoin && c.Role() == Leader {
+						log.Warnf("Removing serf node %s from cluster", ev.Node.NodeID)
+						if err := c.raftNode.RemoveClusterNode(ev.Node.NodeID, ev.Node.Tags[RaftEndpoint]); err != nil {
 							log.WithError(err).WithField("event", ev).Error("Error removing member")
 						}
 					}

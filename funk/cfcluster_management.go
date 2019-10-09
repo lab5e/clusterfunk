@@ -72,11 +72,10 @@ func (c *clusterfunkCluster) GetState(context.Context, *clustermgmt.GetStateRequ
 		State:  clustermgmt.GetStateResponse_OK,
 	}
 
-	ret.NodeCount = int32(c.serfNode.MemberCount())
+	ret.NodeCount = int32(c.serfNode.Size())
 	return ret, nil
 }
 
 func (c *clusterfunkCluster) ListNodes(context.Context, *clustermgmt.ListNodesRequest) (*clustermgmt.ListNodesResponse, error) {
-
 	return nil, errors.New("not implemented")
 }

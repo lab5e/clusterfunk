@@ -135,7 +135,7 @@ func findRaftNode(joinEndpoint string) (string, error) {
 	}
 	defer serfNode.Stop()
 
-	for _, v := range serfNode.Members() {
+	for _, v := range serfNode.Nodes() {
 		if ep, exists := v.Tags[funk.ManagementEndpoint]; exists {
 			return ep, nil
 		}

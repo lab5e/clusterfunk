@@ -22,12 +22,16 @@ const (
 	SerfNodeJoined  SerfEventType = iota // A node joins the cluster
 	SerfNodeLeft                         // A node has left the cluster
 	SerfNodeUpdated                      // A node's tags are updated
-	SerfNodeFailed                       // A node has failed
 )
 
 // NodeEvent is used for channel notifications
 type NodeEvent struct {
-	Event  SerfEventType
+	Event SerfEventType
+	Node  SerfMember
+}
+
+// SerfMember holds information on members in the Serf cluster.
+type SerfMember struct {
 	NodeID string
 	Tags   map[string]string
 }
@@ -36,9 +40,10 @@ type NodeEvent struct {
 type SerfNode struct {
 	mutex         *sync.RWMutex
 	se            *serf.Serf
-	tags          map[string]string
-	changedTags   bool // Keeps track of changes in tags.
+	tags          map[string]string // Local tags.
+	changedTags   bool              // Keeps track of changes in tags.
 	notifications []chan NodeEvent
+	members       map[string]SerfMember
 }
 
 // NewSerfNode creates a new SerfNode instance
@@ -47,6 +52,7 @@ func NewSerfNode() *SerfNode {
 		mutex:         &sync.RWMutex{},
 		tags:          make(map[string]string),
 		notifications: make([]chan NodeEvent, 0),
+		members:       make(map[string]SerfMember, 0),
 	}
 	return ret
 }
@@ -179,50 +185,99 @@ func (s *SerfNode) Events() <-chan NodeEvent {
 	return newChan
 }
 
-// ----------------------------------------------------------------------------
-// Possible keep this internal. It is nice to have a view into the Serf and
-// raft internals but maybe not for a management tools since it operates on
-// a slighlty higher level. Methods below are TBD
-//
-
-//
-// MemberCount is a temporary method until we've made a layer on top of Raft and Serf.
-func (s *SerfNode) MemberCount() int {
+// Node returns information on a particular node. If the node isn't found the
+// node returned will be empty
+func (s *SerfNode) Node(nodeID string) SerfMember {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	return len(s.se.Members())
+	return s.members[nodeID]
 }
 
-// SerfMemberInfo holds info on a single Serf member
-type SerfMemberInfo struct {
-	NodeID string
-	Status string
-	Tags   map[string]string
-}
-
-// Members lists the members in
-func (s *SerfNode) Members() []SerfMemberInfo {
+// Nodes returns a list of known member nodes
+func (s *SerfNode) Nodes() []SerfMember {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
+	ret := make([]SerfMember, 0)
 
-	ret := make([]SerfMemberInfo, 0)
-	for _, v := range s.se.Members() {
-		if v.Status != serf.StatusAlive {
-			// Skip nodes that has left or is in a failed state
-			continue
+	for k, v := range s.members {
+		n := SerfMember{}
+		n.NodeID = k
+		n.Tags = make(map[string]string)
+		for name, value := range v.Tags {
+			n.Tags[name] = value
 		}
-		ret = append(ret, SerfMemberInfo{
-			NodeID: v.Name,
-			Status: v.Status.String(),
-			Tags:   v.Tags,
-		})
+		ret = append(ret, n)
 	}
 	return ret
 }
 
-func (s *SerfNode) sendEvent(ev NodeEvent) {
+// Size returns the size of the member list
+func (s *SerfNode) Size() int {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return len(s.members)
+}
+
+// addMember adds a new member. Returns true if the member does not exist
+func (s *SerfNode) addMember(nodeID string, tags map[string]string) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+	existing, ok := s.members[nodeID]
+	if !ok {
+		s.members[nodeID] = SerfMember{NodeID: nodeID, Tags: tags}
+		s.sendEvent(NodeEvent{
+			Event: SerfNodeJoined,
+			Node:  existing,
+		})
+		return
+	}
+	s.sendEvent(NodeEvent{
+		Event: SerfNodeUpdated,
+		Node:  existing,
+	})
+	existing.Tags = tags
+	s.members[nodeID] = existing
+}
+
+// removeMember removes a member from the collection. Returns true if the member doe snot e
+func (s *SerfNode) removeMember(nodeID string) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	existing, ok := s.members[nodeID]
+	if !ok {
+		return
+	}
+	s.sendEvent(NodeEvent{
+		Event: SerfNodeLeft,
+		Node:  existing,
+	})
+
+	delete(s.members, nodeID)
+}
+
+func (s *SerfNode) updateMember(nodeID string, tags map[string]string) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	existing, ok := s.members[nodeID]
+	if !ok {
+		existing.NodeID = nodeID
+		existing.Tags = tags
+		s.sendEvent(NodeEvent{
+			Event: SerfNodeJoined,
+			Node:  existing,
+		})
+		return
+	}
+	existing.Tags = tags
+	s.members[nodeID] = existing
+	s.sendEvent(NodeEvent{
+		Event: SerfNodeUpdated,
+		Node:  existing,
+	})
+
+}
+
+func (s *SerfNode) sendEvent(ev NodeEvent) {
 	for _, v := range s.notifications {
 		select {
 		case v <- ev:
@@ -240,11 +295,7 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 				continue
 			}
 			for _, v := range e.Members {
-				s.sendEvent(NodeEvent{
-					Event:  SerfNodeJoined,
-					NodeID: v.Name,
-					Tags:   v.Tags,
-				})
+				s.addMember(v.Name, v.Tags)
 			}
 		case serf.EventMemberLeave:
 			e, ok := ev.(serf.MemberEvent)
@@ -252,11 +303,7 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 				continue
 			}
 			for _, v := range e.Members {
-				s.sendEvent(NodeEvent{
-					Event:  SerfNodeLeft,
-					NodeID: v.Name,
-					Tags:   v.Tags,
-				})
+				s.removeMember(v.Name)
 			}
 		case serf.EventMemberReap:
 		case serf.EventMemberUpdate:
@@ -266,11 +313,7 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 				continue
 			}
 			for _, v := range e.Members {
-				s.sendEvent(NodeEvent{
-					Event:  SerfNodeUpdated,
-					NodeID: v.Name,
-					Tags:   v.Tags,
-				})
+				s.updateMember(v.Name, v.Tags)
 			}
 		case serf.EventUser:
 		case serf.EventQuery:
@@ -280,11 +323,7 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 				continue
 			}
 			for _, v := range e.Members {
-				s.sendEvent(NodeEvent{
-					Event:  SerfNodeFailed,
-					NodeID: v.Name,
-					Tags:   v.Tags,
-				})
+				s.removeMember(v.Name)
 			}
 
 		default:

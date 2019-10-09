@@ -126,15 +126,15 @@ func serfEvents(ch <-chan funk.NodeEvent) {
 		switch ev.Event {
 		case funk.SerfNodeJoined:
 			if raftNode.Leader() {
-				if err := raftNode.AddClusterNode(ev.NodeID, ev.Tags[funk.RaftEndpoint]); err != nil {
-					log.WithError(err).WithField("member", ev.NodeID).Error("Error adding member")
+				if err := raftNode.AddClusterNode(ev.Node.NodeID, ev.Node.Tags[funk.RaftEndpoint]); err != nil {
+					log.WithError(err).WithField("member", ev.Node.NodeID).Error("Error adding member")
 				}
 			}
 			continue
 		case funk.SerfNodeLeft:
 			if raftNode.Leader() {
-				if err := raftNode.RemoveClusterNode(ev.NodeID, ev.Tags[funk.RaftEndpoint]); err != nil {
-					log.WithError(err).WithField("member", ev.NodeID).Error("Error removing member")
+				if err := raftNode.RemoveClusterNode(ev.Node.NodeID, ev.Node.Tags[funk.RaftEndpoint]); err != nil {
+					log.WithError(err).WithField("member", ev.Node.NodeID).Error("Error removing member")
 				}
 			}
 			// Ignoring updates and failed nodes. Failed nodes are handled by Raft. Updates aren't used
