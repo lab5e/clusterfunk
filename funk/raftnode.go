@@ -440,6 +440,22 @@ func (r *RaftNode) removeNode(id string) {
 	}
 }
 
+// RefreshNodes refreshes the node list by reading the Raft configuration.
+// If any events are skipped by the Raft library we'll get the appropriate
+// events and an updated node list after this call.
+func (r *RaftNode) RefreshNodes() {
+	cfg := r.ra.GetConfiguration()
+	if cfg.Error() != nil {
+		log.WithError(cfg.Error()).Warn("Unable to update nodes")
+		return
+	}
+	list := []string{}
+	for _, v := range cfg.Configuration().Servers {
+		list = append(list, string(v.ID))
+	}
+	r.Nodes.Sync(list...)
+}
+
 func (r *RaftNode) sendInternalEvent(ev RaftEventType) {
 	select {
 	case r.internalEvents <- ev:

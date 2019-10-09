@@ -19,39 +19,41 @@ import (
 
 // clusterfunkClusterß implements the Cluster interface
 type clusterfunkCluster struct {
-	name                 string                    // Name of cluster
-	shardManager         sharding.ShardManager     // Shard map
-	config               Parameters                // Configuration
-	serfNode             *SerfNode                 // Serf
-	raftNode             *RaftNode                 // Raft
-	eventChannels        []chan Event              // Event channels for subscribers
-	mgmtServer           *grpc.Server              // gRPC server for management
-	leaderServer         *grpc.Server              // gRPC server for leader
-	mutex                *sync.RWMutex             // Mutex for events
-	stateMutex           *sync.RWMutex             // Mutex for state and role
-	currentShardMapIndex uint64                    // The current acked, wanted or sent shard map index
-	processedIndex       uint64                    // The last processed index in the replicated log
-	state                NodeState                 // Current cluster state for this node. Set based on events from Raft
-	role                 NodeRole                  // Current cluster role for this node. Set based on events from Raft-
-	unacknowledged       toolbox.StringSet         // The list of unacknowledged nodes. Only used by the leader.
-	registry             *toolbox.ZeroconfRegistry // Zeroconf lookups. Used when joining
+	name                  string                    // Name of cluster
+	shardManager          sharding.ShardManager     // Shard map
+	config                Parameters                // Configuration
+	serfNode              *SerfNode                 // Serf
+	raftNode              *RaftNode                 // Raft
+	eventChannels         []chan Event              // Event channels for subscribers
+	mgmtServer            *grpc.Server              // gRPC server for management
+	leaderServer          *grpc.Server              // gRPC server for leader
+	mutex                 *sync.RWMutex             // Mutex for events
+	stateMutex            *sync.RWMutex             // Mutex for state and role
+	currentShardMapIndex  uint64                    // The current acked, wanted or sent shard map index
+	proposedShardMapIndex uint64                    // The (leader's) propsed shard map index
+	processedIndex        uint64                    // The last processed index in the replicated log
+	state                 NodeState                 // Current cluster state for this node. Set based on events from Raft
+	role                  NodeRole                  // Current cluster role for this node. Set based on events from Raft-
+	unacknowledged        toolbox.StringSet         // The list of unacknowledged nodes. Only used by the leader.
+	registry              *toolbox.ZeroconfRegistry // Zeroconf lookups. Used when joining
 }
 
 // NewCluster returns a new cluster (client)
 func NewCluster(params Parameters, shardManager sharding.ShardManager) Cluster {
 	ret := &clusterfunkCluster{
-		name:                 params.ClusterName,
-		shardManager:         shardManager,
-		config:               params,
-		serfNode:             NewSerfNode(),
-		raftNode:             NewRaftNode(),
-		eventChannels:        make([]chan Event, 0),
-		mutex:                &sync.RWMutex{},
-		state:                Invalid,
-		role:                 NonVoter,
-		stateMutex:           &sync.RWMutex{},
-		currentShardMapIndex: 0,
-		unacknowledged:       toolbox.NewStringSet(),
+		name:                  params.ClusterName,
+		shardManager:          shardManager,
+		config:                params,
+		serfNode:              NewSerfNode(),
+		raftNode:              NewRaftNode(),
+		eventChannels:         make([]chan Event, 0),
+		mutex:                 &sync.RWMutex{},
+		state:                 Invalid,
+		role:                  NonVoter,
+		stateMutex:            &sync.RWMutex{},
+		currentShardMapIndex:  0,
+		proposedShardMapIndex: 0,
+		unacknowledged:        toolbox.NewStringSet(),
 	}
 	return ret
 }
@@ -178,17 +180,23 @@ func (c *clusterfunkCluster) raftEventLoop(ch <-chan RaftEventType) {
 
 func (c *clusterfunkCluster) handleLeaderEvent() {
 	c.setRole(Leader)
-	// A clustersizechanged-event is emitted by the Raft library when
-	// leader is announced. This will force a reshard
+	c.setCurrentShardMapIndex(0)
+	c.setProposedShardMapIndex(0)
+	// When assuming leadership the node list built by events won't be up to date
+	// with the list.  This forces an update of the node list.
+	c.raftNode.RefreshNodes()
 }
 
 func (c *clusterfunkCluster) handleLeaderLost() {
 	c.setState(Voting)
 	c.setCurrentShardMapIndex(0)
+	c.setProposedShardMapIndex(0)
 }
 
 func (c *clusterfunkCluster) handleFollowerEvent() {
 	c.setRole(Follower)
+	c.setCurrentShardMapIndex(0)
+	c.setProposedShardMapIndex(0)
 }
 
 func (c *clusterfunkCluster) handleClusterSizeChanged() {
@@ -196,11 +204,11 @@ func (c *clusterfunkCluster) handleClusterSizeChanged() {
 		// I'm not the leader. Won't do anything.
 		return
 	}
+	c.setProposedShardMapIndex(0)
 
-	// Reset the list of acked nodes.
+	// Reset the list of acked nodes and
 	list := c.raftNode.Nodes.List()
 	c.unacknowledged.Sync(list...)
-
 	c.setState(Resharding)
 	// reshard cluster, distribute via replicated log.
 
@@ -224,7 +232,7 @@ func (c *clusterfunkCluster) handleClusterSizeChanged() {
 		// otherwise -- just log it and continue
 		log.WithError(err).Error("Could not write log entry for new shard map")
 	}
-	c.setCurrentShardMapIndex(index)
+	c.setProposedShardMapIndex(index)
 	log.WithFields(log.Fields{"index": index}).Debugf("Shard map index")
 
 	// Next messages will be ackReceived when the changes has replicated
@@ -237,6 +245,7 @@ func (c *clusterfunkCluster) handleAckReceived(nodeID string, shardIndex uint64)
 	// when a new ack message is received the ack is noted for the node and
 	// until all nodes have acked the state will stay the same.
 	if !c.unacknowledged.Remove(nodeID) {
+		// It's an unknown node or a duplicate. Just drop it
 		return false
 	}
 	// Timeouts are handled when calling the other nodes via gRPC
@@ -245,6 +254,7 @@ func (c *clusterfunkCluster) handleAckReceived(nodeID string, shardIndex uint64)
 		// ack is completed. Enable the new shard map for the cluster by
 		// sending a commit log message. No further processing is required
 		// here.
+		c.setProposedShardMapIndex(0)
 		c.sendCommitMessage(shardIndex)
 		c.setState(Operational)
 
@@ -260,7 +270,7 @@ func (c *clusterfunkCluster) handleReceiveLog() {
 		case ProposedShardMap:
 			if c.Role() == Leader {
 				// Ack to myself - this skips the whole gRPC call
-				c.handleAckReceived(c.raftNode.LocalNodeID(), c.CurrentShardMapIndex())
+				c.handleAckReceived(c.raftNode.LocalNodeID(), c.ProposedShardMapIndex())
 				continue
 			}
 			c.processProposedShardMap(&msg)

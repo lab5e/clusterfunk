@@ -81,3 +81,15 @@ func (c *clusterfunkCluster) setCurrentShardMapIndex(index uint64) {
 	defer c.stateMutex.Unlock()
 	c.currentShardMapIndex = index
 }
+
+func (c *clusterfunkCluster) ProposedShardMapIndex() uint64 {
+	c.stateMutex.RLock()
+	defer c.stateMutex.RUnlock()
+	return c.proposedShardMapIndex
+}
+
+func (c *clusterfunkCluster) setProposedShardMapIndex(index uint64) {
+	c.stateMutex.Lock()
+	defer c.stateMutex.Unlock()
+	c.proposedShardMapIndex = index
+}
