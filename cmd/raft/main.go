@@ -43,6 +43,14 @@ func main() {
 		panic(err)
 	}
 
+	log.SetFormatter(&log.TextFormatter{FullTimestamp: true, TimestampFormat: "15:04:05.000"})
+
+	checker = funk.NewLivenessChecker(10*time.Millisecond, 3)
+	go func(ev <-chan string) {
+		for id := range ev {
+			log.WithField("id", id).Info("Client died")
+		}
+	}(checker.DeadEvents())
 	if err := start(config); err != nil {
 		panic(err)
 	}
@@ -55,13 +63,24 @@ var serfNode *funk.SerfNode
 var raftNode *funk.RaftNode
 var registry *toolbox.ZeroconfRegistry
 
+var checker funk.LivenessChecker
+
+const livenessEndpoint = "ep.live"
+
+var localLiveEndpoint string
+
 func start(config funk.Parameters) error {
 	config.Final()
 	if config.ClusterName == "" {
 		return errors.New("cluster name not specified")
 	}
 
+	localLiveEndpoint := toolbox.RandomPublicEndpoint()
+
 	serfNode = funk.NewSerfNode()
+	serfNode.SetTag(livenessEndpoint, localLiveEndpoint)
+
+	funk.NewLivenessClient(localLiveEndpoint)
 
 	if config.ZeroConf {
 		registry = toolbox.NewZeroconfRegistry(config.ClusterName)
@@ -111,9 +130,24 @@ func raftEvents(ch <-chan funk.RaftEventType) {
 				"size":    raftNode.Nodes.Size(),
 				"members": raftNode.Nodes.List(),
 			}).Info("Cluster")
+			// Launch new liveness checks
+			checker.Clear()
+			for _, v := range raftNode.Nodes.List() {
+				checker.Add(v, serfNode.Node(v).Tags[livenessEndpoint])
+			}
 		case funk.RaftLeaderLost:
+			// Stop liveness check
+			checker.Clear()
+
 		case funk.RaftBecameLeader:
+			// Start liveness check
+			for _, v := range raftNode.Nodes.List() {
+				checker.Add(v, serfNode.Node(v).Tags[livenessEndpoint])
+			}
+
 		case funk.RaftBecameFollower:
+			// Stop liveness check
+			checker.Clear()
 		case funk.RaftReceivedLog:
 		default:
 			log.WithField("event", e).Info("Unknown event received")
