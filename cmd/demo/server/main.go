@@ -56,6 +56,13 @@ func main() {
 	// This logs a message every time the cluster changes state.
 	go clusterEventListener(cluster.Events())
 
+	// ...announce the endpoint. This is sent via Serf so this should be set before
+	// starting the cluster. Serf updates are slower than the leader election so
+	// the nodes might not pick up the endpoint until after the election. If we
+	// set the endpoint before the cluster is started the serf client will announce
+	// itself with the endpoint already populated.
+	cluster.SetEndpoint(demoEndpoint, demoServerEndpoint)
+
 	// ...and start the cluster node. If the bootstrap flag is set a new cluster
 	// will be launched.
 	if err := cluster.Start(); err != nil {
@@ -63,9 +70,6 @@ func main() {
 		return
 	}
 	defer cluster.Stop()
-
-	// ...and announce the endpoint
-	cluster.SetEndpoint(demoEndpoint, demoServerEndpoint)
 
 	// Nothing blocks here so wait for an interrupt signal.
 	toolbox.WaitForCtrlC()

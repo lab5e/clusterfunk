@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	"github.com/stalehd/clusterfunk/clientfunk"
+	"github.com/stalehd/clusterfunk/serverfunk"
 
 	"github.com/stalehd/clusterfunk/funk"
 
@@ -21,7 +21,7 @@ import (
 type liffProxy struct {
 	localLiff   demo.DemoServiceServer
 	shardFromID sharding.ShardFunc
-	clientProxy *clientfunk.GRPCClientProxy
+	clientProxy *serverfunk.GRPCClientProxy
 }
 
 func newLiffProxy(
@@ -43,7 +43,7 @@ func newLiffProxy(
 
 	// This is the proxying code. It will block requests while the cluster is
 	// busy resharding itself, f.e. when a new node is added or a node has died.
-	proxy := clientfunk.NewGRPCClientProxy(endpointName, makeDemoClient, shardMap, c)
+	proxy := serverfunk.NewGRPCClientProxy(endpointName, makeDemoClient, shardMap, c)
 
 	return &liffProxy{
 		localLiff:   localLiff,

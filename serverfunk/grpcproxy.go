@@ -1,4 +1,4 @@
-package clientfunk
+package serverfunk
 
 import (
 	"errors"
