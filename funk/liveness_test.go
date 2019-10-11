@@ -61,15 +61,16 @@ func TestLiveness(t *testing.T) {
 	assert.Contains(deads, "A")
 	mutex.Unlock()
 
+	checker.Remove("B")
 	localB.Stop()
+
 	localC.Stop()
 
 	time.Sleep((retries + 1) * interval)
 
 	mutex.Lock()
-	assert.Len(deads, 3)
+	assert.Len(deads, 2)
 	assert.Contains(deads, "A")
-	assert.Contains(deads, "B")
 	assert.Contains(deads, "C")
 	mutex.Unlock()
 

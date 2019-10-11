@@ -7,6 +7,29 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// LivenessChecker is a liveness checker. It does a (very simple) high freqyency
+// liveness check on nodes. If it fails more than a certain number of times an
+// event is generated on the DeadEvents channel. Only a single subscriber is
+// supported for this channel.
+type LivenessChecker interface {
+	// Add adds a new new check to the list.
+	Add(id string, endpoint string)
+
+	// Clear removes all checks
+	Clear()
+
+	// Remove removes a single checker
+	Remove(id string)
+
+	// DeadEvents returns the event channel. The ID from the Add method is
+	// echoed on this channel when a client stops responding.
+	DeadEvents() <-chan string
+
+	// Shutdown shuts down the checker and closes the event channel. The
+	// checker will no longer be in an usable state after this.
+	Shutdown()
+}
+
 // LocalLivenessEndpoint launches a local liveness client. The client will respond
 // to (short) UDP packets by echoing back the packet on the same port.
 // This is not a *health* check, just a liveness check if the node is
@@ -55,20 +78,6 @@ func (u *udpLivenessClient) launch(endpoint string) {
 			conn.WriteTo(buf, addr)
 		}
 	}(conn)
-}
-
-// LivenessChecker is a liveness checker. It does a (very simple) high freqyency
-// liveness check on nodes. If it fails more than a certain number of times an
-// event is generated on the DeadEvents channel. Only a single subscriber is
-// supported for this channel.
-type LivenessChecker interface {
-	// Add adds a new new check to the list.
-	Add(id string, endpoint string)
-	// Clear removes all checks
-	Clear()
-	// DeadEvents returns the event channel. The ID from the Add method is
-	// echoed on this channel when a client stops responding.
-	DeadEvents() <-chan string
 }
 
 // This type checks a single client for liveness.
@@ -189,6 +198,18 @@ func (l *livenessChecker) Add(id string, endpoint string) {
 	l.checkers[id] = newSingleChecker(id, endpoint, l.events, l.interval, l.retries)
 }
 
+func (l *livenessChecker) Remove(id string) {
+	existing, ok := l.checkers[id]
+	if ok {
+		existing.Stop()
+	}
+}
+
 func (l *livenessChecker) DeadEvents() <-chan string {
 	return l.events
+}
+
+func (l *livenessChecker) Shutdown() {
+	l.Clear()
+	close(l.events)
 }
