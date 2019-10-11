@@ -11,7 +11,7 @@ import (
 )
 
 func waitForClusterEvent(ev <-chan Event, state NodeState) bool {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 	defer cancel()
 
 	for {
