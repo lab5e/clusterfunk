@@ -15,9 +15,6 @@ type LivenessChecker interface {
 	// Add adds a new new check to the list.
 	Add(id string, endpoint string)
 
-	// Clear removes all checks
-	Clear()
-
 	// Remove removes a single checker
 	Remove(id string)
 
@@ -25,6 +22,8 @@ type LivenessChecker interface {
 	// echoed on this channel when a client stops responding.
 	DeadEvents() <-chan string
 
+	// AliveEvents returns an event channel for alive events.
+	AliveEvents() <-chan string
 	// Shutdown shuts down the checker and closes the event channel. The
 	// checker will no longer be in an usable state after this.
 	Shutdown()
@@ -82,14 +81,16 @@ func (u *udpLivenessClient) launch(endpoint string) {
 
 // This type checks a single client for liveness.
 type singleChecker struct {
-	deadCh    chan string
+	deadCh    chan<- string
+	aliveCh   chan<- string
 	stopCh    chan struct{}
 	maxErrors int
 }
 
-func newSingleChecker(id, endpoint string, deadCh chan string, interval time.Duration, retries int) singleChecker {
+func newSingleChecker(id, endpoint string, deadCh chan<- string, aliveCh chan<- string, interval time.Duration, retries int) singleChecker {
 	ret := singleChecker{
 		deadCh:    deadCh,
+		aliveCh:   aliveCh,
 		stopCh:    make(chan struct{}),
 		maxErrors: retries,
 	}
@@ -115,48 +116,75 @@ func (c *singleChecker) getConnection(endpoint string, interval time.Duration) n
 func (c *singleChecker) checkerProc(id, endpoint string, interval time.Duration) {
 	buffer := make([]byte, 2)
 
+	// The error counter counts up and down - when it reaches the limit (aka maxErrors)
+	// the client is set to either alive (with negative errors, ie success) or dead
+	// (ie errors is positive)
 	errors := 0
 	var conn net.Conn
+	alive := true
+
+	// The waiting interval is bumped up and down depending on the state. If the
+	// client is alive it is set to the check interval and when it is dead the
+	// check interval is 10 times higher.
+	waitInterval := interval
+
 	for {
-		if errors >= c.maxErrors {
-			c.deadCh <- id
+		select {
+		case <-c.stopCh:
 			return
+		default:
+			// keep on running
+		}
+		if alive && errors >= c.maxErrors {
+			alive = false
+			c.deadCh <- id
+			waitInterval = 10 * interval
+		}
+		if !alive && errors <= 0 {
+			alive = true
+			c.aliveCh <- id
+			waitInterval = interval
 		}
 		if conn == nil {
-			conn = c.getConnection(endpoint, interval)
+			conn = c.getConnection(endpoint, waitInterval)
 			if conn == nil {
-				c.deadCh <- id
-				return
+				errors++
+				time.Sleep(waitInterval)
+				continue
 			}
-			defer conn.Close()
 		}
 
-		waitCh := time.After(interval)
+		waitCh := time.After(waitInterval)
 
 		conn.SetWriteDeadline(time.Now().Add(interval))
 		_, err := conn.Write([]byte("Yo"))
 		if err != nil {
 			// Writes will usually succeed since UDP is a black hole but
-			// this *might* fail.
+			// this *might* fail. Close the connection and reopen.
 			errors++
+			conn.Close()
 			conn = nil
+			time.Sleep(waitInterval)
 			continue
 		}
 		conn.SetReadDeadline(time.Now().Add(interval))
 		_, err = conn.Read(buffer)
 		if err != nil {
+			// This will fail if the client is dead.
 			errors++
+			conn.Close()
 			conn = nil
+			time.Sleep(waitInterval)
 			continue
 		}
-
-		select {
-		case <-waitCh:
-			// keep checking
-		case <-c.stopCh:
-			// stop checking
-			return
+		errors--
+		if errors > c.maxErrors {
+			errors = c.maxErrors
 		}
+		if errors < -c.maxErrors {
+			errors = -c.maxErrors
+		}
+		<-waitCh
 	}
 }
 
@@ -172,44 +200,48 @@ func (c *singleChecker) Stop() {
 // this is the liveness checker type that implements the LivenessChecker
 // interface.
 type livenessChecker struct {
-	checkers map[string]singleChecker
-	events   chan string
-	retries  int
-	interval time.Duration
+	checkers    map[string]singleChecker
+	deadEvents  chan string
+	aliveEvents chan string
+	retries     int
+	interval    time.Duration
 }
 
 // NewLivenessChecker is a type that checks hosts for liveness
 func NewLivenessChecker(interval time.Duration, retries int) LivenessChecker {
 	return &livenessChecker{
-		interval: interval,
-		retries:  retries,
-		checkers: make(map[string]singleChecker),
-		events:   make(chan string, 10),
-	}
-}
-
-func (l *livenessChecker) Clear() {
-	for _, v := range l.checkers {
-		v.Stop()
+		interval:    interval,
+		retries:     retries,
+		checkers:    make(map[string]singleChecker),
+		deadEvents:  make(chan string, 10),
+		aliveEvents: make(chan string, 10),
 	}
 }
 
 func (l *livenessChecker) Add(id string, endpoint string) {
-	l.checkers[id] = newSingleChecker(id, endpoint, l.events, l.interval, l.retries)
+	l.checkers[id] = newSingleChecker(id, endpoint, l.deadEvents, l.aliveEvents, l.interval, l.retries)
 }
 
 func (l *livenessChecker) Remove(id string) {
 	existing, ok := l.checkers[id]
 	if ok {
 		existing.Stop()
+		delete(l.checkers, id)
 	}
 }
 
 func (l *livenessChecker) DeadEvents() <-chan string {
-	return l.events
+	return l.deadEvents
+}
+
+func (l *livenessChecker) AliveEvents() <-chan string {
+	return l.aliveEvents
 }
 
 func (l *livenessChecker) Shutdown() {
-	l.Clear()
-	close(l.events)
+	for _, v := range l.checkers {
+		v.Stop()
+	}
+	close(l.deadEvents)
+	close(l.aliveEvents)
 }

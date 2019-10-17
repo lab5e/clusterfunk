@@ -1,7 +1,6 @@
 package funk
 
 import (
-	"sync"
 	"testing"
 	"time"
 
@@ -23,105 +22,74 @@ func TestLiveness(t *testing.T) {
 	localA := NewLivenessClient(ep1)
 	localB := NewLivenessClient(ep2)
 	localC := NewLivenessClient(ep3)
+	/*	defer localA.Stop()
+		defer localB.Stop()
+		defer localC.Stop()*/
 	time.Sleep(interval)
+
 	checker := NewLivenessChecker(interval, retries)
-
-	mutex := &sync.Mutex{}
-	deads := make([]string, 0)
-	go func(ch <-chan string) {
-		for k := range ch {
-			mutex.Lock()
-			t.Logf("%s died", k)
-			deads = append(deads, k)
-			mutex.Unlock()
-		}
-	}(checker.DeadEvents())
-
-	mutex.Lock()
-	assert.Len(deads, 0)
-	mutex.Unlock()
-
-	t.Log("Server's up")
 	checker.Add("A", ep1)
 	checker.Add("B", ep2)
 	checker.Add("C", ep3)
 
-	time.Sleep(retries * interval)
-
-	mutex.Lock()
-	assert.Len(deads, 0)
-	mutex.Unlock()
-
+	timeout := false
+	for !timeout {
+		select {
+		case <-checker.AliveEvents():
+			assert.FailNow("Should not receive an alive event")
+		case <-checker.DeadEvents():
+			assert.FailNow("Should not receive a dead event")
+		case <-time.After(interval * 5):
+			timeout = true
+		}
+	}
 	localA.Stop()
-
-	time.Sleep((retries + 1) * interval)
-
-	mutex.Lock()
-	assert.Len(deads, 1)
-	assert.Contains(deads, "A")
-	mutex.Unlock()
-
-	checker.Remove("B")
+	foundA := false
+	for !foundA {
+		select {
+		case id := <-checker.DeadEvents():
+			assert.Equal("A", id, "Expected A to fail")
+			foundA = true
+		case <-time.After(interval * 15):
+			assert.FailNow("Timed out waiting for dead message")
+		}
+	}
 	localB.Stop()
-
 	localC.Stop()
 
-	time.Sleep((retries + 1) * interval)
+	foundB := false
+	foundC := false
 
-	mutex.Lock()
-	assert.Len(deads, 2)
-	assert.Contains(deads, "A")
-	assert.Contains(deads, "C")
-	mutex.Unlock()
-
-	checker.Clear()
-}
-
-// Ensure clients that are DOA are detected
-func TestLiveCheckerDeadOnArrival(t *testing.T) {
-	const interval = 10 * time.Millisecond
-	const retries = 3
-
-	ep1 := toolbox.RandomLocalEndpoint()
-
-	checker := NewLivenessChecker(interval, retries)
-	checker.Add("A", ep1)
-	time.Sleep(interval)
-	start := time.Now()
-
-	time.Sleep(interval * 4)
-	for k := range checker.DeadEvents() {
-		if k == "A" {
-			break
-		}
-		if time.Now().Sub(start) > (interval * (retries + 1)) {
-			t.Fatal("Didn't detect DOA client")
+	for !foundB && !foundC {
+		select {
+		case id := <-checker.DeadEvents():
+			switch id {
+			case "B":
+				foundB = true
+			case "C":
+				foundC = true
+			case "A":
+				assert.FailNow("A should not die again")
+			}
+		case <-time.After(interval * 15):
+			assert.FailNow("Timed out waiting for dead messages")
 		}
 	}
-}
+	checker.Remove("B")
+	checker.Remove("C")
 
-func TestLiveCheckerPerformance(t *testing.T) {
-	assert := require.New(t)
-
-	const interval = 10 * time.Millisecond
-	const retries = 3
-
-	ep1 := toolbox.RandomLocalEndpoint()
-
-	localA := NewLivenessClient(ep1)
-	time.Sleep(interval)
-	checker := NewLivenessChecker(interval, retries)
-	checker.Add("A", ep1)
-	start := time.Now()
-	var stop time.Time
+	// Bring back A
+	localA = NewLivenessClient(ep1)
+	for !foundA {
+		select {
+		case id := <-checker.AliveEvents():
+			assert.Equal("A", id, "Expected A to fail")
+			foundA = true
+		case <-time.After(interval * 45):
+			assert.FailNow("Timed out waiting for alive message")
+		}
+	}
 	localA.Stop()
-	for k := range checker.DeadEvents() {
-		if k == "A" {
-			stop = time.Now()
-			break
-		}
-	}
-	// With 3 retries and 10 ms interval the client should fail after
-	// 30 ms (+/- 1ms for good measure)
-	assert.Less(int64(stop.Sub(start)), int64(31*time.Millisecond))
+	checker.Shutdown()
+
 }

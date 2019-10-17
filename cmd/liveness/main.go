@@ -34,14 +34,12 @@ func main() {
 		return
 	}
 
+	fmt.Println("Ctrl+C to stop")
 	if *client {
 		for _, v := range eps {
 			c := funk.NewLivenessClient(v)
 			defer c.Stop()
 		}
-		fmt.Println("Ctrl+C to stop")
-		toolbox.WaitForCtrlC()
-		return
 	}
 	if *server {
 		s := funk.NewLivenessChecker(10*time.Millisecond, 3)
@@ -49,14 +47,17 @@ func main() {
 			s.Add(fmt.Sprintf("client%02d", i), v)
 		}
 
-		dead := 0
-		for k := range s.DeadEvents() {
-			fmt.Printf("%s died\n", k)
-			dead++
-			if dead == len(eps) {
-				break
+		go func() {
+			for k := range s.AliveEvents() {
+				fmt.Printf("%s is alive\n", k)
 			}
-		}
-		return
+		}()
+		go func() {
+			for k := range s.DeadEvents() {
+				fmt.Printf("%s died\n", k)
+			}
+		}()
 	}
+	toolbox.WaitForCtrlC()
+	fmt.Println("Stopping...")
 }
