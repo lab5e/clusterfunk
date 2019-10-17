@@ -243,16 +243,7 @@ func (r *RaftNode) observerFunc(ch chan raft.Observation) {
 				// change when there's only a single node becoming a leader
 				r.scheduleInternalEvent(RaftClusterSizeChanged, 500*time.Millisecond)
 			}
-		case raft.PeerLiveness:
-			lt, ok := k.Data.(raft.PeerLiveness)
-			if ok {
-				if !lt.Heartbeat {
-					r.removeNode(string(lt.ID))
-				}
-				if lt.Heartbeat {
-					r.addNode(string(lt.ID))
-				}
-			}
+
 		case raft.RequestVoteRequest:
 			// Not using this at the moment
 
@@ -523,6 +514,24 @@ func (r *RaftNode) coalescingEvents() {
 			eventsToGenerate = make([]RaftEventType, 0)
 		}
 	}
+}
+
+// EnableNode enables a node that has been disabled. The node might be a part of the
+// cluster but not available.
+func (r *RaftNode) EnableNode(id string) {
+	if !r.Leader() {
+		return
+	}
+	r.addNode(id)
+}
+
+// DisableNode disables a node (in reality removing it from the local node list
+// but it is still a member of the Raft cluster)
+func (r *RaftNode) DisableNode(id string) {
+	if !r.Leader() {
+		return
+	}
+	r.removeNode(id)
 }
 
 // The raft.FSM implementation. Right now the implementation looks a lot more

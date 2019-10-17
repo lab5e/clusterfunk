@@ -36,6 +36,8 @@ type clusterfunkCluster struct {
 	role                  NodeRole                  // Current cluster role for this node. Set based on events from Raft-
 	unacknowledged        toolbox.StringSet         // The list of unacknowledged nodes. Only used by the leader.
 	registry              *toolbox.ZeroconfRegistry // Zeroconf lookups. Used when joining
+	livenessChecker       LivenessChecker           // Check for node liveness. The built-in heartbeats in Raft isn't exposed
+	livenessClient        LocalLivenessEndpoint
 }
 
 // NewCluster returns a new cluster (client)
@@ -54,6 +56,7 @@ func NewCluster(params Parameters, shardManager sharding.ShardManager) Cluster {
 		currentShardMapIndex:  0,
 		proposedShardMapIndex: 0,
 		unacknowledged:        toolbox.NewStringSet(),
+		livenessChecker:       NewLivenessChecker(params.LivenessInterval, params.LivenessRetries),
 	}
 	return ret
 }
@@ -135,7 +138,10 @@ func (c *clusterfunkCluster) Start() error {
 		}
 
 	}
-
+	if c.livenessClient == nil {
+		c.livenessClient = NewLivenessClient(c.config.LivenessEndpoint)
+		go c.livenessEventLoop()
+	}
 	go c.raftEventLoop(c.raftNode.Events())
 
 	if err := c.raftNode.Start(c.config.NodeID, c.config.Verbose, c.config.Raft); err != nil {
@@ -144,6 +150,7 @@ func (c *clusterfunkCluster) Start() error {
 
 	c.serfNode.SetTag(RaftEndpoint, c.raftNode.Endpoint())
 	c.serfNode.SetTag(SerfEndpoint, c.config.Serf.Endpoint)
+	c.serfNode.SetTag(LivenessEndpoint, c.config.LivenessEndpoint)
 
 	go c.serfEventLoop(c.serfNode.Events())
 
@@ -161,12 +168,15 @@ func (c *clusterfunkCluster) raftEventLoop(ch <-chan RaftEventType) {
 			toolbox.TimeCall(func() { c.handleClusterSizeChanged() }, "ClusterSizeChanged")
 
 		case RaftLeaderLost:
+			c.livenessChecker.Clear()
 			toolbox.TimeCall(func() { c.handleLeaderLost() }, "LeaderLost")
 
 		case RaftBecameLeader:
+			c.updateLivenessChecks()
 			toolbox.TimeCall(func() { c.handleLeaderEvent() }, "BecameLeader")
 
 		case RaftBecameFollower:
+			c.livenessChecker.Clear()
 			toolbox.TimeCall(func() { c.handleFollowerEvent() }, "BecameFollower")
 
 		case RaftReceivedLog:
@@ -436,6 +446,8 @@ func (c *clusterfunkCluster) serfEventLoop(ch <-chan NodeEvent) {
 						log.Warnf("Adding serf node %s to cluster", ev.Node.NodeID)
 						if err := c.raftNode.AddClusterNode(ev.Node.NodeID, ev.Node.Tags[RaftEndpoint]); err != nil {
 							log.WithError(err).WithField("event", ev).Error("Error adding member")
+						} else {
+							c.livenessChecker.Add(ev.Node.NodeID, ev.Node.Tags[LivenessEndpoint])
 						}
 					}
 				case SerfNodeLeft:
@@ -444,6 +456,7 @@ func (c *clusterfunkCluster) serfEventLoop(ch <-chan NodeEvent) {
 						if err := c.raftNode.RemoveClusterNode(ev.Node.NodeID, ev.Node.Tags[RaftEndpoint]); err != nil {
 							log.WithError(err).WithField("event", ev).Error("Error removing member")
 						}
+						c.livenessChecker.Remove(ev.Node.NodeID)
 					}
 
 				default:
@@ -451,5 +464,28 @@ func (c *clusterfunkCluster) serfEventLoop(ch <-chan NodeEvent) {
 				}
 			}
 		}(c.serfNode.Events())
+	}
+}
+
+func (c *clusterfunkCluster) livenessEventLoop() {
+	for {
+		select {
+		case id := <-c.livenessChecker.AliveEvents():
+			// if node is a member of the cluster change the cluster size
+			c.raftNode.EnableNode(id)
+
+		case id := <-c.livenessChecker.DeadEvents():
+			// if node is a member of the cluster change the cluster size
+			c.raftNode.DisableNode(id)
+		}
+	}
+}
+
+func (c *clusterfunkCluster) updateLivenessChecks() {
+	for _, v := range c.raftNode.Nodes.List() {
+		ep := c.serfNode.Node(v).Tags[LivenessEndpoint]
+		if ep != "" {
+			c.livenessChecker.Add(v, ep)
+		}
 	}
 }

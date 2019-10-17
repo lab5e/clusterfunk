@@ -16,4 +16,4 @@ require (
 )
 
 // Using a non-pushed version of Raft here.
-replace github.com/hashicorp/raft v1.1.1 => github.com/stalehd/raft v1.1.2-0.20190926134415-e3913cefd917
+//replace github.com/hashicorp/raft v1.1.1 => github.com/stalehd/raft v1.1.2-0.20190926134415-e3913cefd917

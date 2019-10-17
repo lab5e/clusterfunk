@@ -24,6 +24,10 @@ type LivenessChecker interface {
 
 	// AliveEvents returns an event channel for alive events.
 	AliveEvents() <-chan string
+
+	// Clear removes all endpoint checks.
+	Clear()
+
 	// Shutdown shuts down the checker and closes the event channel. The
 	// checker will no longer be in an usable state after this.
 	Shutdown()
@@ -238,10 +242,15 @@ func (l *livenessChecker) AliveEvents() <-chan string {
 	return l.aliveEvents
 }
 
-func (l *livenessChecker) Shutdown() {
-	for _, v := range l.checkers {
+func (l *livenessChecker) Clear() {
+	for k, v := range l.checkers {
 		v.Stop()
+		delete(l.checkers, k)
 	}
+}
+
+func (l *livenessChecker) Shutdown() {
+	l.Clear()
 	close(l.deadEvents)
 	close(l.aliveEvents)
 }

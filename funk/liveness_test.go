@@ -90,6 +90,6 @@ func TestLiveness(t *testing.T) {
 		}
 	}
 	localA.Stop()
-	checker.Shutdown()
-
+	checker.Clear()
+	//defer checker.Shutdown()
 }

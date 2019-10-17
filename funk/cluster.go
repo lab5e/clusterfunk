@@ -131,4 +131,5 @@ const (
 	RaftEndpoint       = "ep.raft"
 	LeaderEndpoint     = "ep.leader"
 	ManagementEndpoint = "ep.management" //  gRPC endpoint for management
+	LivenessEndpoint   = "ep.liveness"
 )
