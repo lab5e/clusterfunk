@@ -14,10 +14,8 @@ func TestZeroConf(t *testing.T) {
 	zr := NewZeroconfRegistry("test-cluster")
 	assert.NoError(zr.Register("some-node", "0", 9999))
 
-	assert.Error(zr.Register("another-node", "1", 9998), "Should not be able to register two endpoints")
-	zr.Shutdown()
+	assert.Error(zr.Register("some-node", "0", 9998), "Should not be able to register two endpoints")
 
-	zr = NewZeroconfRegistry("test-cluster")
 	assert.NoError(zr.Register("some-node", "1", 9999))
 
 	defer zr.Shutdown()

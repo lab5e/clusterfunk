@@ -122,6 +122,14 @@ const (
 	clusterEndpointPrefix = "ep."
 )
 
+const (
+	// ZeroconfSerfKind is the type used to register serf endpoints in zeroconf.
+	ZeroconfSerfKind = "serf"
+	// ZeroconfManagementKind is the type used to register management endpoints
+	// in zeroconf.
+	ZeroconfManagementKind = "mgmt"
+)
+
 // The following is a list of well-known endpoints on nodes
 const (
 	//These are

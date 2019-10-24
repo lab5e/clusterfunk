@@ -101,10 +101,6 @@ message ListShardsResponse {
 // LeaderManagement service is responsible for node management. Management
 // operations must happen on the leader in the cluster.
 service ClusterManagement {
-    // GetState returns the node's internal state. Actual content is WIP.
-    rpc GetState(GetStateRequest) returns (GetStateResponse);
-
-
     // ListNodes lists the known nodes in the cluster, both voters, non-voters and
     // bystanders (ie those that are member of the Serf swarm but not the Raft cluster)
     rpc ListNodes(ListNodesRequest) returns (ListNodesResponse);

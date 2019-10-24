@@ -28,7 +28,7 @@ import (
 // or more endpoints via mDNS/Zeroconf/Bonjour until Shutdown() is called.
 type ZeroconfRegistry struct {
 	mutex       *sync.Mutex
-	server      *zeroconf.Server
+	servers     map[string]*zeroconf.Server
 	ClusterName string
 }
 
@@ -44,6 +44,7 @@ var txtRecords = []string{"txtv=0", "name=clusterfunk cluster node"}
 // NewZeroconfRegistry creates a new zeroconf server
 func NewZeroconfRegistry(clusterName string) *ZeroconfRegistry {
 	return &ZeroconfRegistry{
+		servers:     make(map[string]*zeroconf.Server),
 		mutex:       &sync.Mutex{},
 		ClusterName: clusterName,
 	}
@@ -54,26 +55,26 @@ func NewZeroconfRegistry(clusterName string) *ZeroconfRegistry {
 func (zr *ZeroconfRegistry) Register(kind string, id string, port int) error {
 	zr.mutex.Lock()
 	defer zr.mutex.Unlock()
-	if zr.server != nil {
-		return errors.New("endpoint already registered")
-	}
 	var err error
-	zr.server, err = zeroconf.Register(fmt.Sprintf("%s_%s_%s", zr.ClusterName, kind, id), serviceString, defaultDomain, port, txtRecords, nil)
+	entry := fmt.Sprintf("%s_%s_%s", zr.ClusterName, kind, id)
+	_, ok := zr.servers[entry]
+	if ok {
+		return errors.New("entry is already registered")
+	}
+	zr.servers[entry], err = zeroconf.Register(entry, serviceString, defaultDomain, port, txtRecords, nil)
 	if err != nil {
 		return err
 	}
-
 	return nil
-
 }
 
 // Shutdown shuts down the Zeroconf server.
 func (zr *ZeroconfRegistry) Shutdown() {
 	zr.mutex.Lock()
 	defer zr.mutex.Unlock()
-	if zr.server != nil {
-		zr.server.Shutdown()
-		zr.server = nil
+	for k, v := range zr.servers {
+		v.Shutdown()
+		delete(zr.servers, k)
 	}
 }
 
