@@ -104,7 +104,7 @@ func main() {
 
 func findSerfNode(clusterName string) (string, error) {
 	zr := toolbox.NewZeroconfRegistry(clusterName)
-	nodes, err := zr.ResolveFirst(1 * time.Second)
+	nodes, err := zr.ResolveFirst("serf", 1*time.Second)
 	if err != nil {
 		return "", err
 	}

@@ -124,7 +124,7 @@ func (c *clusterfunkCluster) Start() error {
 
 		if !c.config.Raft.Bootstrap && c.config.Serf.JoinAddress == "" {
 			var err error
-			addrs, err := c.registry.Resolve(1 * time.Second)
+			addrs, err := c.registry.Resolve("serf", 1*time.Second)
 			if err != nil {
 				return err
 			}
@@ -133,7 +133,7 @@ func (c *clusterfunkCluster) Start() error {
 			}
 			c.config.Serf.JoinAddress = addrs[0]
 		}
-		if err := c.registry.Register(c.config.NodeID, toolbox.PortOfHostPort(c.config.Serf.Endpoint)); err != nil {
+		if err := c.registry.Register("serf", c.config.NodeID, toolbox.PortOfHostPort(c.config.Serf.Endpoint)); err != nil {
 			return err
 		}
 

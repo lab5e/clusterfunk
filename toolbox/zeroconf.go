@@ -50,15 +50,15 @@ func NewZeroconfRegistry(clusterName string) *ZeroconfRegistry {
 }
 
 // Register registers a new endpoint. Only one endpoint can be created at a time
-func (zr *ZeroconfRegistry) Register(name string, port int) error {
+// The ID parameter is an unique ID.
+func (zr *ZeroconfRegistry) Register(kind string, id string, port int) error {
 	zr.mutex.Lock()
 	defer zr.mutex.Unlock()
 	if zr.server != nil {
 		return errors.New("endpoint already registered")
 	}
 	var err error
-
-	zr.server, err = zeroconf.Register(fmt.Sprintf("%s_%s", zr.ClusterName, name), serviceString, defaultDomain, port, txtRecords, nil)
+	zr.server, err = zeroconf.Register(fmt.Sprintf("%s_%s_%s", zr.ClusterName, kind, id), serviceString, defaultDomain, port, txtRecords, nil)
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func (zr *ZeroconfRegistry) Shutdown() {
 }
 
 // Resolve looks for another service
-func (zr *ZeroconfRegistry) Resolve(waitTime time.Duration) ([]string, error) {
+func (zr *ZeroconfRegistry) Resolve(kind string, waitTime time.Duration) ([]string, error) {
 
 	resolver, err := zeroconf.NewResolver(nil)
 	if err != nil {
@@ -98,7 +98,7 @@ func (zr *ZeroconfRegistry) Resolve(waitTime time.Duration) ([]string, error) {
 	}(entries)
 
 	var ret []string
-	clusterPrefix := fmt.Sprintf("%s_", zr.ClusterName)
+	clusterPrefix := fmt.Sprintf("%s_%s", zr.ClusterName, kind)
 	for entry := range entries {
 		if entry.Service == serviceString {
 			if strings.HasPrefix(entry.Instance, clusterPrefix) {
@@ -112,7 +112,7 @@ func (zr *ZeroconfRegistry) Resolve(waitTime time.Duration) ([]string, error) {
 }
 
 // ResolveFirst looks for another service and returns only the first matching element
-func (zr *ZeroconfRegistry) ResolveFirst(waitTime time.Duration) (string, error) {
+func (zr *ZeroconfRegistry) ResolveFirst(kind string, waitTime time.Duration) (string, error) {
 
 	resolver, err := zeroconf.NewResolver(nil)
 	if err != nil {
@@ -131,7 +131,7 @@ func (zr *ZeroconfRegistry) ResolveFirst(waitTime time.Duration) (string, error)
 		<-ctx.Done()
 	}(entries)
 
-	clusterPrefix := fmt.Sprintf("%s_", zr.ClusterName)
+	clusterPrefix := fmt.Sprintf("%s_%s", zr.ClusterName, kind)
 	for {
 		select {
 		case entry := <-entries:

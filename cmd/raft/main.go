@@ -87,7 +87,7 @@ func start(config funk.Parameters) error {
 
 		if !config.Raft.Bootstrap && config.Serf.JoinAddress == "" {
 			var err error
-			addrs, err := registry.Resolve(1 * time.Second)
+			addrs, err := registry.Resolve("serf", 1*time.Second)
 			if err != nil {
 				return err
 			}
@@ -96,7 +96,7 @@ func start(config funk.Parameters) error {
 			}
 			config.Serf.JoinAddress = addrs[0]
 		}
-		if err := registry.Register(config.NodeID, toolbox.PortOfHostPort(config.Serf.Endpoint)); err != nil {
+		if err := registry.Register("serf", config.NodeID, toolbox.PortOfHostPort(config.Serf.Endpoint)); err != nil {
 			return err
 		}
 

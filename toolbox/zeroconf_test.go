@@ -12,21 +12,21 @@ func TestZeroConf(t *testing.T) {
 	assert := require.New(t)
 
 	zr := NewZeroconfRegistry("test-cluster")
-	assert.NoError(zr.Register("some-node", 9999))
+	assert.NoError(zr.Register("some-node", "0", 9999))
 
-	assert.Error(zr.Register("another-node", 9998), "Should not be able to register two endpoints")
+	assert.Error(zr.Register("another-node", "1", 9998), "Should not be able to register two endpoints")
 	zr.Shutdown()
 
 	zr = NewZeroconfRegistry("test-cluster")
-	assert.NoError(zr.Register("some-node", 9999))
+	assert.NoError(zr.Register("some-node", "1", 9999))
 
 	defer zr.Shutdown()
 
-	results, err := zr.Resolve(550 * time.Millisecond)
+	results, err := zr.Resolve("some-node", 550*time.Millisecond)
 	assert.NoError(err)
 	assert.NotNil(results)
 
-	res, err := zr.ResolveFirst(250 * time.Millisecond)
+	res, err := zr.ResolveFirst("some-node", 250*time.Millisecond)
 	assert.NoError(err)
 	ip, err := FindPublicIPv4()
 	assert.NoError(err)

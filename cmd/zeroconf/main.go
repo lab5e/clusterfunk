@@ -26,8 +26,7 @@ func registerService(name string) {
 	log.Println("Registering service")
 	reg := toolbox.NewZeroconfRegistry(name)
 
-	nodeName := fmt.Sprintf("node_%08x", rand.Int())
-	if err := reg.Register(nodeName, int(rand.Int31n(31000))+1001); err != nil {
+	if err := reg.Register("node", fmt.Sprintf("%08x", rand.Int()), int(rand.Int31n(31000))+1001); err != nil {
 		log.Printf("Error registering service: %v", err)
 		return
 	}
@@ -39,7 +38,7 @@ func registerService(name string) {
 func browseService(name string) {
 	log.Println("Browse service")
 	reg := toolbox.NewZeroconfRegistry(name)
-	results, err := reg.Resolve(2 * time.Second)
+	results, err := reg.Resolve("node", 2*time.Second)
 	if err != nil {
 		log.Printf("Error browsing for zeroconf: %v", err)
 		return
