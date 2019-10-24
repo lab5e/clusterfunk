@@ -3,12 +3,14 @@ package funk
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/stalehd/clusterfunk/funk/clustermgmt"
+	"github.com/stalehd/clusterfunk/toolbox"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -65,9 +67,82 @@ func (c *clusterfunkCluster) startManagementServices() error {
 
 // Node management implementation
 // -----------------------------------------------------------------------------
+func (c *clusterfunkCluster) leaderManagementClient() (clustermgmt.ClusterManagementClient, error) {
+	ep := c.GetEndpoint(c.raftNode.LeaderNodeID(), ManagementEndpoint)
 
-func (c *clusterfunkCluster) GetState(context.Context, *clustermgmt.GetStateRequest) (*clustermgmt.GetStateResponse, error) {
-	return nil, errors.New("not implemented")
+	// TODO: Custom gRPC parameters goes here. Set cert if required
+	opts, err := toolbox.GetGRPCDialOpts(toolbox.GRPCClientParam{})
+	if err != nil {
+		return nil, err
+	}
+	conn, err := grpc.Dial(ep, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return clustermgmt.NewClusterManagementClient(conn), nil
+}
+
+func (c *clusterfunkCluster) GetStatus(ctx context.Context, req *clustermgmt.GetStatusRequest) (*clustermgmt.GetStatusResponse, error) {
+	var ret *clustermgmt.GetStatusResponse
+
+	switch c.State() {
+	case Invalid:
+		fallthrough
+	case Stopping:
+		fallthrough
+	case Starting:
+		fallthrough
+	case Joining:
+		ret = &clustermgmt.GetStatusResponse{
+			ClusterName: c.Name(),
+			LocalState:  c.State().String(),
+			LocalRole:   c.Role().String(),
+			Error: &clustermgmt.Error{
+				ErrorCode: clustermgmt.Error_INVALID,
+				Message:   fmt.Sprintf("Not in a cluster. State is %s", c.State().String()),
+			},
+		}
+
+	case Operational:
+		fallthrough
+	case Voting:
+		fallthrough
+	case Resharding:
+		ret = &clustermgmt.GetStatusResponse{
+			ClusterName:   c.Name(),
+			LocalNodeId:   c.NodeID(),
+			LocalState:    c.State().String(),
+			LocalRole:     c.Role().String(),
+			RaftNodeCount: 0,
+			SerfNodeCount: 0,
+			LeaderNodeId:  "",
+		}
+
+		if c.raftNode.Leader() {
+			ret.RaftNodeCount = int32(c.raftNode.Nodes.Size())
+			ret.SerfNodeCount = int32(c.serfNode.Size())
+			ret.LeaderNodeId = c.NodeID()
+			ret.ShardCount = int32(c.shardManager.ShardCount())
+			ret.ShardWeight = int32(c.shardManager.TotalWeight())
+		} else {
+			if c.State() != Voting {
+				leader, err := c.leaderManagementClient()
+				if err != nil {
+					return nil, err
+				}
+				leaderRet, err := leader.GetStatus(ctx, req)
+				if err != nil {
+					return nil, err
+				}
+				ret.RaftNodeCount = leaderRet.RaftNodeCount
+				ret.SerfNodeCount = leaderRet.SerfNodeCount
+				ret.LeaderNodeId = leaderRet.LocalNodeId
+				ret.ShardCount = leaderRet.ShardCount
+				ret.ShardWeight = leaderRet.ShardWeight
+			}
+		}
+	}
+	return ret, nil
 }
 
 func (c *clusterfunkCluster) ListNodes(context.Context, *clustermgmt.ListNodesRequest) (*clustermgmt.ListNodesResponse, error) {
@@ -86,7 +161,7 @@ func (c *clusterfunkCluster) FindEndpoint(context.Context, *clustermgmt.Endpoint
 	return nil, errors.New("not implemented")
 }
 
-func (c *clusterfunkCluster) AddNode(context.Context, *clustermgmt.AddNodeRequest) (*clustermgmt.AddNodeResponse, error) {
+func (c *clusterfunkCluster) AddNode(ctx context.Context, req *clustermgmt.AddNodeRequest) (*clustermgmt.AddNodeResponse, error) {
 	if c.State() != Operational {
 		return &clustermgmt.AddNodeResponse{
 			Error: &clustermgmt.Error{
@@ -96,14 +171,41 @@ func (c *clusterfunkCluster) AddNode(context.Context, *clustermgmt.AddNodeReques
 		}, nil
 	}
 	if c.Role() == Leader {
+		ret := &clustermgmt.AddNodeResponse{
+			NodeId: c.NodeID(),
+		}
+		if c.raftNode.Nodes.Contains(req.NodeId) {
+			ret.Error = &clustermgmt.Error{
+				ErrorCode: clustermgmt.Error_INVALID,
+				Message:   "Node is already a member of the cluster",
+			}
+			return ret, nil
+		}
+		ep := c.GetEndpoint(req.NodeId, RaftEndpoint)
+		if ep == "" {
+			ret.Error = &clustermgmt.Error{
+				ErrorCode: clustermgmt.Error_UNKNOWN_ID,
+				Message:   "Unknown node",
+			}
+			return ret, nil
+		}
+		if err := c.raftNode.AddClusterNode(req.NodeId, ep); err != nil {
+			ret.Error = &clustermgmt.Error{
+				ErrorCode: clustermgmt.Error_GENERIC,
+				Message:   err.Error(),
+			}
+		}
 		// add the node
-		return nil, errors.New("not implemented")
+		return ret, nil
 	}
-	// proxy to the leader
-	return nil, errors.New("not implemented")
+	leader, err := c.leaderManagementClient()
+	if err != nil {
+		return nil, err
+	}
+	return leader.AddNode(ctx, req)
 }
 
-func (c *clusterfunkCluster) RemoveNode(context.Context, *clustermgmt.RemoveNodeRequest) (*clustermgmt.RemoveNodeResponse, error) {
+func (c *clusterfunkCluster) RemoveNode(ctx context.Context, req *clustermgmt.RemoveNodeRequest) (*clustermgmt.RemoveNodeResponse, error) {
 	if c.State() != Operational {
 		return &clustermgmt.RemoveNodeResponse{
 			Error: &clustermgmt.Error{
@@ -113,11 +215,31 @@ func (c *clusterfunkCluster) RemoveNode(context.Context, *clustermgmt.RemoveNode
 		}, nil
 	}
 	if c.Role() == Leader {
+		ret := &clustermgmt.RemoveNodeResponse{
+			NodeId: c.NodeID(),
+		}
+		ep := c.GetEndpoint(req.NodeId, RaftEndpoint)
+		if ep == "" || !c.raftNode.Nodes.Contains(req.NodeId) {
+			ret.Error = &clustermgmt.Error{
+				ErrorCode: clustermgmt.Error_UNKNOWN_ID,
+				Message:   "Node is not a member of the Serf cluster",
+			}
+			return ret, nil
+		}
+		if err := c.raftNode.RemoveClusterNode(req.NodeId, ep); err != nil {
+			ret.Error = &clustermgmt.Error{
+				ErrorCode: clustermgmt.Error_GENERIC,
+				Message:   err.Error(),
+			}
+		}
 		// add the node
-		return nil, errors.New("not implemented")
+		return ret, nil
 	}
-	// proxy to the leader
-	return nil, errors.New("not implemented")
+	leader, err := c.leaderManagementClient()
+	if err != nil {
+		return nil, err
+	}
+	return leader.RemoveNode(ctx, req)
 }
 
 func (c *clusterfunkCluster) ListShards(ctx context.Context, req *clustermgmt.ListShardsRequest) (*clustermgmt.ListShardsResponse, error) {

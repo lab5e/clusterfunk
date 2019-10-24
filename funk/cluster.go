@@ -137,7 +137,6 @@ const (
 	//HTTPEndpoint       = "ep.http"       // HTTPEndpoint is the HTTP endpoint
 	SerfEndpoint       = "ep.serf"
 	RaftEndpoint       = "ep.raft"
-	LeaderEndpoint     = "ep.leader"
 	ManagementEndpoint = "ep.management" //  gRPC endpoint for management
 	LivenessEndpoint   = "ep.liveness"
 )

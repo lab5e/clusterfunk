@@ -6,7 +6,7 @@ package clustermgmt;
 // operations must happen on the leader in the cluster.
 service ClusterManagement {
     // GetState returns the cluster state of the local node.
-    rpc GetState(GetStateRequest) returns (GetStateResponse);
+    rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
 
     // ListNodes lists the known nodes in the cluster, as seen by the leader.
     rpc ListNodes(ListNodesRequest) returns (ListNodesResponse);
@@ -38,30 +38,30 @@ service ClusterManagement {
 message Error {
     enum Code {
         OK = 0;
-        NO_LEADER = 1;
-        NOT_FOUND = 2;
-        ERROR = 3;
-
+        INVALID = 1;
+        NO_LEADER = 2;
+        GENERIC = 3;
+        UNKNOWN_ID = 4;
     };
     Code ErrorCode  = 1;
     string Message = 2;
 }
 
-// GetStateRequest
-message GetStateRequest {};
+// GetStatusRequest
+message GetStatusRequest {};
 
-// GetStateResponse
-message GetStateResponse {
-  string NodeId = 1;
-  enum ClusterState {
-    OK = 0;
-    VOTING = 1;
-    RESHARDING = 2;
-  };
-  ClusterState State = 2;
-  int32 NodeCount = 3;
-  int32 VoterCount = 4;
-  Error Error = 5;
+// GetStatusResponse
+message GetStatusResponse {
+  string LocalNodeId = 1;
+  string LeaderNodeId = 2;
+  int32 RaftNodeCount = 3;
+  int32 SerfNodeCount = 4;
+  string LocalRole = 5;
+  string LocalState = 6;
+  string ClusterName = 7;
+  int32 ShardCount = 8;
+  int32 ShardWeight = 9;
+  Error Error = 10;
 };
 
 // NodeInfo contains information on a single node in the cluster/swarm
@@ -106,7 +106,9 @@ message EndpointResponse {
 }
 
 // Messages for the AddNode method
-message AddNodeRequest {};
+message AddNodeRequest {
+    string NodeId = 1;
+};
 
 // AddNodeResponse
 message AddNodeResponse {
@@ -115,7 +117,9 @@ message AddNodeResponse {
 };
 
 // RemoveNodeRequest
-message RemoveNodeRequest {};
+message RemoveNodeRequest {
+    string NodeId = 1;
+};
 
 // RemoveNodeResponse
 message RemoveNodeResponse {

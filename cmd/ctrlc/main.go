@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"os"
+	"time"
 
 	"github.com/stalehd/clusterfunk/clientfunk"
 	"github.com/stalehd/clusterfunk/funk/clustermgmt"
@@ -37,25 +40,25 @@ func main() {
 
 	args := flag.Args()
 	if len(args) == 0 {
-		fmt.Println("No command specfied")
+		fmt.Fprintf(os.Stderr, "No command specfied\n")
 		return
 	}
 
 	if config.Endpoint == "" && config.Zeroconf {
 		if config.Zeroconf && config.ClusterName == "" {
-			fmt.Printf("Needs a cluster name if zeroconf is to be used for discovery")
+			fmt.Fprintf(os.Stderr, "Needs a cluster name if zeroconf is to be used for discovery")
 			return
 		}
 		ep, err := clientfunk.ZeroconfManagementLookup(config.ClusterName)
 		if err != nil {
-			fmt.Printf("Unable to do zeroconf lookup: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Unable to do zeroconf lookup: %v\n", err)
 			return
 		}
 		config.Endpoint = ep
 	}
 
 	if config.Endpoint == "" {
-		fmt.Println("Need an endpoint for one of the cluster nodes")
+		fmt.Fprintf(os.Stderr, "Need an endpoint for one of the cluster nodes")
 		return
 	}
 
@@ -64,27 +67,30 @@ func main() {
 	}
 	opts, err := toolbox.GetGRPCDialOpts(grpcParams)
 	if err != nil {
-		fmt.Printf("Could not create GRPC dial options: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Could not create GRPC dial options: %v\n", err)
 		return
 	}
 	conn, err := grpc.Dial(config.Endpoint, opts...)
 	if err != nil {
-		fmt.Printf("Could not dial management endpoint: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Could not dial management endpoint: %v\n", err)
 		return
 	}
 	client := clustermgmt.NewClusterManagementClient(conn)
 
 	switch args[0] {
+	case cmdStatus:
+		status(client)
+
 	case cmdAddNode:
 		if len(args) != 2 {
-			fmt.Printf("Need ID for %s\n", cmdAddNode)
+			fmt.Fprintf(os.Stderr, "Need ID for %s\n", cmdAddNode)
 			return
 		}
 		addNode(args[1], client)
 
 	case cmdRemoveNode:
 		if len(args) != 2 {
-			fmt.Printf("Need ID for %s\n", cmdRemoveNode)
+			fmt.Fprintf(os.Stderr, "Need ID for %s\n", cmdRemoveNode)
 			return
 		}
 		removeNode(args[1], client)
@@ -106,31 +112,78 @@ func main() {
 		stepDown(client)
 
 	default:
-		fmt.Printf("Unknown command: %s\n", args[0])
+		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", args[0])
 		return
 	}
 }
 
+const (
+	gRPCTimeout = 1 * time.Second
+)
+
+func status(client clustermgmt.ClusterManagementClient) {
+	ctx, done := context.WithTimeout(context.Background(), gRPCTimeout)
+	defer done()
+	res, err := client.GetStatus(ctx, &clustermgmt.GetStatusRequest{})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error retrieving status: %v\n", err)
+		return
+	}
+	fmt.Printf("Cluster name: %s\n", res.ClusterName)
+	fmt.Printf("Node ID:      %s\n", res.LocalNodeId)
+	fmt.Printf("State:        %s\n", res.LocalState)
+	fmt.Printf("Role:         %s\n", res.LocalRole)
+	fmt.Printf("Leader ID:    %s\n", res.LeaderNodeId)
+	fmt.Printf("Nodes:        %d Raft, %d Serf\n", res.RaftNodeCount, res.SerfNodeCount)
+	fmt.Printf("Shards:       %d (total weight: %d)\n\n", res.ShardCount, res.ShardWeight)
+}
+
 func addNode(id string, client clustermgmt.ClusterManagementClient) {
-	fmt.Println("add node")
+	ctx, done := context.WithTimeout(context.Background(), gRPCTimeout)
+	defer done()
+	res, err := client.AddNode(ctx, &clustermgmt.AddNodeRequest{
+		NodeId: id,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error adding node: %v\n", err)
+		return
+	}
+	if res.Error != nil {
+		fmt.Fprintf(os.Stderr, "Leader could not add node: %v\n", res.Error.Message)
+		return
+	}
+	fmt.Printf("Node %s added to cluster\n", id)
 }
 
 func removeNode(id string, client clustermgmt.ClusterManagementClient) {
-	fmt.Println("remove node")
+	ctx, done := context.WithTimeout(context.Background(), gRPCTimeout)
+	defer done()
+	res, err := client.RemoveNode(ctx, &clustermgmt.RemoveNodeRequest{
+		NodeId: id,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error removing node: %v\n", err)
+		return
+	}
+	if res.Error != nil {
+		fmt.Fprintf(os.Stderr, "Leader could not remove node: %v\n", res.Error.Message)
+		return
+	}
+	fmt.Printf("Node %s removed from cluster\n", id)
 }
 
 func listEndpoints(filter string, client clustermgmt.ClusterManagementClient) {
-	fmt.Println("list endpoints")
+	fmt.Fprintf(os.Stderr, "list endpoints")
 }
 
 func listNodes(client clustermgmt.ClusterManagementClient) {
-	fmt.Println("list nodes")
+	fmt.Fprintf(os.Stderr, "list nodes")
 }
 
 func listShards(client clustermgmt.ClusterManagementClient) {
-	fmt.Println("list shards")
+	fmt.Fprintf(os.Stderr, "list shards")
 }
 
 func stepDown(client clustermgmt.ClusterManagementClient) {
-	fmt.Println("step down")
+	fmt.Fprintf(os.Stderr, "step down")
 }

@@ -216,6 +216,12 @@ func (sm *weightedShardManager) TotalWeight() int {
 	return sm.totalWeight
 }
 
+func (sm *weightedShardManager) ShardCount() int {
+	sm.mutex.RLock()
+	defer sm.mutex.RUnlock()
+	return len(sm.shards)
+}
+
 func (sm *weightedShardManager) NodeList() []string {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()

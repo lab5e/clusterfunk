@@ -10,15 +10,16 @@ import "errors"
 
 // --- temp methods below
 
-// RaftNodeTemp is ... a temp struct
-type RaftNodeTemp struct {
+// nodeList is ... a temp struct
+type nodeItem struct {
 	ID     string
 	State  string
 	Leader bool
 }
 
-// MemberList returns a list of nodes in the raft cluster
-func (r *RaftNode) MemberList() ([]RaftNodeTemp, error) {
+// memberList returns a list of nodes in the raft cluster. This might be a
+// keeper. It's used to find the leader but it's quite inefficient
+func (r *RaftNode) memberList() ([]nodeItem, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	if r.ra == nil {
@@ -31,9 +32,9 @@ func (r *RaftNode) MemberList() ([]RaftNodeTemp, error) {
 	leader := r.ra.Leader()
 
 	members := config.Configuration().Servers
-	ret := make([]RaftNodeTemp, len(members))
+	ret := make([]nodeItem, len(members))
 	for i, v := range members {
-		ret[i] = RaftNodeTemp{
+		ret[i] = nodeItem{
 			ID:     string(v.ID),
 			State:  v.Suffrage.String(),
 			Leader: (v.Address == leader),

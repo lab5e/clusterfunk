@@ -89,3 +89,15 @@ func (s *StringSet) Clear() {
 
 	s.Strings = []string{}
 }
+
+// Contains returns true if the set contains the string
+func (s *StringSet) Contains(e string) bool {
+	s.Mutex.RLock()
+	defer s.Mutex.RUnlock()
+	for _, v := range s.Strings {
+		if e == v {
+			return true
+		}
+	}
+	return false
+}

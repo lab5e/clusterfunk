@@ -54,6 +54,9 @@ type ShardManager interface {
 	// its weight.
 	TotalWeight() int
 
+	// ShardCount returns the number of shards
+	ShardCount() int
+
 	// NodeList returns a list of nodes in the shard map
 	NodeList() []string
 

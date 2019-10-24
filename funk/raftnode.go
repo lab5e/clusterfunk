@@ -534,6 +534,25 @@ func (r *RaftNode) DisableNode(id string) {
 	r.removeNode(id)
 }
 
+// LeaderNodeID returns the Node ID for the leader
+func (r *RaftNode) LeaderNodeID() string {
+	if r.Leader() {
+		return r.LocalNodeID()
+	}
+
+	list, err := r.memberList()
+	if err != nil {
+		// TODO: Handle gracefully (sort of - this will end up as an error later)
+		return ""
+	}
+	for _, v := range list {
+		if v.Leader {
+			return v.ID
+		}
+	}
+	return ""
+}
+
 // The raft.FSM implementation. Right now the implementation looks a lot more
 // like a storage layer but technically it's a FSM
 
