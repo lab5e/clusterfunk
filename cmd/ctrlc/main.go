@@ -1,10 +1,8 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
-	"time"
 
 	"github.com/stalehd/clusterfunk/clientfunk"
 	"github.com/stalehd/clusterfunk/funk/clustermgmt"
@@ -13,16 +11,19 @@ import (
 )
 
 type parameters struct {
-	ClusterName  string `param:"desc=Cluster name;default=demo"`
-	Zeroconf     bool   `param:"desc=Use zeroconf discovery for Serf;default=true"`
-	Command      string `param:"desc=Command to execute;option=get-state,list-ndoes"`
-	ShowInactive bool   `param:"desc=Show inactive nodes;default=false"`
-	GRPCClient   toolbox.GRPCClientParam
+	ClusterName string `param:"desc=Cluster name;default=demo"`
+	Zeroconf    bool   `param:"desc=Use zeroconf discovery for Serf;default=true"`
+	Endpoint    string `param:"desc=Management endpoint to use"`
 }
 
 const (
-	cmdGetState  = "get-state"
-	cmdListNodes = "list-nodes"
+	cmdStatus     = "status"
+	cmdNodes      = "nodes"
+	cmdEndpoints  = "endpoints"
+	cmdAddNode    = "add-node"
+	cmdRemoveNode = "remove-node"
+	cmdShards     = "shards"
+	cmdStepDown   = "step-down"
 )
 
 type commandRunner func(clustermgmt.ClusterManagementClient, parameters)
@@ -31,12 +32,16 @@ func main() {
 	var config parameters
 	flag.StringVar(&config.ClusterName, "cluster-name", "demo", "Name of cluster to connect with")
 	flag.BoolVar(&config.Zeroconf, "zeroconf", true, "Use Zeroconf to locate endpoints")
-	flag.StringVar(&config.GRPCClient.ServerEndpoint, "endpoint", "", "Management server endpoint")
-	flag.StringVar(&config.Command, "cmd", "get-state", "Command to execute (get-state, list-nodes)")
-	flag.BoolVar(&config.ShowInactive, "show-inactive", false, "Show inactive nodes in lists")
+	flag.StringVar(&config.Endpoint, "endpoint", "", "Management endpoint")
 	flag.Parse()
 
-	if config.GRPCClient.ServerEndpoint == "" && config.Zeroconf {
+	args := flag.Args()
+	if len(args) == 0 {
+		fmt.Println("No command specfied")
+		return
+	}
+
+	if config.Endpoint == "" && config.Zeroconf {
 		if config.Zeroconf && config.ClusterName == "" {
 			fmt.Printf("Needs a cluster name if zeroconf is to be used for discovery")
 			return
@@ -46,64 +51,86 @@ func main() {
 			fmt.Printf("Unable to do zeroconf lookup: %v\n", err)
 			return
 		}
-		config.GRPCClient.ServerEndpoint = ep
+		config.Endpoint = ep
 	}
 
-	if config.GRPCClient.ServerEndpoint == "" {
+	if config.Endpoint == "" {
 		fmt.Println("Need an endpoint for one of the cluster nodes")
 		return
 	}
-	opts, err := toolbox.GetGRPCDialOpts(config.GRPCClient)
+
+	grpcParams := toolbox.GRPCClientParam{
+		ServerEndpoint: config.Endpoint,
+	}
+	opts, err := toolbox.GetGRPCDialOpts(grpcParams)
 	if err != nil {
 		fmt.Printf("Could not create GRPC dial options: %v\n", err)
 		return
 	}
-	conn, err := grpc.Dial(config.GRPCClient.ServerEndpoint, opts...)
+	conn, err := grpc.Dial(config.Endpoint, opts...)
 	if err != nil {
 		fmt.Printf("Could not dial management endpoint: %v\n", err)
 		return
 	}
 	client := clustermgmt.NewClusterManagementClient(conn)
 
-	var runCommand commandRunner
-	switch config.Command {
-	case cmdGetState:
-		runCommand = getState
-	case cmdListNodes:
-		runCommand = listNodes
+	switch args[0] {
+	case cmdAddNode:
+		if len(args) != 2 {
+			fmt.Printf("Need ID for %s\n", cmdAddNode)
+			return
+		}
+		addNode(args[1], client)
+
+	case cmdRemoveNode:
+		if len(args) != 2 {
+			fmt.Printf("Need ID for %s\n", cmdRemoveNode)
+			return
+		}
+		removeNode(args[1], client)
+
+	case cmdEndpoints:
+		epFilter := ""
+		if len(args) > 1 {
+			epFilter = args[1]
+		}
+		listEndpoints(epFilter, client)
+
+	case cmdNodes:
+		listNodes(client)
+
+	case cmdShards:
+		listShards(client)
+
+	case cmdStepDown:
+		stepDown(client)
+
 	default:
-		fmt.Printf("Unknown command: %s\n", config.Command)
+		fmt.Printf("Unknown command: %s\n", args[0])
 		return
 	}
-
-	runCommand(client, config)
 }
 
-func getState(client clustermgmt.ClusterManagementClient, config parameters) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
-	defer cancel()
-
-	res, err := client.GetState(ctx, &clustermgmt.GetStateRequest{})
-	if err != nil {
-		fmt.Printf("Error callling GetState on node: %v\n", err)
-		return
-	}
-
-	fmt.Println("------------------------------------------------------------------------------")
-	fmt.Printf("Node ID:    %s\n", res.NodeId)
-	fmt.Printf("State: %s\n", res.State.String())
-	fmt.Printf("Nodes: %d\n", res.NodeCount)
-	fmt.Println("------------------------------------------------------------------------------")
+func addNode(id string, client clustermgmt.ClusterManagementClient) {
+	fmt.Println("add node")
 }
 
-func listNodes(client clustermgmt.ClusterManagementClient, config parameters) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
-	defer cancel()
+func removeNode(id string, client clustermgmt.ClusterManagementClient) {
+	fmt.Println("remove node")
+}
 
-	_, err := client.ListNodes(ctx, &clustermgmt.ListNodesRequest{})
-	if err != nil {
-		fmt.Printf("Error callling ListNodes on node: %v\n", err)
-		return
-	}
+func listEndpoints(filter string, client clustermgmt.ClusterManagementClient) {
+	fmt.Println("list endpoints")
+}
 
+func listNodes(client clustermgmt.ClusterManagementClient) {
+	fmt.Println("list nodes")
+}
+
+func listShards(client clustermgmt.ClusterManagementClient) {
+	fmt.Println("list shards")
+}
+
+func stepDown(client clustermgmt.ClusterManagementClient) {
+	fmt.Println("step down")
 }

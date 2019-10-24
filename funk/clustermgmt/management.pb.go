@@ -4,9 +4,9 @@
 package clustermgmt
 
 import (
+	context "context"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
-	context "golang.org/x/net/context"
 	grpc "google.golang.org/grpc"
 	math "math"
 )
@@ -20,23 +20,57 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
+
+type Error_Code int32
+
+const (
+	Error_OK        Error_Code = 0
+	Error_NO_LEADER Error_Code = 1
+	Error_NOT_FOUND Error_Code = 2
+	Error_ERROR     Error_Code = 3
+)
+
+var Error_Code_name = map[int32]string{
+	0: "OK",
+	1: "NO_LEADER",
+	2: "NOT_FOUND",
+	3: "ERROR",
+}
+
+var Error_Code_value = map[string]int32{
+	"OK":        0,
+	"NO_LEADER": 1,
+	"NOT_FOUND": 2,
+	"ERROR":     3,
+}
+
+func (x Error_Code) String() string {
+	return proto.EnumName(Error_Code_name, int32(x))
+}
+
+func (Error_Code) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_edc174f991dc0a25, []int{0, 0}
+}
 
 type GetStateResponse_ClusterState int32
 
 const (
-	GetStateResponse_OK     GetStateResponse_ClusterState = 0
-	GetStateResponse_VOTING GetStateResponse_ClusterState = 1
+	GetStateResponse_OK         GetStateResponse_ClusterState = 0
+	GetStateResponse_VOTING     GetStateResponse_ClusterState = 1
+	GetStateResponse_RESHARDING GetStateResponse_ClusterState = 2
 )
 
 var GetStateResponse_ClusterState_name = map[int32]string{
 	0: "OK",
 	1: "VOTING",
+	2: "RESHARDING",
 }
 
 var GetStateResponse_ClusterState_value = map[string]int32{
-	"OK":     0,
-	"VOTING": 1,
+	"OK":         0,
+	"VOTING":     1,
+	"RESHARDING": 2,
 }
 
 func (x GetStateResponse_ClusterState) String() string {
@@ -44,7 +78,7 @@ func (x GetStateResponse_ClusterState) String() string {
 }
 
 func (GetStateResponse_ClusterState) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_edc174f991dc0a25, []int{1, 0}
+	return fileDescriptor_edc174f991dc0a25, []int{2, 0}
 }
 
 type NodeInfo_NodeKind int32
@@ -78,44 +112,56 @@ func (NodeInfo_NodeKind) EnumDescriptor() ([]byte, []int) {
 	return fileDescriptor_edc174f991dc0a25, []int{3, 0}
 }
 
-// NodeState is the state of nodes. See godoc comments for a description
-type NodeInfo_NodeState int32
-
-const (
-	NodeInfo_INITIALIZED  NodeInfo_NodeState = 0
-	NodeInfo_READY        NodeInfo_NodeState = 1
-	NodeInfo_SERVING      NodeInfo_NodeState = 2
-	NodeInfo_REORGANIZING NodeInfo_NodeState = 3
-	NodeInfo_DRAINING     NodeInfo_NodeState = 4
-	NodeInfo_TERMINATING  NodeInfo_NodeState = 5
-)
-
-var NodeInfo_NodeState_name = map[int32]string{
-	0: "INITIALIZED",
-	1: "READY",
-	2: "SERVING",
-	3: "REORGANIZING",
-	4: "DRAINING",
-	5: "TERMINATING",
+// Errors is the various error codes that might be returned. The values are
+// should be fairly obvious.
+type Error struct {
+	ErrorCode            Error_Code `protobuf:"varint,1,opt,name=ErrorCode,proto3,enum=clustermgmt.Error_Code" json:"ErrorCode,omitempty"`
+	Message              string     `protobuf:"bytes,2,opt,name=Message,proto3" json:"Message,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}   `json:"-"`
+	XXX_unrecognized     []byte     `json:"-"`
+	XXX_sizecache        int32      `json:"-"`
 }
 
-var NodeInfo_NodeState_value = map[string]int32{
-	"INITIALIZED":  0,
-	"READY":        1,
-	"SERVING":      2,
-	"REORGANIZING": 3,
-	"DRAINING":     4,
-	"TERMINATING":  5,
+func (m *Error) Reset()         { *m = Error{} }
+func (m *Error) String() string { return proto.CompactTextString(m) }
+func (*Error) ProtoMessage()    {}
+func (*Error) Descriptor() ([]byte, []int) {
+	return fileDescriptor_edc174f991dc0a25, []int{0}
 }
 
-func (x NodeInfo_NodeState) String() string {
-	return proto.EnumName(NodeInfo_NodeState_name, int32(x))
+func (m *Error) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Error.Unmarshal(m, b)
+}
+func (m *Error) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Error.Marshal(b, m, deterministic)
+}
+func (m *Error) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Error.Merge(m, src)
+}
+func (m *Error) XXX_Size() int {
+	return xxx_messageInfo_Error.Size(m)
+}
+func (m *Error) XXX_DiscardUnknown() {
+	xxx_messageInfo_Error.DiscardUnknown(m)
 }
 
-func (NodeInfo_NodeState) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_edc174f991dc0a25, []int{3, 1}
+var xxx_messageInfo_Error proto.InternalMessageInfo
+
+func (m *Error) GetErrorCode() Error_Code {
+	if m != nil {
+		return m.ErrorCode
+	}
+	return Error_OK
 }
 
+func (m *Error) GetMessage() string {
+	if m != nil {
+		return m.Message
+	}
+	return ""
+}
+
+// GetStateRequest
 type GetStateRequest struct {
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
@@ -126,7 +172,7 @@ func (m *GetStateRequest) Reset()         { *m = GetStateRequest{} }
 func (m *GetStateRequest) String() string { return proto.CompactTextString(m) }
 func (*GetStateRequest) ProtoMessage()    {}
 func (*GetStateRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_edc174f991dc0a25, []int{0}
+	return fileDescriptor_edc174f991dc0a25, []int{1}
 }
 
 func (m *GetStateRequest) XXX_Unmarshal(b []byte) error {
@@ -147,11 +193,13 @@ func (m *GetStateRequest) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_GetStateRequest proto.InternalMessageInfo
 
+// GetStateResponse
 type GetStateResponse struct {
 	NodeId               string                        `protobuf:"bytes,1,opt,name=NodeId,proto3" json:"NodeId,omitempty"`
 	State                GetStateResponse_ClusterState `protobuf:"varint,2,opt,name=State,proto3,enum=clustermgmt.GetStateResponse_ClusterState" json:"State,omitempty"`
 	NodeCount            int32                         `protobuf:"varint,3,opt,name=NodeCount,proto3" json:"NodeCount,omitempty"`
 	VoterCount           int32                         `protobuf:"varint,4,opt,name=VoterCount,proto3" json:"VoterCount,omitempty"`
+	Error                *Error                        `protobuf:"bytes,5,opt,name=Error,proto3" json:"Error,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                      `json:"-"`
 	XXX_unrecognized     []byte                        `json:"-"`
 	XXX_sizecache        int32                         `json:"-"`
@@ -161,7 +209,7 @@ func (m *GetStateResponse) Reset()         { *m = GetStateResponse{} }
 func (m *GetStateResponse) String() string { return proto.CompactTextString(m) }
 func (*GetStateResponse) ProtoMessage()    {}
 func (*GetStateResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_edc174f991dc0a25, []int{1}
+	return fileDescriptor_edc174f991dc0a25, []int{2}
 }
 
 func (m *GetStateResponse) XXX_Unmarshal(b []byte) error {
@@ -210,63 +258,21 @@ func (m *GetStateResponse) GetVoterCount() int32 {
 	return 0
 }
 
-type EndpointInfo struct {
-	Name                 string   `protobuf:"bytes,1,opt,name=Name,proto3" json:"Name,omitempty"`
-	HostPort             string   `protobuf:"bytes,2,opt,name=HostPort,proto3" json:"HostPort,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *EndpointInfo) Reset()         { *m = EndpointInfo{} }
-func (m *EndpointInfo) String() string { return proto.CompactTextString(m) }
-func (*EndpointInfo) ProtoMessage()    {}
-func (*EndpointInfo) Descriptor() ([]byte, []int) {
-	return fileDescriptor_edc174f991dc0a25, []int{2}
-}
-
-func (m *EndpointInfo) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_EndpointInfo.Unmarshal(m, b)
-}
-func (m *EndpointInfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_EndpointInfo.Marshal(b, m, deterministic)
-}
-func (m *EndpointInfo) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_EndpointInfo.Merge(m, src)
-}
-func (m *EndpointInfo) XXX_Size() int {
-	return xxx_messageInfo_EndpointInfo.Size(m)
-}
-func (m *EndpointInfo) XXX_DiscardUnknown() {
-	xxx_messageInfo_EndpointInfo.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_EndpointInfo proto.InternalMessageInfo
-
-func (m *EndpointInfo) GetName() string {
+func (m *GetStateResponse) GetError() *Error {
 	if m != nil {
-		return m.Name
+		return m.Error
 	}
-	return ""
-}
-
-func (m *EndpointInfo) GetHostPort() string {
-	if m != nil {
-		return m.HostPort
-	}
-	return ""
+	return nil
 }
 
 // NodeInfo contains information on a single node in the cluster/swarm
 type NodeInfo struct {
 	// NodeId is the node's identifier.
-	NodeId               string             `protobuf:"bytes,1,opt,name=NodeId,proto3" json:"NodeId,omitempty"`
-	Kind                 NodeInfo_NodeKind  `protobuf:"varint,2,opt,name=Kind,proto3,enum=clustermgmt.NodeInfo_NodeKind" json:"Kind,omitempty"`
-	State                NodeInfo_NodeState `protobuf:"varint,3,opt,name=State,proto3,enum=clustermgmt.NodeInfo_NodeState" json:"State,omitempty"`
-	Endpoints            []*EndpointInfo    `protobuf:"bytes,4,rep,name=Endpoints,proto3" json:"Endpoints,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}           `json:"-"`
-	XXX_unrecognized     []byte             `json:"-"`
-	XXX_sizecache        int32              `json:"-"`
+	NodeId               string            `protobuf:"bytes,1,opt,name=NodeId,proto3" json:"NodeId,omitempty"`
+	Kind                 NodeInfo_NodeKind `protobuf:"varint,2,opt,name=Kind,proto3,enum=clustermgmt.NodeInfo_NodeKind" json:"Kind,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
+	XXX_unrecognized     []byte            `json:"-"`
+	XXX_sizecache        int32             `json:"-"`
 }
 
 func (m *NodeInfo) Reset()         { *m = NodeInfo{} }
@@ -308,26 +314,45 @@ func (m *NodeInfo) GetKind() NodeInfo_NodeKind {
 	return NodeInfo_LEADER
 }
 
-func (m *NodeInfo) GetState() NodeInfo_NodeState {
-	if m != nil {
-		return m.State
-	}
-	return NodeInfo_INITIALIZED
+// ListNodesRequest
+type ListNodesRequest struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *NodeInfo) GetEndpoints() []*EndpointInfo {
-	if m != nil {
-		return m.Endpoints
-	}
-	return nil
+func (m *ListNodesRequest) Reset()         { *m = ListNodesRequest{} }
+func (m *ListNodesRequest) String() string { return proto.CompactTextString(m) }
+func (*ListNodesRequest) ProtoMessage()    {}
+func (*ListNodesRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_edc174f991dc0a25, []int{4}
 }
 
-// ListSerfNodesResponse is the response to a ListSerfNodes call. The number of
+func (m *ListNodesRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ListNodesRequest.Unmarshal(m, b)
+}
+func (m *ListNodesRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ListNodesRequest.Marshal(b, m, deterministic)
+}
+func (m *ListNodesRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ListNodesRequest.Merge(m, src)
+}
+func (m *ListNodesRequest) XXX_Size() int {
+	return xxx_messageInfo_ListNodesRequest.Size(m)
+}
+func (m *ListNodesRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_ListNodesRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ListNodesRequest proto.InternalMessageInfo
+
+// ListNodesResponse is the response to a ListSerfNodes call. The number of
 // Serf nodes will initially be quite small so we won't need a stream response
 // here.
 type ListNodesResponse struct {
 	NodeId               string      `protobuf:"bytes,1,opt,name=NodeId,proto3" json:"NodeId,omitempty"`
 	Nodes                []*NodeInfo `protobuf:"bytes,2,rep,name=Nodes,proto3" json:"Nodes,omitempty"`
+	Error                *Error      `protobuf:"bytes,3,opt,name=Error,proto3" json:"Error,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}    `json:"-"`
 	XXX_unrecognized     []byte      `json:"-"`
 	XXX_sizecache        int32       `json:"-"`
@@ -337,7 +362,7 @@ func (m *ListNodesResponse) Reset()         { *m = ListNodesResponse{} }
 func (m *ListNodesResponse) String() string { return proto.CompactTextString(m) }
 func (*ListNodesResponse) ProtoMessage()    {}
 func (*ListNodesResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_edc174f991dc0a25, []int{4}
+	return fileDescriptor_edc174f991dc0a25, []int{5}
 }
 
 func (m *ListNodesResponse) XXX_Unmarshal(b []byte) error {
@@ -372,84 +397,542 @@ func (m *ListNodesResponse) GetNodes() []*NodeInfo {
 	return nil
 }
 
-type ListNodesRequest struct {
+func (m *ListNodesResponse) GetError() *Error {
+	if m != nil {
+		return m.Error
+	}
+	return nil
+}
+
+type EndpointRequest struct {
+	EndpointName         string   `protobuf:"bytes,1,opt,name=EndpointName,proto3" json:"EndpointName,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *ListNodesRequest) Reset()         { *m = ListNodesRequest{} }
-func (m *ListNodesRequest) String() string { return proto.CompactTextString(m) }
-func (*ListNodesRequest) ProtoMessage()    {}
-func (*ListNodesRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_edc174f991dc0a25, []int{5}
+func (m *EndpointRequest) Reset()         { *m = EndpointRequest{} }
+func (m *EndpointRequest) String() string { return proto.CompactTextString(m) }
+func (*EndpointRequest) ProtoMessage()    {}
+func (*EndpointRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_edc174f991dc0a25, []int{6}
 }
 
-func (m *ListNodesRequest) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_ListNodesRequest.Unmarshal(m, b)
+func (m *EndpointRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_EndpointRequest.Unmarshal(m, b)
 }
-func (m *ListNodesRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_ListNodesRequest.Marshal(b, m, deterministic)
+func (m *EndpointRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_EndpointRequest.Marshal(b, m, deterministic)
 }
-func (m *ListNodesRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ListNodesRequest.Merge(m, src)
+func (m *EndpointRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_EndpointRequest.Merge(m, src)
 }
-func (m *ListNodesRequest) XXX_Size() int {
-	return xxx_messageInfo_ListNodesRequest.Size(m)
+func (m *EndpointRequest) XXX_Size() int {
+	return xxx_messageInfo_EndpointRequest.Size(m)
 }
-func (m *ListNodesRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_ListNodesRequest.DiscardUnknown(m)
+func (m *EndpointRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_EndpointRequest.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_ListNodesRequest proto.InternalMessageInfo
+var xxx_messageInfo_EndpointRequest proto.InternalMessageInfo
+
+func (m *EndpointRequest) GetEndpointName() string {
+	if m != nil {
+		return m.EndpointName
+	}
+	return ""
+}
+
+type EndpointInfo struct {
+	NodeId               string   `protobuf:"bytes,1,opt,name=NodeId,proto3" json:"NodeId,omitempty"`
+	HostPort             string   `protobuf:"bytes,2,opt,name=HostPort,proto3" json:"HostPort,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *EndpointInfo) Reset()         { *m = EndpointInfo{} }
+func (m *EndpointInfo) String() string { return proto.CompactTextString(m) }
+func (*EndpointInfo) ProtoMessage()    {}
+func (*EndpointInfo) Descriptor() ([]byte, []int) {
+	return fileDescriptor_edc174f991dc0a25, []int{7}
+}
+
+func (m *EndpointInfo) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_EndpointInfo.Unmarshal(m, b)
+}
+func (m *EndpointInfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_EndpointInfo.Marshal(b, m, deterministic)
+}
+func (m *EndpointInfo) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_EndpointInfo.Merge(m, src)
+}
+func (m *EndpointInfo) XXX_Size() int {
+	return xxx_messageInfo_EndpointInfo.Size(m)
+}
+func (m *EndpointInfo) XXX_DiscardUnknown() {
+	xxx_messageInfo_EndpointInfo.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_EndpointInfo proto.InternalMessageInfo
+
+func (m *EndpointInfo) GetNodeId() string {
+	if m != nil {
+		return m.NodeId
+	}
+	return ""
+}
+
+func (m *EndpointInfo) GetHostPort() string {
+	if m != nil {
+		return m.HostPort
+	}
+	return ""
+}
+
+type EndpointResponse struct {
+	NodeId               string          `protobuf:"bytes,1,opt,name=NodeId,proto3" json:"NodeId,omitempty"`
+	Error                *Error          `protobuf:"bytes,2,opt,name=Error,proto3" json:"Error,omitempty"`
+	Endpoints            []*EndpointInfo `protobuf:"bytes,3,rep,name=Endpoints,proto3" json:"Endpoints,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}        `json:"-"`
+	XXX_unrecognized     []byte          `json:"-"`
+	XXX_sizecache        int32           `json:"-"`
+}
+
+func (m *EndpointResponse) Reset()         { *m = EndpointResponse{} }
+func (m *EndpointResponse) String() string { return proto.CompactTextString(m) }
+func (*EndpointResponse) ProtoMessage()    {}
+func (*EndpointResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_edc174f991dc0a25, []int{8}
+}
+
+func (m *EndpointResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_EndpointResponse.Unmarshal(m, b)
+}
+func (m *EndpointResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_EndpointResponse.Marshal(b, m, deterministic)
+}
+func (m *EndpointResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_EndpointResponse.Merge(m, src)
+}
+func (m *EndpointResponse) XXX_Size() int {
+	return xxx_messageInfo_EndpointResponse.Size(m)
+}
+func (m *EndpointResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_EndpointResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_EndpointResponse proto.InternalMessageInfo
+
+func (m *EndpointResponse) GetNodeId() string {
+	if m != nil {
+		return m.NodeId
+	}
+	return ""
+}
+
+func (m *EndpointResponse) GetError() *Error {
+	if m != nil {
+		return m.Error
+	}
+	return nil
+}
+
+func (m *EndpointResponse) GetEndpoints() []*EndpointInfo {
+	if m != nil {
+		return m.Endpoints
+	}
+	return nil
+}
+
+// Messages for the AddNode method
+type AddNodeRequest struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *AddNodeRequest) Reset()         { *m = AddNodeRequest{} }
+func (m *AddNodeRequest) String() string { return proto.CompactTextString(m) }
+func (*AddNodeRequest) ProtoMessage()    {}
+func (*AddNodeRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_edc174f991dc0a25, []int{9}
+}
+
+func (m *AddNodeRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_AddNodeRequest.Unmarshal(m, b)
+}
+func (m *AddNodeRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_AddNodeRequest.Marshal(b, m, deterministic)
+}
+func (m *AddNodeRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_AddNodeRequest.Merge(m, src)
+}
+func (m *AddNodeRequest) XXX_Size() int {
+	return xxx_messageInfo_AddNodeRequest.Size(m)
+}
+func (m *AddNodeRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_AddNodeRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_AddNodeRequest proto.InternalMessageInfo
+
+// AddNodeResponse
+type AddNodeResponse struct {
+	NodeId               string   `protobuf:"bytes,1,opt,name=NodeId,proto3" json:"NodeId,omitempty"`
+	Error                *Error   `protobuf:"bytes,2,opt,name=Error,proto3" json:"Error,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *AddNodeResponse) Reset()         { *m = AddNodeResponse{} }
+func (m *AddNodeResponse) String() string { return proto.CompactTextString(m) }
+func (*AddNodeResponse) ProtoMessage()    {}
+func (*AddNodeResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_edc174f991dc0a25, []int{10}
+}
+
+func (m *AddNodeResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_AddNodeResponse.Unmarshal(m, b)
+}
+func (m *AddNodeResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_AddNodeResponse.Marshal(b, m, deterministic)
+}
+func (m *AddNodeResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_AddNodeResponse.Merge(m, src)
+}
+func (m *AddNodeResponse) XXX_Size() int {
+	return xxx_messageInfo_AddNodeResponse.Size(m)
+}
+func (m *AddNodeResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_AddNodeResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_AddNodeResponse proto.InternalMessageInfo
+
+func (m *AddNodeResponse) GetNodeId() string {
+	if m != nil {
+		return m.NodeId
+	}
+	return ""
+}
+
+func (m *AddNodeResponse) GetError() *Error {
+	if m != nil {
+		return m.Error
+	}
+	return nil
+}
+
+// RemoveNodeRequest
+type RemoveNodeRequest struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *RemoveNodeRequest) Reset()         { *m = RemoveNodeRequest{} }
+func (m *RemoveNodeRequest) String() string { return proto.CompactTextString(m) }
+func (*RemoveNodeRequest) ProtoMessage()    {}
+func (*RemoveNodeRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_edc174f991dc0a25, []int{11}
+}
+
+func (m *RemoveNodeRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_RemoveNodeRequest.Unmarshal(m, b)
+}
+func (m *RemoveNodeRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_RemoveNodeRequest.Marshal(b, m, deterministic)
+}
+func (m *RemoveNodeRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_RemoveNodeRequest.Merge(m, src)
+}
+func (m *RemoveNodeRequest) XXX_Size() int {
+	return xxx_messageInfo_RemoveNodeRequest.Size(m)
+}
+func (m *RemoveNodeRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_RemoveNodeRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_RemoveNodeRequest proto.InternalMessageInfo
+
+// RemoveNodeResponse
+type RemoveNodeResponse struct {
+	NodeId               string   `protobuf:"bytes,1,opt,name=NodeId,proto3" json:"NodeId,omitempty"`
+	Error                *Error   `protobuf:"bytes,2,opt,name=Error,proto3" json:"Error,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *RemoveNodeResponse) Reset()         { *m = RemoveNodeResponse{} }
+func (m *RemoveNodeResponse) String() string { return proto.CompactTextString(m) }
+func (*RemoveNodeResponse) ProtoMessage()    {}
+func (*RemoveNodeResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_edc174f991dc0a25, []int{12}
+}
+
+func (m *RemoveNodeResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_RemoveNodeResponse.Unmarshal(m, b)
+}
+func (m *RemoveNodeResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_RemoveNodeResponse.Marshal(b, m, deterministic)
+}
+func (m *RemoveNodeResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_RemoveNodeResponse.Merge(m, src)
+}
+func (m *RemoveNodeResponse) XXX_Size() int {
+	return xxx_messageInfo_RemoveNodeResponse.Size(m)
+}
+func (m *RemoveNodeResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_RemoveNodeResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_RemoveNodeResponse proto.InternalMessageInfo
+
+func (m *RemoveNodeResponse) GetNodeId() string {
+	if m != nil {
+		return m.NodeId
+	}
+	return ""
+}
+
+func (m *RemoveNodeResponse) GetError() *Error {
+	if m != nil {
+		return m.Error
+	}
+	return nil
+}
+
+// ListShardsRequest
+type ListShardsRequest struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *ListShardsRequest) Reset()         { *m = ListShardsRequest{} }
+func (m *ListShardsRequest) String() string { return proto.CompactTextString(m) }
+func (*ListShardsRequest) ProtoMessage()    {}
+func (*ListShardsRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_edc174f991dc0a25, []int{13}
+}
+
+func (m *ListShardsRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ListShardsRequest.Unmarshal(m, b)
+}
+func (m *ListShardsRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ListShardsRequest.Marshal(b, m, deterministic)
+}
+func (m *ListShardsRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ListShardsRequest.Merge(m, src)
+}
+func (m *ListShardsRequest) XXX_Size() int {
+	return xxx_messageInfo_ListShardsRequest.Size(m)
+}
+func (m *ListShardsRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_ListShardsRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ListShardsRequest proto.InternalMessageInfo
+
+// ListShardsResponse
+type ListShardsResponse struct {
+	NodeId               string   `protobuf:"bytes,1,opt,name=NodeId,proto3" json:"NodeId,omitempty"`
+	Error                *Error   `protobuf:"bytes,2,opt,name=Error,proto3" json:"Error,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *ListShardsResponse) Reset()         { *m = ListShardsResponse{} }
+func (m *ListShardsResponse) String() string { return proto.CompactTextString(m) }
+func (*ListShardsResponse) ProtoMessage()    {}
+func (*ListShardsResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_edc174f991dc0a25, []int{14}
+}
+
+func (m *ListShardsResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ListShardsResponse.Unmarshal(m, b)
+}
+func (m *ListShardsResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ListShardsResponse.Marshal(b, m, deterministic)
+}
+func (m *ListShardsResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ListShardsResponse.Merge(m, src)
+}
+func (m *ListShardsResponse) XXX_Size() int {
+	return xxx_messageInfo_ListShardsResponse.Size(m)
+}
+func (m *ListShardsResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_ListShardsResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ListShardsResponse proto.InternalMessageInfo
+
+func (m *ListShardsResponse) GetNodeId() string {
+	if m != nil {
+		return m.NodeId
+	}
+	return ""
+}
+
+func (m *ListShardsResponse) GetError() *Error {
+	if m != nil {
+		return m.Error
+	}
+	return nil
+}
+
+type StepDownRequest struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *StepDownRequest) Reset()         { *m = StepDownRequest{} }
+func (m *StepDownRequest) String() string { return proto.CompactTextString(m) }
+func (*StepDownRequest) ProtoMessage()    {}
+func (*StepDownRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_edc174f991dc0a25, []int{15}
+}
+
+func (m *StepDownRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_StepDownRequest.Unmarshal(m, b)
+}
+func (m *StepDownRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_StepDownRequest.Marshal(b, m, deterministic)
+}
+func (m *StepDownRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_StepDownRequest.Merge(m, src)
+}
+func (m *StepDownRequest) XXX_Size() int {
+	return xxx_messageInfo_StepDownRequest.Size(m)
+}
+func (m *StepDownRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_StepDownRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_StepDownRequest proto.InternalMessageInfo
+
+type StepDownResponse struct {
+	NodeId               string   `protobuf:"bytes,1,opt,name=NodeId,proto3" json:"NodeId,omitempty"`
+	Error                *Error   `protobuf:"bytes,2,opt,name=Error,proto3" json:"Error,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *StepDownResponse) Reset()         { *m = StepDownResponse{} }
+func (m *StepDownResponse) String() string { return proto.CompactTextString(m) }
+func (*StepDownResponse) ProtoMessage()    {}
+func (*StepDownResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_edc174f991dc0a25, []int{16}
+}
+
+func (m *StepDownResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_StepDownResponse.Unmarshal(m, b)
+}
+func (m *StepDownResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_StepDownResponse.Marshal(b, m, deterministic)
+}
+func (m *StepDownResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_StepDownResponse.Merge(m, src)
+}
+func (m *StepDownResponse) XXX_Size() int {
+	return xxx_messageInfo_StepDownResponse.Size(m)
+}
+func (m *StepDownResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_StepDownResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_StepDownResponse proto.InternalMessageInfo
+
+func (m *StepDownResponse) GetNodeId() string {
+	if m != nil {
+		return m.NodeId
+	}
+	return ""
+}
+
+func (m *StepDownResponse) GetError() *Error {
+	if m != nil {
+		return m.Error
+	}
+	return nil
+}
 
 func init() {
+	proto.RegisterEnum("clustermgmt.Error_Code", Error_Code_name, Error_Code_value)
 	proto.RegisterEnum("clustermgmt.GetStateResponse_ClusterState", GetStateResponse_ClusterState_name, GetStateResponse_ClusterState_value)
 	proto.RegisterEnum("clustermgmt.NodeInfo_NodeKind", NodeInfo_NodeKind_name, NodeInfo_NodeKind_value)
-	proto.RegisterEnum("clustermgmt.NodeInfo_NodeState", NodeInfo_NodeState_name, NodeInfo_NodeState_value)
+	proto.RegisterType((*Error)(nil), "clustermgmt.Error")
 	proto.RegisterType((*GetStateRequest)(nil), "clustermgmt.GetStateRequest")
 	proto.RegisterType((*GetStateResponse)(nil), "clustermgmt.GetStateResponse")
-	proto.RegisterType((*EndpointInfo)(nil), "clustermgmt.EndpointInfo")
 	proto.RegisterType((*NodeInfo)(nil), "clustermgmt.NodeInfo")
-	proto.RegisterType((*ListNodesResponse)(nil), "clustermgmt.ListNodesResponse")
 	proto.RegisterType((*ListNodesRequest)(nil), "clustermgmt.ListNodesRequest")
+	proto.RegisterType((*ListNodesResponse)(nil), "clustermgmt.ListNodesResponse")
+	proto.RegisterType((*EndpointRequest)(nil), "clustermgmt.EndpointRequest")
+	proto.RegisterType((*EndpointInfo)(nil), "clustermgmt.EndpointInfo")
+	proto.RegisterType((*EndpointResponse)(nil), "clustermgmt.EndpointResponse")
+	proto.RegisterType((*AddNodeRequest)(nil), "clustermgmt.AddNodeRequest")
+	proto.RegisterType((*AddNodeResponse)(nil), "clustermgmt.AddNodeResponse")
+	proto.RegisterType((*RemoveNodeRequest)(nil), "clustermgmt.RemoveNodeRequest")
+	proto.RegisterType((*RemoveNodeResponse)(nil), "clustermgmt.RemoveNodeResponse")
+	proto.RegisterType((*ListShardsRequest)(nil), "clustermgmt.ListShardsRequest")
+	proto.RegisterType((*ListShardsResponse)(nil), "clustermgmt.ListShardsResponse")
+	proto.RegisterType((*StepDownRequest)(nil), "clustermgmt.StepDownRequest")
+	proto.RegisterType((*StepDownResponse)(nil), "clustermgmt.StepDownResponse")
 }
 
 func init() { proto.RegisterFile("management.proto", fileDescriptor_edc174f991dc0a25) }
 
 var fileDescriptor_edc174f991dc0a25 = []byte{
-	// 492 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x84, 0x53, 0xdd, 0x8e, 0x12, 0x31,
-	0x14, 0xde, 0x19, 0x60, 0x64, 0x0e, 0xe8, 0x96, 0x93, 0x68, 0x46, 0xb2, 0x22, 0xe9, 0x15, 0xd1,
-	0x84, 0x0b, 0x8c, 0xf1, 0x6e, 0xe3, 0xb8, 0x34, 0x58, 0x17, 0x3a, 0xa6, 0x4b, 0x88, 0xee, 0x1d,
-	0x4a, 0xdd, 0x90, 0x38, 0x53, 0x64, 0xca, 0x3b, 0xf9, 0x34, 0xbe, 0x89, 0xef, 0x60, 0xa6, 0xe5,
-	0x67, 0xd8, 0x88, 0xde, 0xf5, 0x9c, 0xf3, 0x7d, 0xdf, 0xe9, 0xf9, 0x7a, 0x0a, 0x24, 0x9d, 0x67,
-	0xf3, 0x3b, 0x95, 0xaa, 0xcc, 0xf4, 0x57, 0x6b, 0x6d, 0x34, 0x36, 0xbe, 0x7e, 0xdf, 0xe4, 0x46,
-	0xad, 0xd3, 0xbb, 0xd4, 0xd0, 0x16, 0x9c, 0x8f, 0x94, 0xb9, 0x31, 0x73, 0xa3, 0xa4, 0xfa, 0xb1,
-	0x51, 0xb9, 0xa1, 0xbf, 0x3c, 0x20, 0x87, 0x5c, 0xbe, 0xd2, 0x59, 0xae, 0xf0, 0x09, 0x04, 0x42,
-	0x2f, 0x14, 0x5f, 0x44, 0x5e, 0xd7, 0xeb, 0x85, 0x72, 0x1b, 0xe1, 0x5b, 0xa8, 0x59, 0x60, 0xe4,
-	0x77, 0xbd, 0xde, 0xa3, 0xc1, 0x8b, 0x7e, 0x49, 0xbc, 0x7f, 0x5f, 0xa5, 0x7f, 0xe5, 0x8a, 0x2e,
-	0xe9, 0x88, 0x78, 0x01, 0x61, 0xa1, 0x75, 0xa5, 0x37, 0x99, 0x89, 0x2a, 0x5d, 0xaf, 0x57, 0x93,
-	0x87, 0x04, 0x76, 0x00, 0x66, 0xda, 0xa8, 0xb5, 0x2b, 0x57, 0x6d, 0xb9, 0x94, 0xa1, 0x14, 0x9a,
-	0x65, 0x51, 0x0c, 0xc0, 0x4f, 0xae, 0xc9, 0x19, 0x02, 0x04, 0xb3, 0x64, 0xca, 0xc5, 0x88, 0x78,
-	0xf4, 0x12, 0x9a, 0x2c, 0x5b, 0xac, 0xf4, 0x32, 0x33, 0x3c, 0xfb, 0xa6, 0x11, 0xa1, 0x2a, 0xe6,
-	0xa9, 0xda, 0x4e, 0x62, 0xcf, 0xd8, 0x86, 0xfa, 0x7b, 0x9d, 0x9b, 0x8f, 0x7a, 0x6d, 0xec, 0x28,
-	0xa1, 0xdc, 0xc7, 0xf4, 0xb7, 0x0f, 0x75, 0x3b, 0x6e, 0x41, 0x3e, 0x65, 0xc4, 0x00, 0xaa, 0xd7,
-	0xcb, 0x6c, 0xb1, 0xf5, 0xa1, 0x73, 0xe4, 0xc3, 0x8e, 0x6c, 0x0f, 0x05, 0x4a, 0x5a, 0x2c, 0xbe,
-	0xde, 0x99, 0x57, 0xb1, 0xa4, 0xe7, 0xa7, 0x49, 0x47, 0x8e, 0xbd, 0x81, 0x70, 0x37, 0x4f, 0x1e,
-	0x55, 0xbb, 0x95, 0x5e, 0x63, 0xf0, 0xf4, 0x88, 0x5a, 0x9e, 0x56, 0x1e, 0xb0, 0xf4, 0xd2, 0xcd,
-	0x61, 0x7b, 0x03, 0x04, 0x63, 0x16, 0x0f, 0x99, 0x24, 0x67, 0x18, 0x42, 0x6d, 0x96, 0x4c, 0x99,
-	0x24, 0x1e, 0x36, 0xa1, 0x2e, 0x12, 0xe1, 0x22, 0x1f, 0x1f, 0x42, 0x28, 0x12, 0x31, 0x61, 0x93,
-	0x77, 0x4c, 0x92, 0x0a, 0x55, 0xee, 0xa9, 0xdc, 0x2d, 0xce, 0xa1, 0xc1, 0x05, 0x9f, 0xf2, 0x78,
-	0xcc, 0x6f, 0xd9, 0xd0, 0xa9, 0x48, 0x16, 0x0f, 0x3f, 0x13, 0x0f, 0x1b, 0xf0, 0xe0, 0x86, 0xc9,
-	0x59, 0x61, 0xbf, 0x8f, 0x04, 0x9a, 0x92, 0x25, 0x72, 0x14, 0x0b, 0x7e, 0x5b, 0x64, 0x2a, 0x45,
-	0x93, 0xa1, 0x8c, 0xb9, 0x28, 0xa2, 0x6a, 0x21, 0x34, 0x65, 0x72, 0xc2, 0x45, 0x6c, 0xdf, 0xab,
-	0x46, 0x3f, 0x41, 0x6b, 0xbc, 0xcc, 0x4d, 0xd1, 0x2a, 0xff, 0xef, 0x02, 0xbe, 0x84, 0x9a, 0x05,
-	0x46, 0xbe, 0x35, 0xe2, 0xf1, 0x5f, 0x3d, 0x94, 0x0e, 0x43, 0x11, 0x48, 0x49, 0xd9, 0xae, 0xfb,
-	0xe0, 0xa7, 0x07, 0xad, 0xed, 0x0a, 0x4d, 0xf6, 0x5f, 0x05, 0x47, 0x50, 0xdf, 0x6d, 0x2f, 0x5e,
-	0x9c, 0x58, 0x6a, 0xcb, 0x6f, 0x3f, 0xfb, 0xe7, 0xca, 0xe3, 0x07, 0x08, 0xf7, 0x2d, 0xf1, 0x18,
-	0x7b, 0xff, 0x2a, 0xed, 0xce, 0xa9, 0xb2, 0xd3, 0xfa, 0x12, 0xd8, 0x0f, 0xfc, 0xea, 0x4f, 0x00,
-	0x00, 0x00, 0xff, 0xff, 0xa3, 0x0a, 0xf8, 0xbf, 0xd4, 0x03, 0x00, 0x00,
+	// 681 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x55, 0x4d, 0x6f, 0xd3, 0x40,
+	0x10, 0xad, 0x9d, 0x8f, 0xc6, 0xd3, 0x90, 0x38, 0x8b, 0x00, 0x13, 0x4a, 0x89, 0xf6, 0x14, 0x81,
+	0x94, 0x83, 0x51, 0xd5, 0x1b, 0xa2, 0x6d, 0xdc, 0xb4, 0xb4, 0xb1, 0xd1, 0x26, 0xe4, 0x5a, 0x05,
+	0xbc, 0x94, 0x48, 0xc4, 0x1b, 0xec, 0x2d, 0xdc, 0x39, 0x71, 0xe1, 0xc0, 0x85, 0x1f, 0xc0, 0x2f,
+	0x45, 0x5e, 0xaf, 0xbf, 0x9b, 0xe6, 0x92, 0xdb, 0xce, 0xcc, 0xf3, 0xcc, 0x9b, 0x99, 0xb7, 0x6b,
+	0xd0, 0x97, 0x73, 0x6f, 0x7e, 0x43, 0x97, 0xd4, 0xe3, 0x83, 0x95, 0xcf, 0x38, 0x43, 0x7b, 0x9f,
+	0xbe, 0xde, 0x06, 0x9c, 0xfa, 0xcb, 0x9b, 0x25, 0xc7, 0x7f, 0x14, 0xa8, 0x59, 0xbe, 0xcf, 0x7c,
+	0x74, 0x08, 0x9a, 0x38, 0x9c, 0x32, 0x97, 0x1a, 0x4a, 0x4f, 0xe9, 0xb7, 0xcc, 0x27, 0x83, 0x0c,
+	0x74, 0x20, 0xa2, 0x83, 0x30, 0x4c, 0x52, 0x24, 0x32, 0x60, 0x77, 0x4c, 0x83, 0x60, 0x7e, 0x43,
+	0x0d, 0xb5, 0xa7, 0xf4, 0x35, 0x12, 0x9b, 0xf8, 0x08, 0xaa, 0x02, 0x51, 0x07, 0xd5, 0xb9, 0xd4,
+	0x77, 0xd0, 0x03, 0xd0, 0x6c, 0xe7, 0xfa, 0xca, 0x3a, 0x1e, 0x5a, 0x44, 0x57, 0x22, 0x73, 0x7a,
+	0x7d, 0xe6, 0x7c, 0xb0, 0x87, 0xba, 0x8a, 0x34, 0xa8, 0x59, 0x84, 0x38, 0x44, 0xaf, 0xe0, 0x0e,
+	0xb4, 0x47, 0x94, 0x4f, 0xf8, 0x9c, 0x53, 0x42, 0xbf, 0xdd, 0xd2, 0x80, 0xe3, 0x5f, 0x2a, 0xe8,
+	0xa9, 0x2f, 0x58, 0x31, 0x2f, 0xa0, 0xe8, 0x31, 0xd4, 0x6d, 0xe6, 0xd2, 0x0b, 0x57, 0xd0, 0xd5,
+	0x88, 0xb4, 0xd0, 0x5b, 0xa8, 0x09, 0xa0, 0x20, 0xd4, 0x32, 0x5f, 0xe6, 0xba, 0x28, 0x66, 0x19,
+	0x9c, 0x46, 0xc1, 0xc8, 0x19, 0x7d, 0x88, 0xf6, 0x41, 0x0b, 0x73, 0x9d, 0xb2, 0x5b, 0x8f, 0x1b,
+	0x95, 0x9e, 0xd2, 0xaf, 0x91, 0xd4, 0x81, 0x0e, 0x00, 0x66, 0x8c, 0x53, 0x3f, 0x0a, 0x57, 0x45,
+	0x38, 0xe3, 0x41, 0x7d, 0x39, 0x52, 0xa3, 0xd6, 0x53, 0xfa, 0x7b, 0x26, 0x2a, 0x4f, 0x91, 0x44,
+	0x00, 0x6c, 0x42, 0x33, 0x5b, 0x3e, 0x19, 0x15, 0x40, 0x7d, 0xe6, 0x4c, 0x2f, 0xec, 0x91, 0xae,
+	0xa0, 0x16, 0x00, 0xb1, 0x26, 0xe7, 0xc7, 0x64, 0x18, 0xda, 0x2a, 0xfe, 0xab, 0x40, 0x43, 0x34,
+	0xea, 0x7d, 0x66, 0x6b, 0x47, 0x60, 0x42, 0xf5, 0x72, 0xe1, 0xb9, 0x72, 0x02, 0x07, 0x39, 0x06,
+	0xf1, 0xc7, 0xe2, 0x10, 0xa2, 0x88, 0xc0, 0xe2, 0x37, 0x51, 0xde, 0xf0, 0x1c, 0x12, 0x90, 0x8b,
+	0xda, 0x09, 0x37, 0x33, 0x73, 0xa6, 0x62, 0x67, 0x4d, 0x68, 0xd8, 0x8e, 0x1d, 0x59, 0x6a, 0xb4,
+	0x41, 0x7b, 0x6c, 0x8d, 0x4f, 0xac, 0x70, 0x6d, 0x08, 0xf4, 0xab, 0x45, 0xc0, 0xc3, 0x1c, 0x41,
+	0xbc, 0xb7, 0x9f, 0x0a, 0x74, 0x32, 0xce, 0x0d, 0x8b, 0x7b, 0x05, 0x35, 0x01, 0x34, 0xd4, 0x5e,
+	0xa5, 0xbf, 0x67, 0x3e, 0xba, 0x93, 0x36, 0x89, 0x30, 0xe9, 0x94, 0x2b, 0x9b, 0xa6, 0x7c, 0x08,
+	0x6d, 0xcb, 0x73, 0x57, 0x6c, 0xe1, 0x71, 0xc9, 0x0b, 0x61, 0x68, 0xc6, 0x2e, 0x7b, 0xbe, 0xa4,
+	0x92, 0x47, 0xce, 0x87, 0x4f, 0x52, 0xcc, 0xbd, 0xb3, 0xee, 0x42, 0xe3, 0x9c, 0x05, 0xfc, 0x3d,
+	0xf3, 0xb9, 0xbc, 0x02, 0x89, 0x8d, 0x7f, 0x2b, 0xa0, 0xa7, 0xb5, 0x37, 0xb4, 0x9f, 0x74, 0xa4,
+	0x6e, 0xe8, 0x08, 0x1d, 0x81, 0x16, 0x67, 0x0d, 0x8c, 0x8a, 0x18, 0xd6, 0xd3, 0x3c, 0x3a, 0x43,
+	0x9c, 0xa4, 0x58, 0xac, 0x43, 0xeb, 0xd8, 0x75, 0xc3, 0x7a, 0xf1, 0x86, 0x26, 0xd0, 0x4e, 0x3c,
+	0xdb, 0xe2, 0x87, 0x1f, 0x42, 0x87, 0xd0, 0x25, 0xfb, 0x4e, 0xb3, 0x95, 0x66, 0x80, 0xb2, 0xce,
+	0x6d, 0x16, 0x0b, 0x25, 0x36, 0xf9, 0x32, 0xf7, 0xdd, 0x20, 0x53, 0x2c, 0xeb, 0xdc, 0x5a, 0xb1,
+	0x0e, 0xb4, 0x27, 0x9c, 0xae, 0x86, 0xec, 0x87, 0x17, 0x97, 0x9a, 0x82, 0x9e, 0xba, 0xb6, 0x55,
+	0xc8, 0xfc, 0x57, 0x85, 0x8e, 0x7c, 0x1b, 0xc6, 0xc9, 0x0b, 0x8e, 0x46, 0xd0, 0x88, 0x1f, 0x30,
+	0xb4, 0xbf, 0xe6, 0x5d, 0x13, 0xac, 0xba, 0xcf, 0xef, 0x7d, 0xf5, 0xd0, 0x3b, 0xd0, 0x92, 0x7b,
+	0x89, 0xf2, 0xd8, 0xe2, 0x25, 0xee, 0x1e, 0xac, 0x0b, 0xcb, 0x5c, 0x97, 0xd0, 0x3c, 0x5b, 0x78,
+	0x6e, 0xac, 0xb2, 0x02, 0xb1, 0xc2, 0xd5, 0x2b, 0x10, 0x2b, 0x5d, 0x8e, 0x21, 0xec, 0x4a, 0x3d,
+	0xa2, 0x67, 0x39, 0x64, 0x5e, 0xb7, 0xdd, 0xfd, 0xbb, 0x83, 0x32, 0xcb, 0x18, 0x20, 0xd5, 0x1a,
+	0xca, 0x37, 0x50, 0x52, 0x66, 0xf7, 0xc5, 0xda, 0xb8, 0x4c, 0x37, 0x82, 0x46, 0xbc, 0xe2, 0x42,
+	0x77, 0x05, 0x31, 0x14, 0xba, 0x2b, 0xe9, 0x62, 0x0c, 0x90, 0xca, 0x12, 0x95, 0x07, 0x9b, 0x13,
+	0x71, 0x81, 0x57, 0x59, 0xcf, 0x1f, 0xeb, 0xe2, 0x8f, 0xfe, 0xfa, 0x7f, 0x00, 0x00, 0x00, 0xff,
+	0xff, 0xec, 0x30, 0x1a, 0x5b, 0xe5, 0x07, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -464,11 +947,26 @@ const _ = grpc.SupportPackageIsVersion4
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type ClusterManagementClient interface {
-	// GetState returns the node's internal state. Actual content is WIP.
+	// GetState returns the cluster state of the local node.
 	GetState(ctx context.Context, in *GetStateRequest, opts ...grpc.CallOption) (*GetStateResponse, error)
-	// ListNodes lists the known nodes in the cluster, both voters, non-voters and
-	// bystanders (ie those that are member of the Serf swarm but not the Raft cluster)
+	// ListNodes lists the known nodes in the cluster, as seen by the leader.
 	ListNodes(ctx context.Context, in *ListNodesRequest, opts ...grpc.CallOption) (*ListNodesResponse, error)
+	// FindEndpoint looks up an endpoint and returns the list. The list is
+	// retrieved from the local node.
+	FindEndpoint(ctx context.Context, in *EndpointRequest, opts ...grpc.CallOption) (*EndpointResponse, error)
+	// AddNode adds a node to the cluster. This request is proxied to the leader
+	// if it is received by a non-leader node. The request will fail if there's
+	// no current leader in the cluster.
+	AddNode(ctx context.Context, in *AddNodeRequest, opts ...grpc.CallOption) (*AddNodeResponse, error)
+	// RemoveNode removes a node from the cluster. This request is handled by
+	// the leader. If the request is sent to one of the non-leaders in the cluster
+	// it will be proxied to the leader.
+	RemoveNode(ctx context.Context, in *RemoveNodeRequest, opts ...grpc.CallOption) (*RemoveNodeResponse, error)
+	// StepDown causes the (Raft) leader to step down and a new leader will be elected.
+	StepDown(ctx context.Context, in *StepDownRequest, opts ...grpc.CallOption) (*StepDownResponse, error)
+	// ListShards dumps the current shard map as seen by the node handling the
+	// request.
+	ListShards(ctx context.Context, in *ListShardsRequest, opts ...grpc.CallOption) (*ListShardsResponse, error)
 }
 
 type clusterManagementClient struct {
@@ -497,13 +995,73 @@ func (c *clusterManagementClient) ListNodes(ctx context.Context, in *ListNodesRe
 	return out, nil
 }
 
+func (c *clusterManagementClient) FindEndpoint(ctx context.Context, in *EndpointRequest, opts ...grpc.CallOption) (*EndpointResponse, error) {
+	out := new(EndpointResponse)
+	err := c.cc.Invoke(ctx, "/clustermgmt.ClusterManagement/FindEndpoint", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *clusterManagementClient) AddNode(ctx context.Context, in *AddNodeRequest, opts ...grpc.CallOption) (*AddNodeResponse, error) {
+	out := new(AddNodeResponse)
+	err := c.cc.Invoke(ctx, "/clustermgmt.ClusterManagement/AddNode", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *clusterManagementClient) RemoveNode(ctx context.Context, in *RemoveNodeRequest, opts ...grpc.CallOption) (*RemoveNodeResponse, error) {
+	out := new(RemoveNodeResponse)
+	err := c.cc.Invoke(ctx, "/clustermgmt.ClusterManagement/RemoveNode", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *clusterManagementClient) StepDown(ctx context.Context, in *StepDownRequest, opts ...grpc.CallOption) (*StepDownResponse, error) {
+	out := new(StepDownResponse)
+	err := c.cc.Invoke(ctx, "/clustermgmt.ClusterManagement/StepDown", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *clusterManagementClient) ListShards(ctx context.Context, in *ListShardsRequest, opts ...grpc.CallOption) (*ListShardsResponse, error) {
+	out := new(ListShardsResponse)
+	err := c.cc.Invoke(ctx, "/clustermgmt.ClusterManagement/ListShards", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ClusterManagementServer is the server API for ClusterManagement service.
 type ClusterManagementServer interface {
-	// GetState returns the node's internal state. Actual content is WIP.
+	// GetState returns the cluster state of the local node.
 	GetState(context.Context, *GetStateRequest) (*GetStateResponse, error)
-	// ListNodes lists the known nodes in the cluster, both voters, non-voters and
-	// bystanders (ie those that are member of the Serf swarm but not the Raft cluster)
+	// ListNodes lists the known nodes in the cluster, as seen by the leader.
 	ListNodes(context.Context, *ListNodesRequest) (*ListNodesResponse, error)
+	// FindEndpoint looks up an endpoint and returns the list. The list is
+	// retrieved from the local node.
+	FindEndpoint(context.Context, *EndpointRequest) (*EndpointResponse, error)
+	// AddNode adds a node to the cluster. This request is proxied to the leader
+	// if it is received by a non-leader node. The request will fail if there's
+	// no current leader in the cluster.
+	AddNode(context.Context, *AddNodeRequest) (*AddNodeResponse, error)
+	// RemoveNode removes a node from the cluster. This request is handled by
+	// the leader. If the request is sent to one of the non-leaders in the cluster
+	// it will be proxied to the leader.
+	RemoveNode(context.Context, *RemoveNodeRequest) (*RemoveNodeResponse, error)
+	// StepDown causes the (Raft) leader to step down and a new leader will be elected.
+	StepDown(context.Context, *StepDownRequest) (*StepDownResponse, error)
+	// ListShards dumps the current shard map as seen by the node handling the
+	// request.
+	ListShards(context.Context, *ListShardsRequest) (*ListShardsResponse, error)
 }
 
 func RegisterClusterManagementServer(s *grpc.Server, srv ClusterManagementServer) {
@@ -546,6 +1104,96 @@ func _ClusterManagement_ListNodes_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ClusterManagement_FindEndpoint_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EndpointRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClusterManagementServer).FindEndpoint(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/clustermgmt.ClusterManagement/FindEndpoint",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClusterManagementServer).FindEndpoint(ctx, req.(*EndpointRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ClusterManagement_AddNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddNodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClusterManagementServer).AddNode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/clustermgmt.ClusterManagement/AddNode",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClusterManagementServer).AddNode(ctx, req.(*AddNodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ClusterManagement_RemoveNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveNodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClusterManagementServer).RemoveNode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/clustermgmt.ClusterManagement/RemoveNode",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClusterManagementServer).RemoveNode(ctx, req.(*RemoveNodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ClusterManagement_StepDown_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StepDownRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClusterManagementServer).StepDown(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/clustermgmt.ClusterManagement/StepDown",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClusterManagementServer).StepDown(ctx, req.(*StepDownRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ClusterManagement_ListShards_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListShardsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClusterManagementServer).ListShards(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/clustermgmt.ClusterManagement/ListShards",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClusterManagementServer).ListShards(ctx, req.(*ListShardsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _ClusterManagement_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "clustermgmt.ClusterManagement",
 	HandlerType: (*ClusterManagementServer)(nil),
@@ -557,6 +1205,26 @@ var _ClusterManagement_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListNodes",
 			Handler:    _ClusterManagement_ListNodes_Handler,
+		},
+		{
+			MethodName: "FindEndpoint",
+			Handler:    _ClusterManagement_FindEndpoint_Handler,
+		},
+		{
+			MethodName: "AddNode",
+			Handler:    _ClusterManagement_AddNode_Handler,
+		},
+		{
+			MethodName: "RemoveNode",
+			Handler:    _ClusterManagement_RemoveNode_Handler,
+		},
+		{
+			MethodName: "StepDown",
+			Handler:    _ClusterManagement_StepDown_Handler,
+		},
+		{
+			MethodName: "ListShards",
+			Handler:    _ClusterManagement_ListShards_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

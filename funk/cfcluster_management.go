@@ -67,15 +67,79 @@ func (c *clusterfunkCluster) startManagementServices() error {
 // -----------------------------------------------------------------------------
 
 func (c *clusterfunkCluster) GetState(context.Context, *clustermgmt.GetStateRequest) (*clustermgmt.GetStateResponse, error) {
-	ret := &clustermgmt.GetStateResponse{
-		NodeId: c.config.NodeID,
-		State:  clustermgmt.GetStateResponse_OK,
-	}
-
-	ret.NodeCount = int32(c.serfNode.Size())
-	return ret, nil
+	return nil, errors.New("not implemented")
 }
 
 func (c *clusterfunkCluster) ListNodes(context.Context, *clustermgmt.ListNodesRequest) (*clustermgmt.ListNodesResponse, error) {
+	if c.State() != Operational {
+		return &clustermgmt.ListNodesResponse{
+			Error: &clustermgmt.Error{
+				ErrorCode: clustermgmt.Error_NO_LEADER,
+				Message:   "Cluster is not in operational state",
+			},
+		}, nil
+	}
+	return nil, errors.New("not implemented")
+}
+
+func (c *clusterfunkCluster) FindEndpoint(context.Context, *clustermgmt.EndpointRequest) (*clustermgmt.EndpointResponse, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (c *clusterfunkCluster) AddNode(context.Context, *clustermgmt.AddNodeRequest) (*clustermgmt.AddNodeResponse, error) {
+	if c.State() != Operational {
+		return &clustermgmt.AddNodeResponse{
+			Error: &clustermgmt.Error{
+				ErrorCode: clustermgmt.Error_NO_LEADER,
+				Message:   "Cluster is not in operational state",
+			},
+		}, nil
+	}
+	if c.Role() == Leader {
+		// add the node
+		return nil, errors.New("not implemented")
+	}
+	// proxy to the leader
+	return nil, errors.New("not implemented")
+}
+
+func (c *clusterfunkCluster) RemoveNode(context.Context, *clustermgmt.RemoveNodeRequest) (*clustermgmt.RemoveNodeResponse, error) {
+	if c.State() != Operational {
+		return &clustermgmt.RemoveNodeResponse{
+			Error: &clustermgmt.Error{
+				ErrorCode: clustermgmt.Error_NO_LEADER,
+				Message:   "Cluster is not in operational state",
+			},
+		}, nil
+	}
+	if c.Role() == Leader {
+		// add the node
+		return nil, errors.New("not implemented")
+	}
+	// proxy to the leader
+	return nil, errors.New("not implemented")
+}
+
+func (c *clusterfunkCluster) ListShards(ctx context.Context, req *clustermgmt.ListShardsRequest) (*clustermgmt.ListShardsResponse, error) {
+	if c.State() != Operational {
+		return &clustermgmt.ListShardsResponse{
+			Error: &clustermgmt.Error{
+				ErrorCode: clustermgmt.Error_NO_LEADER,
+				Message:   "Cluster is not in operational state",
+			},
+		}, nil
+	}
+	return nil, errors.New("not implemented")
+}
+
+func (c *clusterfunkCluster) StepDown(ctx context.Context, req *clustermgmt.StepDownRequest) (*clustermgmt.StepDownResponse, error) {
+	if c.State() != Operational {
+		return &clustermgmt.StepDownResponse{
+			Error: &clustermgmt.Error{
+				ErrorCode: clustermgmt.Error_NO_LEADER,
+				Message:   "Cluster is not in operational state",
+			},
+		}, nil
+	}
 	return nil, errors.New("not implemented")
 }

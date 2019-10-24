@@ -2,126 +2,142 @@ syntax = "proto3";
 
 package clustermgmt;
 
-message GetStateRequest {
-
-};
-
-message GetStateResponse {
-    string NodeId = 1;
-    enum ClusterState {
-        OK = 0;
-        VOTING = 1;
-    };
-    ClusterState State = 2;
-    int32 NodeCount = 3;
-    int32 VoterCount = 4;
-};
-
-message EndpointInfo {
-    string Name = 1;
-    string HostPort = 2;
-}
-
-// NodeInfo contains information on a single node in the cluster/swarm
-message NodeInfo {
-    // NodeId is the node's identifier.
-    string NodeId = 1;
-
-    enum NodeKind {
-        LEADER = 0;
-        VOTER = 1;
-        NONVOTER = 2;
-        NONMEMBER = 3;
-    };
-    NodeKind Kind = 2;
-
-    // NodeState is the state of nodes. See godoc comments for a description
-    enum NodeState {
-        INITIALIZED = 0;
-        READY = 1;
-        SERVING = 2;
-        REORGANIZING = 3;
-        DRAINING = 4;
-        TERMINATING = 5;
-    };
-    NodeState State = 3;
-    repeated EndpointInfo Endpoints = 4;
-}
-
-//ListSerfNodesResponse is the response to a ListSerfNodes call. The number of
-// Serf nodes will initially be quite small so we won't need a stream response
-// here.
-message ListNodesResponse {
-    string NodeId = 1;
-    repeated NodeInfo Nodes = 2;
-};
-
-message ListNodesRequest {
-
-};
-
-/*
-// Messages for the RetireNode method
-message RetireNodeRequest {
-
-};
-
-message RetireNodeResponse {
-
-};
-
-// Messages for the AddNode method
-message AddNodeRequest {
-
-};
-
-message AddNodeResponse {
-
-};
-
-// Messages for the PurgeNode method
-message PurgeNodeRequest {
-
-};
-
-message PurgeNodeResponse {
-
-};
-
-// Messages for the ListShards method
-message ListShardsRequest {
-
-};
-
-message ListShardsResponse {
-
-};
-*/
-
 // LeaderManagement service is responsible for node management. Management
 // operations must happen on the leader in the cluster.
 service ClusterManagement {
-    // ListNodes lists the known nodes in the cluster, both voters, non-voters and
-    // bystanders (ie those that are member of the Serf swarm but not the Raft cluster)
+    // GetState returns the cluster state of the local node.
+    rpc GetState(GetStateRequest) returns (GetStateResponse);
+
+    // ListNodes lists the known nodes in the cluster, as seen by the leader.
     rpc ListNodes(ListNodesRequest) returns (ListNodesResponse);
 
+    // FindEndpoint looks up an endpoint and returns the list. The list is
+    // retrieved from the local node.
+    rpc FindEndpoint(EndpointRequest) returns (EndpointResponse);
 
-    /*
-    // RetireNode will mark a node as retired and it will be removed the next
-    // time a shard distribution process is happening.
-    rpc RetireNode(RetireNodeRequest) returns (RetireNodeResponse);
-
-    // AddNode will add a node to the cluster. When the node joins a new shard
-    // distribution process will start.
+    // AddNode adds a node to the cluster. This request is proxied to the leader
+    // if it is received by a non-leader node. The request will fail if there's
+    // no current leader in the cluster.
     rpc AddNode(AddNodeRequest) returns (AddNodeResponse);
 
-    // PurgeNode will forcefully remove a node from the cluster. The node
-    // might be online, in that case a new shard distribution process starts
-    // or it might be offline and in that case there will be no changes.
-    rpc PurgeNode(PurgeNodeRequest) returns (PurgeNodeResponse);
+    // RemoveNode removes a node from the cluster. This request is handled by
+    // the leader. If the request is sent to one of the non-leaders in the cluster
+    // it will be proxied to the leader.
+    rpc RemoveNode(RemoveNodeRequest) returns (RemoveNodeResponse);
 
-    // ListShards will list statistics for the shards on each node.
+    // StepDown causes the (Raft) leader to step down and a new leader will be elected.
+    rpc StepDown(StepDownRequest) returns (StepDownResponse);
+
+    // ListShards dumps the current shard map as seen by the node handling the
+    // request.
     rpc ListShards(ListShardsRequest) returns (ListShardsResponse);
-    */
 };
 
+// Errors is the various error codes that might be returned. The values are
+// should be fairly obvious.
+message Error {
+    enum Code {
+        OK = 0;
+        NO_LEADER = 1;
+        NOT_FOUND = 2;
+        ERROR = 3;
+
+    };
+    Code ErrorCode  = 1;
+    string Message = 2;
+}
+
+// GetStateRequest
+message GetStateRequest {};
+
+// GetStateResponse
+message GetStateResponse {
+  string NodeId = 1;
+  enum ClusterState {
+    OK = 0;
+    VOTING = 1;
+    RESHARDING = 2;
+  };
+  ClusterState State = 2;
+  int32 NodeCount = 3;
+  int32 VoterCount = 4;
+  Error Error = 5;
+};
+
+// NodeInfo contains information on a single node in the cluster/swarm
+message NodeInfo {
+  // NodeId is the node's identifier.
+  string NodeId = 1;
+
+  enum NodeKind {
+    LEADER = 0;
+    VOTER = 1;
+    NONVOTER = 2;
+    NONMEMBER = 3;
+  };
+  NodeKind Kind = 2;
+}
+
+// ListNodesRequest
+message ListNodesRequest {};
+
+// ListNodesResponse is the response to a ListSerfNodes call. The number of
+// Serf nodes will initially be quite small so we won't need a stream response
+// here.
+message ListNodesResponse {
+  string NodeId = 1;
+  repeated NodeInfo Nodes = 2;
+  Error Error = 3;
+};
+
+message EndpointRequest {
+    string EndpointName = 1;
+}
+
+message EndpointInfo {
+    string NodeId = 1;
+    string HostPort = 2;
+}
+
+message EndpointResponse {
+    string NodeId = 1;
+    Error Error = 2;
+    repeated EndpointInfo Endpoints = 3;
+}
+
+// Messages for the AddNode method
+message AddNodeRequest {};
+
+// AddNodeResponse
+message AddNodeResponse {
+    string NodeId = 1;
+    Error Error = 2;
+};
+
+// RemoveNodeRequest
+message RemoveNodeRequest {};
+
+// RemoveNodeResponse
+message RemoveNodeResponse {
+    string NodeId = 1;
+    Error Error = 2;
+};
+
+// ListShardsRequest
+message ListShardsRequest {};
+
+// ListShardsResponse
+message ListShardsResponse {
+    string NodeId = 1;
+    Error Error = 2;
+};
+
+
+message StepDownRequest {
+
+};
+
+message StepDownResponse {
+    string NodeId = 1;
+    Error Error = 2;
+};
