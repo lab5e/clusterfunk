@@ -1,7 +1,8 @@
 # TODOs
 
-
-* Proper FSM and log
+* Non-members of the cluster, ie nodes that are part of the
+  Serf cluster but not the Raft cluster. Useful for other kinds
+  of services.
 
 * Turn off auto-join/leave for Serf in production clusters
 
@@ -19,6 +20,7 @@
   for each node. Might be an idea to implement a similar scheme (or just add to
   the existing management gRPC since it's already running on all nodes. Make
   utility functions to discover. Outside discovery might not be within the scope.
+  Management function w/ gRPC might also be used for this.
 
 * Make sure bootstrapping a cluster with the same names as an existing one
   returns an error.
