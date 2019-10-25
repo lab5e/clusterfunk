@@ -16,8 +16,10 @@ type connection struct {
 	Taken      bool
 }
 
+// SetUnhealthy marks the connection as unhealthy and not taken.
 func (c *connection) SetUnhealthy() {
 	c.Healthy = false
+	c.Taken = false
 	if c.Connection != nil {
 		c.Connection.Close()
 		c.Connection = nil
@@ -67,8 +69,8 @@ func (e *EndpointPool) GetEndpoint() (*grpc.ClientConn, error) {
 // ReleaseEndpoint releases the endpoint back into the pool. If the pool doesn't
 // contain the endpoint it will be closed and discarded.
 func (e *EndpointPool) ReleaseEndpoint(conn *grpc.ClientConn) bool {
-	for i, conn := range e.Connections {
-		if conn.Endpoint == conn.Connection.Target() {
+	for i, c := range e.Connections {
+		if c.Endpoint == conn.Target() {
 			e.Connections[i].Taken = false
 			return true
 		}
@@ -78,7 +80,8 @@ func (e *EndpointPool) ReleaseEndpoint(conn *grpc.ClientConn) bool {
 
 // MarkUnhealthy releases the connection back into the pool and marks it
 // unhealthy. The connection will be closed. Connections that does not exist
-// in the pool will also be closed.
+// in the pool will also be closed. The connection will be marked as unused
+// after this.
 func (e *EndpointPool) MarkUnhealthy(conn *grpc.ClientConn) bool {
 	conn.Close()
 	for i, c := range e.Connections {
@@ -92,8 +95,8 @@ func (e *EndpointPool) MarkUnhealthy(conn *grpc.ClientConn) bool {
 
 // clearUnhealthy removes all unhealthy connections from the pool
 func (e *EndpointPool) clearUnhealthy() {
-	for i, v := range e.Connections {
-		if !v.Healthy {
+	for i := len(e.Connections) - 1; i >= 0; i-- {
+		if !e.Connections[i].Healthy {
 			e.Connections = append(e.Connections[:i], e.Connections[i+1:]...)
 		}
 	}
@@ -102,7 +105,8 @@ func (e *EndpointPool) clearUnhealthy() {
 // Sync refreshes the endpoints in the pool. All endpoints in the input is
 // assumed to be healthy. Existing connections are kept, connections that no
 // longer exists in the set of endpoints are removed and any new connections are
-// added to the pool.
+// added to the pool. Any taken connection in the pool remains taken and
+// unhealthy connections in the new endpoint list will be marked healthy.
 func (e *EndpointPool) Sync(endpoints []string) {
 	ss := toolbox.NewStringSet()
 	ss.Sync(endpoints...)
@@ -145,4 +149,15 @@ func (e *EndpointPool) LowWaterMark() bool {
 		return true
 	}
 	return false
+}
+
+// Available returns the number of available connections. Mostly for diagnostics.
+func (e *EndpointPool) Available() int {
+	avail := 0
+	for _, v := range e.Connections {
+		if !v.Taken {
+			avail++
+		}
+	}
+	return avail
 }
