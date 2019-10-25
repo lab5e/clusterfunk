@@ -10,6 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stalehd/clusterfunk/toolbox"
+
+	"github.com/stalehd/clusterfunk/clientfunk"
 	"github.com/stalehd/clusterfunk/cmd/demo"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -38,6 +41,17 @@ func init() {
 func main() {
 
 	endpoints := strings.Split(config.Endpoints, ",")
+	if config.Endpoints == "" {
+		ep, err := clientfunk.ZeroconfManagementLookup("demo")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Unable to do zeroconf lookup: %v\n", err)
+			return
+		}
+		endpoints, err = clientfunk.GetEndpoints("ep.demo", toolbox.GRPCClientParam{ServerEndpoint: ep})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Unable to locate endpoints: %v\n", err)
+		}
+	}
 	clients := make([]demo.DemoServiceClient, 0)
 
 	for _, v := range endpoints {
