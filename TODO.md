@@ -25,7 +25,4 @@
 * Make sure bootstrapping a cluster with the same names as an existing one
   returns an error.
 
-* Integrate liveness checker into Raft (needs to handle nodes going away then coming back)
-  Checker only handles nodes dying not coming back from the dead
-
 * Consistent SerfNode/RaftNode interfaces
