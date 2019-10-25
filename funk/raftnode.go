@@ -419,6 +419,17 @@ func (r *RaftNode) GetLogMessages(startingIndex uint64) []LogMessage {
 	return ret
 }
 
+// StepDown steps down as a leader if this is the leader node
+func (r *RaftNode) StepDown() error {
+	if !r.Leader() {
+		return errors.New("not the leader")
+	}
+	if err := r.ra.LeadershipTransfer().Error(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (r *RaftNode) addNode(id string) {
 	if r.Nodes.Add(id) {
 		r.sendInternalEvent(RaftClusterSizeChanged)
@@ -589,6 +600,31 @@ func (r *RaftNode) Snapshot() (raft.FSMSnapshot, error) {
 func (r *RaftNode) Restore(io.ReadCloser) error {
 	log.Info("FSMSnapshot Restore")
 	return nil
+}
+
+// memberList returns a list of nodes in the raft cluster.
+func (r *RaftNode) memberList() ([]nodeItem, error) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	if r.ra == nil {
+		return nil, errors.New("raft cluster is not started")
+	}
+	config := r.ra.GetConfiguration()
+	if err := config.Error(); err != nil {
+		return nil, err
+	}
+	leader := r.ra.Leader()
+
+	members := config.Configuration().Servers
+	ret := make([]nodeItem, len(members))
+	for i, v := range members {
+		ret[i] = nodeItem{
+			ID:     string(v.ID),
+			State:  v.Suffrage.String(),
+			Leader: (v.Address == leader),
+		}
+	}
+	return ret, nil
 }
 
 type raftSnapshot struct {

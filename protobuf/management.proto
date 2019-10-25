@@ -5,46 +5,47 @@ package clustermgmt;
 // LeaderManagement service is responsible for node management. Management
 // operations must happen on the leader in the cluster.
 service ClusterManagement {
-    // GetState returns the cluster state of the local node.
-    rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
+  // GetState returns the cluster state of the local node.
+  rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
 
-    // ListNodes lists the known nodes in the cluster, as seen by the leader.
-    rpc ListNodes(ListNodesRequest) returns (ListNodesResponse);
+  // ListNodes lists the known nodes in the cluster, as seen by the leader.
+  rpc ListNodes(ListNodesRequest) returns (ListNodesResponse);
 
-    // FindEndpoint looks up an endpoint and returns the list. The list is
-    // retrieved from the local node.
-    rpc FindEndpoint(EndpointRequest) returns (EndpointResponse);
+  // FindEndpoint looks up an endpoint and returns the list. The list is
+  // retrieved from the local node.
+  rpc FindEndpoint(EndpointRequest) returns (EndpointResponse);
 
-    // AddNode adds a node to the cluster. This request is proxied to the leader
-    // if it is received by a non-leader node. The request will fail if there's
-    // no current leader in the cluster.
-    rpc AddNode(AddNodeRequest) returns (AddNodeResponse);
+  // AddNode adds a node to the cluster. This request is proxied to the leader
+  // if it is received by a non-leader node. The request will fail if there's
+  // no current leader in the cluster.
+  rpc AddNode(AddNodeRequest) returns (AddNodeResponse);
 
-    // RemoveNode removes a node from the cluster. This request is handled by
-    // the leader. If the request is sent to one of the non-leaders in the cluster
-    // it will be proxied to the leader.
-    rpc RemoveNode(RemoveNodeRequest) returns (RemoveNodeResponse);
+  // RemoveNode removes a node from the cluster. This request is handled by
+  // the leader. If the request is sent to one of the non-leaders in the cluster
+  // it will be proxied to the leader.
+  rpc RemoveNode(RemoveNodeRequest) returns (RemoveNodeResponse);
 
-    // StepDown causes the (Raft) leader to step down and a new leader will be elected.
-    rpc StepDown(StepDownRequest) returns (StepDownResponse);
+  // StepDown causes the (Raft) leader to step down and a new leader will be
+  // elected.
+  rpc StepDown(StepDownRequest) returns (StepDownResponse);
 
-    // ListShards dumps the current shard map as seen by the node handling the
-    // request.
-    rpc ListShards(ListShardsRequest) returns (ListShardsResponse);
+  // ListShards dumps the current shard map as seen by the node handling the
+  // request.
+  rpc ListShards(ListShardsRequest) returns (ListShardsResponse);
 };
 
 // Errors is the various error codes that might be returned. The values are
 // should be fairly obvious.
 message Error {
-    enum Code {
-        OK = 0;
-        INVALID = 1;
-        NO_LEADER = 2;
-        GENERIC = 3;
-        UNKNOWN_ID = 4;
-    };
-    Code ErrorCode  = 1;
-    string Message = 2;
+  enum Code {
+    OK = 0;
+    INVALID = 1;
+    NO_LEADER = 2;
+    GENERIC = 3;
+    UNKNOWN_ID = 4;
+  };
+  Code ErrorCode = 1;
+  string Message = 2;
 }
 
 // GetStatusRequest
@@ -68,14 +69,9 @@ message GetStatusResponse {
 message NodeInfo {
   // NodeId is the node's identifier.
   string NodeId = 1;
-
-  enum NodeKind {
-    LEADER = 0;
-    VOTER = 1;
-    NONVOTER = 2;
-    NONMEMBER = 3;
-  };
-  NodeKind Kind = 2;
+  string RaftState = 2;
+  string SerfState = 3;
+  bool Leader = 4;
 }
 
 // ListNodesRequest
@@ -86,62 +82,64 @@ message ListNodesRequest {};
 // here.
 message ListNodesResponse {
   string NodeId = 1;
-  repeated NodeInfo Nodes = 2;
-  Error Error = 3;
+  string LeaderId = 2;
+  repeated NodeInfo Nodes = 3;
+  Error Error = 4;
 };
 
-message EndpointRequest {
-    string EndpointName = 1;
-}
+message EndpointRequest { string EndpointName = 1; }
 
 message EndpointInfo {
-    string NodeId = 1;
-    string HostPort = 2;
+  string NodeId = 1;
+  string Name = 2;
+  string HostPort = 3;
 }
 
 message EndpointResponse {
-    string NodeId = 1;
-    Error Error = 2;
-    repeated EndpointInfo Endpoints = 3;
+  string NodeId = 1;
+  Error Error = 2;
+  repeated EndpointInfo Endpoints = 3;
 }
 
 // Messages for the AddNode method
-message AddNodeRequest {
-    string NodeId = 1;
-};
+message AddNodeRequest { string NodeId = 1; };
 
 // AddNodeResponse
 message AddNodeResponse {
-    string NodeId = 1;
-    Error Error = 2;
+  string NodeId = 1;
+  Error Error = 2;
 };
 
 // RemoveNodeRequest
-message RemoveNodeRequest {
-    string NodeId = 1;
-};
+message RemoveNodeRequest { string NodeId = 1; };
 
 // RemoveNodeResponse
 message RemoveNodeResponse {
-    string NodeId = 1;
-    Error Error = 2;
+  string NodeId = 1;
+  Error Error = 2;
 };
 
 // ListShardsRequest
 message ListShardsRequest {};
 
+message ShardInfo {
+  string NodeId = 1;
+  int32 ShardCount = 2;
+  int32 ShardWeight = 3;
+};
+
 // ListShardsResponse
 message ListShardsResponse {
-    string NodeId = 1;
-    Error Error = 2;
+  string NodeId = 1;
+  Error Error = 2;
+  repeated ShardInfo Shards = 3;
+  int32 TotalShards = 4;
+  int32 TotalWeight = 5;
 };
 
-
-message StepDownRequest {
-
-};
+message StepDownRequest {};
 
 message StepDownResponse {
-    string NodeId = 1;
-    Error Error = 2;
+  string NodeId = 1;
+  Error Error = 2;
 };

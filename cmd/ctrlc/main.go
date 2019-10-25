@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sort"
 	"time"
 
 	"github.com/stalehd/clusterfunk/clientfunk"
@@ -27,6 +28,7 @@ const (
 	cmdRemoveNode = "remove-node"
 	cmdShards     = "shards"
 	cmdStepDown   = "step-down"
+	cmdHelp       = "help"
 )
 
 type commandRunner func(clustermgmt.ClusterManagementClient, parameters)
@@ -43,7 +45,26 @@ func main() {
 		fmt.Fprintf(os.Stderr, "No command specfied\n")
 		return
 	}
+	if args[0] == cmdHelp {
+		fmt.Println(`
+ctrlc [--cluster-name] [--zeroconf] [--endpoint] [cmd]
 
+	--cluster-name: Name of cluster")
+	--zeroconf     Enable or disable zeroconf")
+		--endpoint     Management endpoint to use")
+
+Available commands:")
+
+	status           Show node and cluster status")
+	nodes            List nodes in cluster")
+	endpoints [name] List endpoints")
+	add-node [id]    Add node to cluster")
+	remove-node [id] Remove node from cluster")
+	shards           List shard distribution")
+	step-down        Leader step down
+	`)
+		return
+	}
 	if config.Endpoint == "" && config.Zeroconf {
 		if config.Zeroconf && config.ClusterName == "" {
 			fmt.Fprintf(os.Stderr, "Needs a cluster name if zeroconf is to be used for discovery")
@@ -173,17 +194,92 @@ func removeNode(id string, client clustermgmt.ClusterManagementClient) {
 }
 
 func listEndpoints(filter string, client clustermgmt.ClusterManagementClient) {
-	fmt.Fprintf(os.Stderr, "list endpoints")
+	ctx, done := context.WithTimeout(context.Background(), gRPCTimeout)
+	defer done()
+
+	res, err := client.FindEndpoint(ctx, &clustermgmt.EndpointRequest{EndpointName: filter})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error searching for endpoint: %v\n", err)
+		return
+	}
+	if res.Error != nil {
+		fmt.Fprintf(os.Stderr, "Unable to search for endpoint: %v\n", res.Error.Message)
+		return
+	}
+
+	fmt.Printf("Node ID              Name                 Endpoint\n")
+
+	sort.Slice(res.Endpoints, func(i, j int) bool {
+		return res.Endpoints[i].Name < res.Endpoints[j].Name
+	})
+	for _, v := range res.Endpoints {
+		fmt.Printf("%-20s %-20s %s\n", v.NodeId, v.Name, v.HostPort)
+	}
+	fmt.Printf("\nReporting node: %s\n", res.NodeId)
 }
 
 func listNodes(client clustermgmt.ClusterManagementClient) {
-	fmt.Fprintf(os.Stderr, "list nodes")
+	ctx, done := context.WithTimeout(context.Background(), gRPCTimeout)
+	defer done()
+
+	res, err := client.ListNodes(ctx, &clustermgmt.ListNodesRequest{})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error listing nodes: %v\n", err)
+		return
+	}
+	if res.Error != nil {
+		fmt.Fprintf(os.Stderr, "Unable to list nodes: %v\n", res.Error.Message)
+		return
+	}
+
+	fmt.Printf("  Node ID              Raft       Serf\n")
+	for _, v := range res.Nodes {
+		leader := ""
+		if v.Leader {
+			leader += "*"
+		}
+		fmt.Printf("%-2s%-20s %-10s %s\n", leader, v.NodeId, v.RaftState, v.SerfState)
+	}
+	fmt.Printf("\nReporting node: %s   Leader node: %s\n", res.NodeId, res.LeaderId)
 }
 
 func listShards(client clustermgmt.ClusterManagementClient) {
-	fmt.Fprintf(os.Stderr, "list shards")
+	ctx, done := context.WithTimeout(context.Background(), gRPCTimeout)
+	defer done()
+
+	res, err := client.ListShards(ctx, &clustermgmt.ListShardsRequest{})
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error listing shards: %v\n", err)
+		return
+	}
+	if res.Error != nil {
+		fmt.Fprintf(os.Stderr, "Unable to list shards: %v\n", res.Error.Message)
+		return
+	}
+
+	fmt.Println("Node ID              Shards             Weight")
+	for _, v := range res.Shards {
+		shardPct := float32(v.ShardCount) / float32(res.TotalShards) * 100.0
+		weightPct := float32(v.ShardWeight) / float32(res.TotalWeight) * 100.0
+		fmt.Printf("%-20s %10d (%3.1f%%) %10d (%3.1f%%)\n", v.NodeId, v.ShardCount, shardPct, v.ShardWeight, weightPct)
+	}
+	fmt.Printf("\nReporting node: %s    Total shards: %d    Total weight: %d\n", res.NodeId, res.TotalShards, res.TotalWeight)
 }
 
 func stepDown(client clustermgmt.ClusterManagementClient) {
-	fmt.Fprintf(os.Stderr, "step down")
+	ctx, done := context.WithTimeout(context.Background(), gRPCTimeout)
+	defer done()
+
+	res, err := client.StepDown(ctx, &clustermgmt.StepDownRequest{})
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error asking leader to step down: %v\n", err)
+		return
+	}
+	if res.Error != nil {
+		fmt.Fprintf(os.Stderr, "Leader is unable to step down: %v\n", res.Error.Message)
+		return
+	}
+	fmt.Printf("Leader node %s has stepped down\n", res.NodeId)
 }

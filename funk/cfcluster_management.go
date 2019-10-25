@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -145,7 +146,7 @@ func (c *clusterfunkCluster) GetStatus(ctx context.Context, req *clustermgmt.Get
 	return ret, nil
 }
 
-func (c *clusterfunkCluster) ListNodes(context.Context, *clustermgmt.ListNodesRequest) (*clustermgmt.ListNodesResponse, error) {
+func (c *clusterfunkCluster) ListNodes(ctx context.Context, req *clustermgmt.ListNodesRequest) (*clustermgmt.ListNodesResponse, error) {
 	if c.State() != Operational {
 		return &clustermgmt.ListNodesResponse{
 			Error: &clustermgmt.Error{
@@ -154,11 +155,76 @@ func (c *clusterfunkCluster) ListNodes(context.Context, *clustermgmt.ListNodesRe
 			},
 		}, nil
 	}
-	return nil, errors.New("not implemented")
+	if !c.raftNode.Leader() {
+		client, err := c.leaderManagementClient()
+		if err != nil {
+			return nil, err
+		}
+		ret, err := client.ListNodes(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+		ret.NodeId = c.NodeID()
+		return ret, nil
+	}
+
+	nodes := make(map[string]*clustermgmt.NodeInfo)
+	ret := &clustermgmt.ListNodesResponse{
+		LeaderId: c.NodeID(),
+		NodeId:   c.NodeID(),
+		Nodes:    make([]*clustermgmt.NodeInfo, 0),
+	}
+
+	list, err := c.raftNode.memberList()
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range list {
+		nodes[v.ID] = &clustermgmt.NodeInfo{
+			NodeId:    v.ID,
+			RaftState: v.State,
+			Leader:    v.Leader,
+		}
+	}
+
+	for _, v := range c.serfNode.memberList() {
+		n, ok := nodes[v.ID]
+		if !ok {
+			n = &clustermgmt.NodeInfo{
+				NodeId:    v.ID,
+				RaftState: "",
+				Leader:    false,
+			}
+		}
+		n.SerfState = v.State
+		nodes[v.ID] = n
+	}
+
+	for _, v := range nodes {
+		ret.Nodes = append(ret.Nodes, v)
+	}
+	return ret, nil
 }
 
-func (c *clusterfunkCluster) FindEndpoint(context.Context, *clustermgmt.EndpointRequest) (*clustermgmt.EndpointResponse, error) {
-	return nil, errors.New("not implemented")
+func (c *clusterfunkCluster) FindEndpoint(ctx context.Context, req *clustermgmt.EndpointRequest) (*clustermgmt.EndpointResponse, error) {
+	ret := &clustermgmt.EndpointResponse{
+		NodeId:    c.NodeID(),
+		Endpoints: make([]*clustermgmt.EndpointInfo, 0),
+	}
+	for _, v := range c.serfNode.Nodes() {
+		for k, val := range v.Tags {
+			if strings.HasPrefix(k, clusterEndpointPrefix) {
+				if strings.Contains(k, req.EndpointName) {
+					ret.Endpoints = append(ret.Endpoints, &clustermgmt.EndpointInfo{
+						NodeId:   v.NodeID,
+						Name:     k,
+						HostPort: val,
+					})
+				}
+			}
+		}
+	}
+	return ret, nil
 }
 
 func (c *clusterfunkCluster) AddNode(ctx context.Context, req *clustermgmt.AddNodeRequest) (*clustermgmt.AddNodeResponse, error) {
@@ -251,7 +317,33 @@ func (c *clusterfunkCluster) ListShards(ctx context.Context, req *clustermgmt.Li
 			},
 		}, nil
 	}
-	return nil, errors.New("not implemented")
+	items := make(map[string]*clustermgmt.ShardInfo)
+
+	ret := &clustermgmt.ListShardsResponse{
+		NodeId: c.NodeID(),
+		Shards: make([]*clustermgmt.ShardInfo, 0),
+	}
+	shards := c.shardManager.Shards()
+	ret.TotalShards = int32(len(shards))
+	ret.TotalWeight = int32(c.shardManager.TotalWeight())
+	for _, v := range shards {
+		i := items[v.NodeID()]
+		if i == nil {
+			i = &clustermgmt.ShardInfo{
+				NodeId:      v.NodeID(),
+				ShardCount:  0,
+				ShardWeight: 0,
+			}
+		}
+		i.ShardCount++
+		i.ShardWeight += int32(v.Weight())
+		items[v.NodeID()] = i
+	}
+
+	for _, v := range items {
+		ret.Shards = append(ret.Shards, v)
+	}
+	return ret, nil
 }
 
 func (c *clusterfunkCluster) StepDown(ctx context.Context, req *clustermgmt.StepDownRequest) (*clustermgmt.StepDownResponse, error) {
@@ -263,5 +355,23 @@ func (c *clusterfunkCluster) StepDown(ctx context.Context, req *clustermgmt.Step
 			},
 		}, nil
 	}
-	return nil, errors.New("not implemented")
+	if c.raftNode.Leader() {
+		if err := c.raftNode.StepDown(); err != nil {
+			return &clustermgmt.StepDownResponse{
+				Error: &clustermgmt.Error{
+					ErrorCode: clustermgmt.Error_GENERIC,
+					Message:   err.Error(),
+				},
+			}, nil
+		}
+		return &clustermgmt.StepDownResponse{
+			NodeId: c.NodeID(),
+		}, nil
+	}
+
+	client, err := c.leaderManagementClient()
+	if err != nil {
+		return nil, err
+	}
+	return client.StepDown(ctx, req)
 }

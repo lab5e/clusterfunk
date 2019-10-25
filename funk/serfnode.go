@@ -347,6 +347,18 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 	}
 }
 
+func (s *SerfNode) memberList() []nodeItem {
+	var ret []nodeItem
+	for _, v := range s.se.Members() {
+		ret = append(ret, nodeItem{
+			ID:     v.Name,
+			State:  v.Status.String(),
+			Leader: false,
+		})
+	}
+	return ret
+}
+
 type muteWriter struct {
 }
 
