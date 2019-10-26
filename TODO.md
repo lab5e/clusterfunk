@@ -1,5 +1,9 @@
 # TODOs
 
+* Rewrite client pool to block when getting a new client. Also rename
+  from "EndpointPool" to "ConnectionPool" since it isn't endpoint that
+  are pooled.
+
 * Non-members of the cluster, ie nodes that are part of the
   Serf cluster but not the Raft cluster. Useful for other kinds
   of services.

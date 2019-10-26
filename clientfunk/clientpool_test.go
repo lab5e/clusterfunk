@@ -1,8 +1,10 @@
 package clientfunk
 
 import (
+	"context"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -15,7 +17,7 @@ const poolElements = 20
 func TestEndpointPool(t *testing.T) {
 	assert := require.New(t)
 
-	pool := NewEndpointPool([]grpc.DialOption{grpc.WithInsecure()})
+	pool := NewClientPool([]grpc.DialOption{grpc.WithInsecure()})
 	// Make a pool of 10 servers. These are just to avoid errors
 	var endpoints []string
 
@@ -30,54 +32,66 @@ func TestEndpointPool(t *testing.T) {
 	pool.Sync(endpoints)
 	assert.Equal(poolElements, pool.Available())
 	assert.Falsef(pool.LowWaterMark(), "Expected no low watermark")
+
 	var taken []*grpc.ClientConn
 
 	for i := 0; i < poolElements; i++ {
-		c, err := pool.GetEndpoint()
+		ctx, done := context.WithTimeout(context.Background(), 10*time.Millisecond)
+		c, err := pool.Take(ctx)
 		assert.NoError(err)
 		assert.NotNil(c)
 		taken = append(taken, c)
+		done()
 	}
 	assert.Equal(0, pool.Available())
 
-	_, err := pool.GetEndpoint()
+	ctx, done := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	_, err := pool.Take(ctx)
 	assert.Error(err, "Expected error when using exhausted pool")
+	done()
 
 	// Release all
 	for i, v := range taken {
 		t.Logf("Releasing %s", v.Target())
 		assert.Equal(i, pool.Available())
-		assert.True(pool.ReleaseEndpoint(v))
+		pool.Release(v)
 	}
 	assert.Equal(poolElements, pool.Available())
 
 	taken = []*grpc.ClientConn{}
-	c, err := pool.GetEndpoint()
+	ctx, done = context.WithTimeout(context.Background(), 10*time.Millisecond)
+	c, err := pool.Take(ctx)
 	assert.NoError(err, "Expected no error when pool is full again")
 	pool.MarkUnhealthy(c)
-
-	for i := 0; i < poolElements/2; i++ {
-		c, err := pool.GetEndpoint()
-		assert.NoErrorf(err, "Did not expect error when retrieving connection: %+v", pool.Connections)
+	done()
+	for i := 0; i < poolElements-1; i++ {
+		ctx, done := context.WithTimeout(context.Background(), 10*time.Millisecond)
+		c, err := pool.Take(ctx)
+		assert.NoError(err, "Did not expect error when retrieving connection")
 		pool.MarkUnhealthy(c)
+		done()
 	}
+	assert.Equal(0, pool.Available())
 
-	assert.False(pool.LowWaterMark(), "Expecting no low watermark when 50% is unhealthy")
-
-	// Re-sync with half the number of connections
+	// Re-sync with half the number of connections. All are marked unhealthy so
+	// the only endpoints available will be the new ones
 	endpoints = endpoints[:poolElements/2]
 	pool.Sync(endpoints)
 	assert.Equal(len(endpoints), pool.Available())
 
 	for range endpoints {
-		c, _ := pool.GetEndpoint()
+		ctx, done := context.WithTimeout(context.Background(), 10*time.Millisecond)
+		c, _ := pool.Take(ctx)
 		pool.MarkUnhealthy(c)
+		done()
 	}
+	assert.Equal(0, pool.Size())
+	assert.Equal(0, pool.Available())
 	assert.True(pool.LowWaterMark())
 }
 
 func BenchmarkPoolGetRelease(b *testing.B) {
-	pool := NewEndpointPool([]grpc.DialOption{grpc.WithInsecure()})
+	pool := NewClientPool([]grpc.DialOption{grpc.WithInsecure()})
 	// Make a pool of 10 servers. These are just to avoid errors
 	var endpoints []string
 
@@ -92,42 +106,16 @@ func BenchmarkPoolGetRelease(b *testing.B) {
 	// Make it slightly realistic -- mark 1/3 as unhealthy
 	for range endpoints {
 		if rand.Int()%3 == 0 {
-			c, _ := pool.GetEndpoint()
+			ctx := context.Background()
+			c, _ := pool.Take(ctx)
 			pool.MarkUnhealthy(c)
 		}
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		c, _ := pool.GetEndpoint()
-		pool.ReleaseEndpoint(c)
-	}
-}
-
-func BenchmarkPoolSync(b *testing.B) {
-	pool := NewEndpointPool([]grpc.DialOption{grpc.WithInsecure()})
-	// Make a pool of 10 servers. These are just to avoid errors
-	var endpoints []string
-
-	// Note that the gRPC connections will not connect to a server
-	// when they are created; ie no need for a server runnin gin the other end.
-	for i := 0; i < poolElements; i++ {
-		ep := toolbox.RandomLocalEndpoint()
-		endpoints = append(endpoints, ep)
-	}
-
-	pool.Sync(endpoints)
-	b.ResetTimer()
-
-	// This might take a loooooong time to run since we're stopping
-	// the timer and doing slow work before restarting.
-	for i := 0; i < b.N; i++ {
-		b.StopTimer()
-		endpoints = endpoints[:poolElements/3]
-		for i := 0; i < poolElements/3; i++ {
-			endpoints = append(endpoints, toolbox.RandomLocalEndpoint())
-		}
-		b.StartTimer()
-		pool.Sync(endpoints)
+		ctx := context.Background()
+		c, _ := pool.Take(ctx)
+		pool.Release(c)
 	}
 }
