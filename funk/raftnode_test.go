@@ -37,7 +37,6 @@ func TestRaftCluster(t *testing.T) {
 		for lastEvent != ev {
 			lastEvent = <-ch
 		}
-		return
 	}
 
 	waitForEvent(RaftBecameLeader, evts1)

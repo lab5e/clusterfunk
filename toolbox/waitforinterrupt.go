@@ -9,10 +9,5 @@ import (
 func WaitForCtrlC() {
 	terminate := make(chan os.Signal, 1)
 	signal.Notify(terminate, os.Interrupt)
-	for {
-		select {
-		case <-terminate:
-			return
-		}
-	}
+	<-terminate
 }

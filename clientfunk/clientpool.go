@@ -4,7 +4,6 @@ import (
 	"context"
 	"sync/atomic"
 
-	"github.com/stalehd/clusterfunk/toolbox"
 	"google.golang.org/grpc"
 )
 
@@ -16,19 +15,17 @@ const maxPoolSize = 100
 // is marked as unhealthy it is closed and dropped and never handed out
 // again. The pool can be refreshed with new connections regularly.
 type ClientPool struct {
-	currentEndpoints toolbox.StringSet
-	connections      chan *grpc.ClientConn
-	poolSize         *int32
-	DialOptions      []grpc.DialOption
+	connections chan *grpc.ClientConn
+	DialOptions []grpc.DialOption
+	taken       *int32
 }
 
 // NewClientPool creates a new EndpointPool instance
 func NewClientPool(options []grpc.DialOption) *ClientPool {
 	return &ClientPool{
-		connections:      make(chan *grpc.ClientConn, maxPoolSize),
-		DialOptions:      options[:],
-		currentEndpoints: toolbox.NewStringSet(),
-		poolSize:         new(int32),
+		connections: make(chan *grpc.ClientConn, maxPoolSize),
+		DialOptions: options[:],
+		taken:       new(int32),
 	}
 }
 
@@ -38,6 +35,7 @@ func (c *ClientPool) Take(ctx context.Context) (*grpc.ClientConn, error) {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case ret := <-c.connections:
+		atomic.AddInt32(c.taken, 1)
 		return ret, nil
 	}
 }
@@ -46,12 +44,13 @@ func (c *ClientPool) Take(ctx context.Context) (*grpc.ClientConn, error) {
 // new connections in the pool so
 func (c *ClientPool) Release(conn *grpc.ClientConn) {
 	c.connections <- conn
+	atomic.AddInt32(c.taken, -1)
 }
 
 // MarkUnhealthy removes the connection from the pool
 func (c *ClientPool) MarkUnhealthy(conn *grpc.ClientConn) {
-	c.currentEndpoints.Remove(conn.Target())
 	conn.Close()
+	atomic.AddInt32(c.taken, -1)
 }
 
 // Sync refreshes the connections in the pool. Note that existing healthy connections
@@ -62,26 +61,12 @@ func (c *ClientPool) Sync(endpoints []string) {
 		panic("max client pool size will be exceeded")
 	}
 	for _, v := range endpoints {
-		if c.currentEndpoints.Add(v) {
-			conn, err := grpc.Dial(v, c.DialOptions...)
-			if err != nil {
-				c.currentEndpoints.Remove(v)
-				continue
-			}
-			c.connections <- conn
+		conn, err := grpc.Dial(v, c.DialOptions...)
+		if err != nil {
+			continue
 		}
+		c.connections <- conn
 	}
-	atomic.StoreInt32(c.poolSize, int32(c.currentEndpoints.Size()))
-}
-
-// LowWaterMark returns true if less than 1/3rd of the connections in the pool
-// is unhealthy.
-func (c *ClientPool) LowWaterMark() bool {
-	size := atomic.LoadInt32(c.poolSize)
-	if size == 0 || (float32(c.currentEndpoints.Size())/float32(size) < 0.333) {
-		return true
-	}
-	return false
 }
 
 // Available returns the number of available connections. Mostly for diagnostics.
@@ -89,7 +74,8 @@ func (c *ClientPool) Available() int {
 	return len(c.connections)
 }
 
-// Size returns the number of healthy connections in the pool.
+// Size returns the number of connections (theoretically) available, ie the
+// number of available connections plus the number of connections taken.
 func (c *ClientPool) Size() int {
-	return c.currentEndpoints.Size()
+	return len(c.connections) + int(atomic.LoadInt32(c.taken))
 }

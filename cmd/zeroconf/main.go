@@ -5,23 +5,11 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/stalehd/clusterfunk/toolbox"
 )
 
-func waitForTermination() {
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-
-	select {
-	case <-sig:
-	}
-
-}
 func registerService(name string) {
 	log.Println("Registering service")
 	reg := toolbox.NewZeroconfRegistry(name)
@@ -30,7 +18,7 @@ func registerService(name string) {
 		log.Printf("Error registering service: %v", err)
 		return
 	}
-	waitForTermination()
+	toolbox.WaitForCtrlC()
 
 	reg.Shutdown()
 }

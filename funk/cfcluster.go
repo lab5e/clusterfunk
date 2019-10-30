@@ -79,8 +79,12 @@ func (c *clusterfunkCluster) GetEndpoint(nodeID string, endpointName string) str
 func (c *clusterfunkCluster) Stop() {
 	c.setState(Stopping)
 
-	c.raftNode.Stop()
-	c.serfNode.Stop()
+	if err := c.raftNode.Stop(); err != nil {
+		log.WithError(err).Warning("Error stopping Raft node. Will stop anyways")
+	}
+	if err := c.serfNode.Stop(); err != nil {
+		log.WithError(err).Warning("Error stopping Serf node. Will stop anyways.")
+	}
 
 	c.setRole(Unknown)
 	c.setState(Invalid)
@@ -408,9 +412,7 @@ func (c *clusterfunkCluster) sendCommitMessage(index uint64) {
 	commitMsg := clusterproto.CommitShardMapMessage{
 		ShardMapLogIndex: int64(index),
 	}
-	for _, v := range c.raftNode.Nodes.List() {
-		commitMsg.Nodes = append(commitMsg.Nodes, v)
-	}
+	commitMsg.Nodes = append(commitMsg.Nodes, c.raftNode.Nodes.List()...)
 	commitBuf, err := proto.Marshal(&commitMsg)
 	if err != nil {
 		panic(fmt.Sprintf("Unable to marshal commit message buffer: %v", err))

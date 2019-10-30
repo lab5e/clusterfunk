@@ -19,12 +19,7 @@ const numShards = 10000
 func waitForExit() {
 	terminate := make(chan os.Signal, 1)
 	signal.Notify(terminate, os.Interrupt)
-	for {
-		select {
-		case <-terminate:
-			return
-		}
-	}
+	<-terminate
 }
 
 func main() {
@@ -66,8 +61,6 @@ var registry *toolbox.ZeroconfRegistry
 var checker funk.LivenessChecker
 
 const livenessEndpoint = "ep.live"
-
-var localLiveEndpoint string
 
 func start(config funk.Parameters) error {
 	config.Final()

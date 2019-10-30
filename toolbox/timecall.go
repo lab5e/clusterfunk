@@ -10,6 +10,6 @@ import (
 func TimeCall(call func(), description string) {
 	start := time.Now()
 	call()
-	diff := time.Now().Sub(start)
+	diff := time.Since(start)
 	log.Printf("%s took %f ms to execute", description, float64(diff)/float64(time.Millisecond))
 }

@@ -55,7 +55,11 @@ func refreshPool(pool *clientfunk.ClientPool) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to locate endpoints: %v\n", err)
 	}
-	pool.Sync(endpoints)
+	var p []string
+	for i := 0; i < 3; i++ {
+		p = append(p, endpoints...)
+	}
+	pool.Sync(p)
 }
 func main() {
 	clientPool := clientfunk.NewClientPool([]grpc.DialOption{grpc.WithInsecure()})
@@ -105,6 +109,15 @@ func main() {
 		fmt.Fprintf(csvFile, "Num,Node,Time\n")
 		defer csvFile.Close()
 	}
+	go func() {
+		for {
+			time.Sleep(100 * time.Millisecond)
+			if clientPool.Available() == 0 {
+				fmt.Printf("Low Water Mark for pool. Refreshing it.")
+				refreshPool(clientPool)
+			}
+		}
+	}()
 
 	success := 0
 	received := 0
@@ -121,10 +134,6 @@ func main() {
 			// Log call time to CSV
 			fmt.Fprintf(csvFile, "%d,%s,%f\n", received, result.NodeID, result.Time)
 			received++
-			if clientPool.LowWaterMark() {
-				fmt.Printf("Low Water Mark for pool. Refreshing it.")
-				refreshPool(clientPool)
-			}
 		}
 	}()
 

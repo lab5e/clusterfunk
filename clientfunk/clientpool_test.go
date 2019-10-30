@@ -28,10 +28,8 @@ func TestEndpointPool(t *testing.T) {
 		endpoints = append(endpoints, ep)
 	}
 	assert.Equal(0, pool.Available())
-	assert.True(pool.LowWaterMark(), "Empty pool should have low watermark")
 	pool.Sync(endpoints)
 	assert.Equal(poolElements, pool.Available())
-	assert.Falsef(pool.LowWaterMark(), "Expected no low watermark")
 
 	var taken []*grpc.ClientConn
 
@@ -58,7 +56,6 @@ func TestEndpointPool(t *testing.T) {
 	}
 	assert.Equal(poolElements, pool.Available())
 
-	taken = []*grpc.ClientConn{}
 	ctx, done = context.WithTimeout(context.Background(), 10*time.Millisecond)
 	c, err := pool.Take(ctx)
 	assert.NoError(err, "Expected no error when pool is full again")
@@ -85,9 +82,7 @@ func TestEndpointPool(t *testing.T) {
 		pool.MarkUnhealthy(c)
 		done()
 	}
-	assert.Equal(0, pool.Size())
 	assert.Equal(0, pool.Available())
-	assert.True(pool.LowWaterMark())
 }
 
 func BenchmarkPoolGetRelease(b *testing.B) {

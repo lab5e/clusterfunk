@@ -76,7 +76,8 @@ func PortOfHostPort(hostport string) int {
 	if err != nil {
 		panic(err.Error())
 	}
-	ret, err := strconv.ParseInt(port, 10, 32)
+	// Will ignore the error here since we want to return 0 if there's an error
+	ret, _ := strconv.ParseInt(port, 10, 32)
 	return int(ret)
 }
 

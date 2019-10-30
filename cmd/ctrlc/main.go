@@ -31,8 +31,6 @@ const (
 	cmdHelp       = "help"
 )
 
-type commandRunner func(clustermgmt.ClusterManagementClient, parameters)
-
 func main() {
 	var config parameters
 	flag.StringVar(&config.ClusterName, "cluster-name", "demo", "Name of cluster to connect with")

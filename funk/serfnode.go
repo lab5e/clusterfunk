@@ -66,7 +66,7 @@ func NewSerfNode() *SerfNode {
 		mutex:         &sync.RWMutex{},
 		tags:          make(map[string]string),
 		notifications: make([]chan NodeEvent, 0),
-		members:       make(map[string]SerfMember, 0),
+		members:       make(map[string]SerfMember),
 	}
 	return ret
 }

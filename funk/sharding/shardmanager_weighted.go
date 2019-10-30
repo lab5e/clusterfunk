@@ -95,7 +95,7 @@ func (sm *weightedShardManager) Init(maxShards int, weights []int) error {
 		sm.totalWeight += weight
 		sm.shards[i] = NewShard(i, weight)
 		if weight == 0 {
-			return fmt.Errorf("Can't use weight = 0 for shard %d", i)
+			return fmt.Errorf("can't use weight = 0 for shard %d", i)
 		}
 	}
 	return nil
@@ -231,13 +231,6 @@ func (sm *weightedShardManager) NodeList() []string {
 		ret = append(ret, k)
 	}
 	return ret
-}
-
-// This is the wire type for the gob encoder
-type shardWire struct {
-	ID     int
-	Weight int
-	NodeID string
 }
 
 func (sm *weightedShardManager) MarshalBinary() ([]byte, error) {
