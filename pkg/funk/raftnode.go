@@ -6,7 +6,7 @@ import (
 	"io"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/stalehd/clusterfunk/toolbox"
+	"github.com/stalehd/clusterfunk/pkg/toolbox"
 
 	"net"
 	"os"

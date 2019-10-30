@@ -3,8 +3,8 @@ package clientfunk
 import (
 	"testing"
 
-	"github.com/stalehd/clusterfunk/funk"
-	"github.com/stalehd/clusterfunk/toolbox"
+	"github.com/stalehd/clusterfunk/pkg/funk"
+	"github.com/stalehd/clusterfunk/pkg/toolbox"
 	"github.com/stretchr/testify/require"
 )
 

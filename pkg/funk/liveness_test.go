@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/stalehd/clusterfunk/toolbox"
+	"github.com/stalehd/clusterfunk/pkg/toolbox"
 )
 
 // Ensure clients gets events when they die while acking

@@ -10,10 +10,10 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/stalehd/clusterfunk/funk/clusterproto"
+	"github.com/stalehd/clusterfunk/pkg/funk/clusterproto"
 
-	"github.com/stalehd/clusterfunk/funk/sharding"
-	"github.com/stalehd/clusterfunk/toolbox"
+	"github.com/stalehd/clusterfunk/pkg/funk/sharding"
+	"github.com/stalehd/clusterfunk/pkg/toolbox"
 	"google.golang.org/grpc"
 )
 
@@ -443,9 +443,7 @@ func (c *clusterfunkCluster) serfEventLoop(ch <-chan NodeEvent) {
 					continue
 				}
 				switch ev.Event {
-				case SerfNodeJoined:
-					fallthrough
-				case SerfNodeUpdated:
+				case SerfNodeJoined, SerfNodeUpdated:
 					if knownNodes.Add(ev.Node.NodeID) && c.config.AutoJoin && c.Role() == Leader {
 						log.Warnf("Adding serf node %s to cluster", ev.Node.NodeID)
 						if err := c.raftNode.AddClusterNode(ev.Node.NodeID, ev.Node.Tags[RaftEndpoint]); err != nil {

@@ -3,13 +3,13 @@ package main
 import (
 	"flag"
 
-	"github.com/stalehd/clusterfunk/funk"
 
 	golog "log"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/stalehd/clusterfunk/funk/sharding"
-	"github.com/stalehd/clusterfunk/toolbox"
+	"github.com/stalehd/clusterfunk/pkg/funk"
+	"github.com/stalehd/clusterfunk/pkg/funk/sharding"
+	"github.com/stalehd/clusterfunk/pkg/toolbox"
 )
 
 const numShards = 10000

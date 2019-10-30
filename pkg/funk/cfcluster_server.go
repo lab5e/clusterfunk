@@ -8,7 +8,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/stalehd/clusterfunk/funk/clusterproto"
+	"github.com/stalehd/clusterfunk/pkg/funk/clusterproto"
 	"google.golang.org/grpc"
 )
 

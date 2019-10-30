@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/stalehd/clusterfunk/funk/clustermgmt"
-	"github.com/stalehd/clusterfunk/toolbox"
+	"github.com/stalehd/clusterfunk/pkg/funk/clustermgmt"
+	"github.com/stalehd/clusterfunk/pkg/toolbox"
 	"google.golang.org/grpc"
 )
 

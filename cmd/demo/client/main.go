@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stalehd/clusterfunk/toolbox"
+	"github.com/stalehd/clusterfunk/pkg/toolbox"
 
-	"github.com/stalehd/clusterfunk/clientfunk"
+	"github.com/stalehd/clusterfunk/pkg/clientfunk"
 	"github.com/stalehd/clusterfunk/cmd/demo"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"

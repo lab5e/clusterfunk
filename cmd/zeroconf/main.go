@@ -7,7 +7,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/stalehd/clusterfunk/toolbox"
+	"github.com/stalehd/clusterfunk/pkg/toolbox"
 )
 
 func registerService(name string) {

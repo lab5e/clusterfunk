@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stalehd/clusterfunk/toolbox"
+	"github.com/stalehd/clusterfunk/pkg/toolbox"
 	"github.com/stretchr/testify/require"
 )
 

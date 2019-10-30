@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stalehd/clusterfunk/funk/sharding"
-	"github.com/stalehd/clusterfunk/toolbox"
+	"github.com/stalehd/clusterfunk/pkg/funk/sharding"
+	"github.com/stalehd/clusterfunk/pkg/toolbox"
 	"github.com/stretchr/testify/require"
 )
 

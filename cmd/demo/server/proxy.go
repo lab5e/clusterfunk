@@ -3,12 +3,10 @@ package main
 import (
 	"context"
 
-	"github.com/stalehd/clusterfunk/serverfunk"
-
-	"github.com/stalehd/clusterfunk/funk"
-
 	"github.com/stalehd/clusterfunk/cmd/demo"
-	"github.com/stalehd/clusterfunk/funk/sharding"
+	"github.com/stalehd/clusterfunk/pkg/serverfunk"
+	"github.com/stalehd/clusterfunk/pkg/funk"
+	"github.com/stalehd/clusterfunk/pkg/funk/sharding"
 	"google.golang.org/grpc"
 )
 

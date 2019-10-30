@@ -10,8 +10,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/stalehd/clusterfunk/funk/clustermgmt"
-	"github.com/stalehd/clusterfunk/toolbox"
+	"github.com/stalehd/clusterfunk/pkg/funk/clustermgmt"
+	"github.com/stalehd/clusterfunk/pkg/toolbox"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -87,13 +87,7 @@ func (c *clusterfunkCluster) GetStatus(ctx context.Context, req *clustermgmt.Get
 	var ret *clustermgmt.GetStatusResponse
 
 	switch c.State() {
-	case Invalid:
-		fallthrough
-	case Stopping:
-		fallthrough
-	case Starting:
-		fallthrough
-	case Joining:
+	case Invalid, Stopping, Starting, Joining:
 		ret = &clustermgmt.GetStatusResponse{
 			ClusterName: c.Name(),
 			LocalState:  c.State().String(),
@@ -104,11 +98,7 @@ func (c *clusterfunkCluster) GetStatus(ctx context.Context, req *clustermgmt.Get
 			},
 		}
 
-	case Operational:
-		fallthrough
-	case Voting:
-		fallthrough
-	case Resharding:
+	case Operational, Voting, Resharding:
 		ret = &clustermgmt.GetStatusResponse{
 			ClusterName:   c.Name(),
 			LocalNodeId:   c.NodeID(),

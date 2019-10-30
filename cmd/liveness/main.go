@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/stalehd/clusterfunk/toolbox"
+	"github.com/stalehd/clusterfunk/pkg/toolbox"
 
-	"github.com/stalehd/clusterfunk/funk"
+	"github.com/stalehd/clusterfunk/pkg/funk"
 )
 
 var eps = []string{
