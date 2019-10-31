@@ -60,6 +60,16 @@ func (c *ClientPool) Sync(endpoints []string) {
 	if len(endpoints) > maxPoolSize {
 		panic("max client pool size will be exceeded")
 	}
+	// Drain the pool
+	for len(c.connections) > 0 {
+		select {
+		case conn := <- c.connections:
+			conn.Close()
+		default:
+			// skip
+		}
+	}
+	// ..and reestablish the new connections
 	for _, v := range endpoints {
 		conn, err := grpc.Dial(v, c.DialOptions...)
 		if err != nil {
