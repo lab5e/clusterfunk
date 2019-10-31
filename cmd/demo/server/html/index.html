@@ -1,0 +1,149 @@
+<!doctype html>
+<!-- this is a template for the web server -->
+<html>
+
+<head>
+    <title>Cluster status</title>
+    <link rel="stylesheet" href="https://unpkg.com/purecss@1.0.1/build/pure-min.css"
+        integrity="sha384-oAOxQR6DkCoMliIh8yFnu25d7Eq/PHS21PClpwjOTeU2jRSq11vu66rf90/cZr47" crossorigin="anonymous">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+        .miniheading h2 {
+            color: #E00A13;
+        }
+
+        .statusheading {
+            color: black;
+            background-color: #FFFF00;
+            font-size: smaller;
+            padding: 0.5em;
+        }
+
+        .statusheading-error {
+            color: white;
+            background-color: #E00A13;
+        }
+
+        .statusheading-ok {
+            color: white;
+            background-color: #00AA00;
+        }
+
+        .l-box {
+            padding: 1em;
+        }
+    </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+</head>
+
+<body>
+
+    <div class="pure-g">
+        <div class="pure-u-1-1">
+            <div class="l-box">
+                <img src="clusterfunk_logo.png" />
+            </div>
+
+        </div>
+        <div class="pure-u-1-1 statusheading" id="status">
+            <span>My node ID: 0</span> <span>Status: unknown</span>
+
+        </div>
+        <div class="pure-u-1-3 miniheading">
+            <div class="l-box">
+                <h2>State</h2>
+                <span id="state">unknown</span>
+            </div>
+        </div>
+        <div class="pure-u-1-3 miniheading">
+            <div class="l-box">
+                <h2>Members</h2>
+                <table class="pure-table">
+                    <thead>
+                        <tr>
+                            <th>
+                                ID
+                            </th>
+
+                        </tr>
+                    </thead>
+                    <tbody id="members">
+                        <tr>
+                            <td>(no members)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="pure-u-1-3 miniheading">
+            <div class="l-box">
+                <h2>Shards</h2>
+                <table class="pure-table">
+                    <thead>
+                        <tr>
+                            <th>
+                                Node ID
+                            </th>
+                            <th>
+                                Number of shards
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="shards">
+                        <tr>
+                            <td>(no members)</td>
+                            <td>-</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+<script lang="javascript">
+
+    $(document).ready(function (e) {
+        $('#state').replaceWith('hello there');
+
+        $('#members').replaceWith('<tr><td></td></tr>');
+
+        $('#shards').replaceWith('<tr><td></td><td></td></tr>')
+
+        // Connect to the web socket
+        var ws = new WebSocket("wss://localhost:8080/statusws");
+        ws.onmessage = function (s, ev) {
+            var msg = JSON.Parse(ev.data);
+            switch (msg.Type) {
+                case "info":
+                // info on local node. Sent right after connect.
+                case "status":
+                // Status has changed. Sent continuously and after connect.
+                case "members":
+                // member list is updated. Sent after connect + cluster events.
+                case "shards":
+                // shard list is updated. Sent after connect + cluster events.
+            }
+        };
+        ws.onerror = function (s, ev) {
+            $('#status').removeClass('statusheading-ok');
+            $('#status').removeClass('statusheading-error');
+            $('#status').addClass('statusheading-error');
+
+        };
+        ws.onopen = function (s, ev) {
+            $('#status').removeClass('statusheading-ok');
+            $('#status').removeClass('statusheading-error');
+            $('#status').addClass('statusheading-ok');
+        };
+
+        ws.onclose = function (s, ev) {
+            $('#status').removeClass('statusheading-ok');
+            $('#status').removeClass('statusheading-error');
+        };
+    });
+</script>
+
+</html>
