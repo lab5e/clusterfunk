@@ -12,8 +12,8 @@ import (
 
 	"github.com/stalehd/clusterfunk/pkg/toolbox"
 
-	"github.com/stalehd/clusterfunk/pkg/clientfunk"
 	"github.com/stalehd/clusterfunk/cmd/demo"
+	"github.com/stalehd/clusterfunk/pkg/clientfunk"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -27,7 +27,7 @@ type parameters struct {
 	PrintSummary bool
 }
 
-const numWorkers = 1
+const numWorkers = 3
 
 var config parameters
 
@@ -55,16 +55,12 @@ func refreshPool(pool *clientfunk.ClientPool) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to locate endpoints: %v\n", err)
 	}
-	var p []string
-	for i := 0; i < 3; i++ {
-		p = append(p, endpoints...)
-	}
-	pool.Sync(p)
+	pool.Sync(endpoints)
 }
 func main() {
 	clientPool := clientfunk.NewClientPool([]grpc.DialOption{grpc.WithInsecure()})
 	refreshPool(clientPool)
-
+	lowWatermark := clientPool.Size() - 1
 	// Seed is quite important here
 	rand.Seed(time.Now().UnixNano())
 
@@ -74,26 +70,47 @@ func main() {
 	// otherwise.
 	timings := make(chan result)
 
-	go func(timingCh chan<- result, times int) {
-		for i := 0; i < times; i++ {
-			time.Sleep(config.Sleep)
-			start := time.Now()
-			res, err := failoverCall(clientPool, demoServerCall, &demo.LiffRequest{ID: int64(rand.Int())})
-			stop := time.Now()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error calling Liff: %v\n", err)
-				timingCh <- result{Success: false}
-				continue
-			}
-			resp := res.(*demo.LiffResponse)
-			timingCh <- result{
-				NodeID:  resp.NodeID,
-				Success: true,
-				Time:    float64(stop.Sub(start)) / float64(time.Millisecond)}
+	for worker := 0; worker < numWorkers; worker++ {
+		go func(timingCh chan<- result, times int) {
+			for i := 0; i < times; i++ {
+				time.Sleep(config.Sleep)
+				ctx, done := context.WithTimeout(context.Background(), 2*time.Second)
+				conn, err := clientPool.Take(ctx)
+				done()
+				if err != nil {
+					continue
+				}
+				ctx, done = context.WithTimeout(context.Background(), 3*time.Second)
+				liffClient := demo.NewDemoServiceClient(conn)
+				start := time.Now()
+				res, err := liffClient.Liff(ctx, &demo.LiffRequest{ID: int64(rand.Int())})
+				stop := time.Now()
+				done()
+				if err != nil {
+					code := status.Code(err)
+					switch code {
+					case codes.Unavailable /*, codes.DeadlineExceeded*/ :
+						fmt.Printf("Connection %s might be unhealthy (deadline). Marking as unhealthy\n", conn.Target())
+						clientPool.MarkUnhealthy(conn)
+					default:
+						fmt.Fprintf(os.Stderr, "Error calling Liff: %v (code=%v)\n", err, code)
+						clientPool.Release(conn)
+					}
+					timingCh <- result{Success: false}
+					continue
+				}
 
-		}
-		wg.Done()
-	}(timings, config.Repeats)
+				clientPool.Release(conn)
+
+				timingCh <- result{
+					NodeID:  res.NodeID,
+					Success: true,
+					Time:    float64(stop.Sub(start)) / float64(time.Millisecond)}
+
+			}
+			wg.Done()
+		}(timings, config.Repeats)
+	}
 
 	nodes := make(map[string]int)
 	totals := make(map[string]float64)
@@ -111,9 +128,8 @@ func main() {
 	}
 	go func() {
 		for {
-			time.Sleep(100 * time.Millisecond)
-			if clientPool.Available() == 0 {
-				fmt.Printf("Low Water Mark for pool. Refreshing it.")
+			time.Sleep(2 * time.Second)
+			if clientPool.Size() < lowWatermark {
 				refreshPool(clientPool)
 			}
 		}
@@ -121,25 +137,36 @@ func main() {
 
 	success := 0
 	received := 0
+	total := 0.0
+	max := 0.0
+	min := 99999999.9
 	go func() {
 		for result := range timings {
+			received++
+			fmt.Printf("\rReceived %d responses", received)
 			if !result.Success {
+				fmt.Printf("Error     : %f ms\n", result.Time)
 				continue
 			}
 			success++
-			fmt.Printf("Time on %s: %f ms\n", result.NodeID, result.Time)
-
+			total += result.Time
+			if max < result.Time {
+				max = result.Time
+			}
+			if min > result.Time {
+				min = result.Time
+			}
 			nodes[result.NodeID]++
 			totals[result.NodeID] += result.Time
 			// Log call time to CSV
 			fmt.Fprintf(csvFile, "%d,%s,%f\n", received, result.NodeID, result.Time)
-			received++
 		}
 	}()
 
 	wg.Wait()
 	if config.PrintSummary {
 		fmt.Println("=================================================")
+		fmt.Printf("average: %6.2f   min: %6.2f  max: %6.2f\n", total/float64(success), min, max)
 		fmt.Printf("%d calls in total, %d successful, %d failed\n", config.Repeats*numWorkers, success, (numWorkers*config.Repeats)-success)
 		for k, v := range nodes {
 			fmt.Printf("%20s: %d calls - %f ms average\n", k, v, totals[k]/float64(v))
