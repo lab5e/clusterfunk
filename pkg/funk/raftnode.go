@@ -266,9 +266,14 @@ func (r *RaftNode) Stop() error {
 	}
 
 	if r.ra.VerifyLeader().Error() == nil {
-		// Make sure all entries are replicated
-		r.ra.Barrier(2 * time.Second).Error()
-		r.ra.RemoveServer(raft.ServerID(r.localNodeID), 0, 2*time.Second).Error()
+		// Make sure all entries are replicated. If there's an error just log
+		// it and continue to stop
+		if err := r.ra.Barrier(2 * time.Second).Error(); err != nil {
+			log.WithError(err).Warning("Unable to call Barrier()")
+		}
+		if err := r.ra.RemoveServer(raft.ServerID(r.localNodeID), 0, 2*time.Second).Error(); err != nil {
+			log.WithError(err).Warning("Unable to remove myself from the cluster")
+		}
 	}
 
 	if err := r.ra.Shutdown().Error(); err != nil {

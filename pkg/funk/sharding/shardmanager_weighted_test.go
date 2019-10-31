@@ -78,6 +78,7 @@ func TestNodeData(t *testing.T) {
 	}
 
 	defer func() {
+		// nolint
 		recover()
 	}()
 	nd.RemoveShard(1)
@@ -103,6 +104,8 @@ func BenchmarkWeightedShardManager(b *testing.B) {
 	for i := range weights {
 		weights[i] = int(rand.Int31n(100)) + 1
 	}
+
+	// nolint - don't care about error returns here
 	sm.Init(benchmarkShardCount, weights)
 
 	var nodes []string
@@ -127,6 +130,7 @@ func BenchmarkMapToNode(b *testing.B) {
 	for i := range weights {
 		weights[i] = int(rand.Int31n(100)) + 1
 	}
+	// nolint - won't check error return
 	sm.Init(benchmarkShardCount, weights)
 
 	var nodes []string
@@ -150,6 +154,7 @@ func BenchmarkShardInit(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		sm := NewShardManager()
+		// nolint - won't check for errors
 		sm.Init(benchmarkShardCount, weights)
 	}
 }
@@ -168,45 +173,37 @@ func BenchmarkShardWeight(b *testing.B) {
 }
 
 func TestMarshalUnmarshalBinary(t *testing.T) {
+	assert := require.New(t)
 	weights := make([]int, benchmarkShardCount)
 	for i := range weights {
 		weights[i] = int(rand.Int31n(100)) + 1
 	}
 	sm := NewShardManager()
-	sm.Init(benchmarkShardCount, weights)
+
+	assert.NoError(sm.Init(benchmarkShardCount, weights))
+
 	var nodes []string
 	for i := 0; i < benchmarkNodeCount; i++ {
 		nodes = append(nodes, fmt.Sprintf("Node%04d", i))
 	}
 	sm.UpdateNodes(nodes...)
 	buf, err := sm.MarshalBinary()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
+
 	t.Logf("%d shards = %d bytes", benchmarkShardCount, len(buf))
 	newManager := NewShardManager()
-	if err := newManager.UnmarshalBinary(buf); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(newManager.UnmarshalBinary(buf))
 
-	if newManager.TotalWeight() != sm.TotalWeight() {
-		t.Fatalf("Total weight is different")
-	}
-	if len(newManager.Shards()) != len(sm.Shards()) {
-		t.Fatalf("Number of shards is different: %d != %d", len(newManager.Shards()), len(sm.Shards()))
-	}
+	assert.Equal(sm.TotalWeight(), newManager.TotalWeight(), "Total weight for both should be the same")
+
+	assert.Equal(len(newManager.Shards()), len(sm.Shards()), "Number of shards should be the same")
+
 	for i := 0; i < benchmarkShardCount; i++ {
 		old := sm.MapToNode(i)
 		new := newManager.MapToNode(i)
-		if new.NodeID() != old.NodeID() {
-			t.Fatalf("Shard %d is in a different place (%s/%s)", i, new.NodeID(), old.NodeID())
-		}
-		if new.Weight() != old.Weight() {
-			t.Fatalf("Shard %d has different weight", i)
-		}
-		if new.ID() != old.ID() {
-			t.Fatalf("Shard %d has different ID", i)
-		}
+		assert.Equalf(new.NodeID(), old.NodeID(), "Shard %d is in a different place", i)
+		assert.Equalf(new.Weight(), old.Weight(), "Shard %d has different weight", i)
+		assert.Equalf(new.ID(), old.ID(), "Shard %d has different ID", i)
 	}
 }
 
@@ -216,6 +213,7 @@ func BenchmarkMarshalManager(b *testing.B) {
 		weights[i] = int(rand.Int31n(100)) + 1
 	}
 	sm := NewShardManager()
+	// nolint - wont't check error return
 	sm.Init(benchmarkShardCount, weights)
 	var nodes []string
 	for i := 0; i < benchmarkNodeCount; i++ {
@@ -224,6 +222,7 @@ func BenchmarkMarshalManager(b *testing.B) {
 	sm.UpdateNodes(nodes...)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		// nolint - won't check error returns
 		sm.MarshalBinary()
 	}
 }
@@ -234,6 +233,7 @@ func BenchmarkUnmarshalManager(b *testing.B) {
 		weights[i] = int(rand.Int31n(100)) + 1
 	}
 	sm := NewShardManager()
+	// nolint - won't check error returns
 	sm.Init(benchmarkShardCount, weights)
 	nodes := []string{}
 	for i := 0; i < benchmarkNodeCount; i++ {
@@ -245,6 +245,7 @@ func BenchmarkUnmarshalManager(b *testing.B) {
 	newManager := NewShardManager()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		// nolint - this is a benchmark
 		newManager.UnmarshalBinary(buf)
 	}
 }

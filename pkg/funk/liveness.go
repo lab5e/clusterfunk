@@ -73,11 +73,16 @@ func (u *udpLivenessClient) launch(endpoint string) {
 				return
 			default:
 			}
-			conn.SetReadDeadline(time.Now().Add(1 * time.Second))
+			if err := conn.SetReadDeadline(time.Now().Add(1 * time.Second)); err != nil {
+				log.WithError(err).Warning("Can't set deadline for socket")
+				time.Sleep(1 * time.Second)
+				continue
+			}
 			_, addr, err := conn.ReadFrom(buf)
 			if err != nil {
 				continue
 			}
+			// nolint This *might* cause an error but we'll ignore the erorr since it's handled elsewhere.
 			conn.WriteTo(buf, addr)
 		}
 	}(conn)
@@ -149,6 +154,7 @@ func (c *singleChecker) checkerProc(id, endpoint string, interval time.Duration)
 			c.aliveCh <- id
 			waitInterval = interval
 		}
+
 		if conn == nil {
 			conn = c.getConnection(endpoint, waitInterval)
 			if conn == nil {
@@ -160,7 +166,13 @@ func (c *singleChecker) checkerProc(id, endpoint string, interval time.Duration)
 
 		waitCh := time.After(waitInterval)
 
-		conn.SetWriteDeadline(time.Now().Add(interval))
+		if err := conn.SetWriteDeadline(time.Now().Add(interval)); err != nil {
+			log.WithError(err).Warning("Can't set deadline for liveness check socket")
+			conn.Close()
+			conn = nil
+			time.Sleep(waitInterval)
+			continue
+		}
 		_, err := conn.Write([]byte("Yo"))
 		if err != nil {
 			// Writes will usually succeed since UDP is a black hole but
@@ -171,7 +183,14 @@ func (c *singleChecker) checkerProc(id, endpoint string, interval time.Duration)
 			time.Sleep(waitInterval)
 			continue
 		}
-		conn.SetReadDeadline(time.Now().Add(interval))
+		if err := conn.SetReadDeadline(time.Now().Add(interval)); err != nil {
+			log.WithError(err).Warning("Can't set deadline for liveness check socket")
+			conn.Close()
+			conn = nil
+			time.Sleep(waitInterval)
+			continue
+		}
+
 		_, err = conn.Read(buffer)
 		if err != nil {
 			// This will fail if the client is dead.
