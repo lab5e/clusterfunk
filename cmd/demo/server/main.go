@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 
-
 	golog "log"
 
 	log "github.com/sirupsen/logrus"
@@ -36,6 +35,8 @@ func init() {
 	config.Final()
 }
 func main() {
+	p := newProducer()
+	launchLocalWebserver(p)
 	// Set up the shard map.
 	shards = sharding.NewShardManager()
 	if err := shards.Init(numShards, nil); err != nil {

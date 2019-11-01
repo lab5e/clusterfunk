@@ -113,8 +113,12 @@
         $('#shards').replaceWith('<tr><td></td><td></td></tr>')
 
         // Connect to the web socket
-        var ws = new WebSocket("wss://localhost:8080/statusws");
+        var url = new URL('/statusws', window.location.href);
+        url.protocol = url.protocol.replace('http', 'ws');
+        var ws = new WebSocket(url.href);
+        console.debug('Opening websocket ', url)
         ws.onmessage = function (s, ev) {
+            console.debug('Received WS message', msg)
             var msg = JSON.Parse(ev.data);
             switch (msg.Type) {
                 case "info":
