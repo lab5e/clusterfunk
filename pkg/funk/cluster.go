@@ -110,6 +110,13 @@ type Cluster interface {
 	// SetEndpoint registers an endpoint on the local node
 	SetEndpoint(name string, endpoint string)
 
+	// Leader returns the node ID of the leader in the cluster. If no leader
+	// is currently elected it will return a blank string.
+	Leader() string
+
+	// Nodes returns a list of the node IDs of each member
+	Nodes() []string
+
 	// GetEndpoint returns the endpoint for a particular node. If the node
 	// or endpoint isn't found it will return a blank. The endpoint is
 	// retrieved from the Serf cluster. Note that there's no guarantee

@@ -6,10 +6,14 @@
     <title>Cluster status</title>
     <link rel="stylesheet" href="https://unpkg.com/purecss@1.0.1/build/pure-min.css"
         integrity="sha384-oAOxQR6DkCoMliIh8yFnu25d7Eq/PHS21PClpwjOTeU2jRSq11vu66rf90/cZr47" crossorigin="anonymous">
-
+    <link rel="icon" type="image/png" href="cf_icon.png">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <style>
+        h1 {
+            color: #E00A13;
+        }
+
         .miniheading h2 {
             color: #E00A13;
         }
@@ -42,37 +46,43 @@
 <body>
 
     <div class="pure-g">
-        <div class="pure-u-1-1">
+        <div class="pure-u-1-2">
             <div class="l-box">
                 <img src="clusterfunk_logo.png" />
             </div>
-
+        </div>
+        <div class="pure-u-1-2">
+            <div class="l-box">
+                <h1>Node <span id="node-id"></span></h1>
+            </div>
         </div>
         <div class="pure-u-1-1 statusheading" id="status">
-            <span>My node ID: 0</span> <span>Status: unknown</span>
-
+            disconnected
         </div>
         <div class="pure-u-1-3 miniheading">
             <div class="l-box">
                 <h2>State</h2>
-                <span id="state">unknown</span>
+                <div>State: <span id="node-state"></span></div>
+                <div>Role: <span id="node-role"></span></div>
+
             </div>
         </div>
         <div class="pure-u-1-3 miniheading">
             <div class="l-box">
                 <h2>Members</h2>
-                <table class="pure-table">
+                <table class="pure-table" id="members">
                     <thead>
                         <tr>
-                            <th>
-                                ID
-                            </th>
-
+                            <th>Role</th>
+                            <th>ID</th>
+                            <th>Status page</th>
                         </tr>
                     </thead>
-                    <tbody id="members">
+                    <tbody>
                         <tr>
-                            <td>(no members)</td>
+                            <td>diverse</td>
+                            <td>dr</td>
+                            <td>who</td>
                         </tr>
                     </tbody>
                 </table>
@@ -81,7 +91,7 @@
         <div class="pure-u-1-3 miniheading">
             <div class="l-box">
                 <h2>Shards</h2>
-                <table class="pure-table">
+                <table class="pure-table" id="shards">
                     <thead>
                         <tr>
                             <th>
@@ -92,7 +102,7 @@
                             </th>
                         </tr>
                     </thead>
-                    <tbody id="shards">
+                    <tbody>
                         <tr>
                             <td>(no members)</td>
                             <td>-</td>
@@ -106,46 +116,82 @@
 <script lang="javascript">
 
     $(document).ready(function (e) {
-        $('#state').replaceWith('hello there');
-
-        $('#members').replaceWith('<tr><td></td></tr>');
-
-        $('#shards').replaceWith('<tr><td></td><td></td></tr>')
-
         // Connect to the web socket
         var url = new URL('/statusws', window.location.href);
         url.protocol = url.protocol.replace('http', 'ws');
         var ws = new WebSocket(url.href);
         console.debug('Opening websocket ', url)
-        ws.onmessage = function (s, ev) {
-            console.debug('Received WS message', msg)
-            var msg = JSON.Parse(ev.data);
-            switch (msg.Type) {
+        ws.onmessage = function (ev) {
+            var msg = JSON.parse(ev.data);
+            switch (msg.type) {
+
                 case "info":
-                // info on local node. Sent right after connect.
+                    // info on local node. Sent right after connect.
+                    $('#node-id').text(msg.nodeId);
+                    $('#node-state').text(msg.state);
+                    $('#node-role').text(msg.role);
+                    break;
+
                 case "status":
-                // Status has changed. Sent continuously and after connect.
+                    // Status has changed. Sent continuously and after connect.
+                    $('#node-state').text(msg.state);
+                    $('#node-role').text(msg.role);
+                    break;
+
                 case "members":
-                // member list is updated. Sent after connect + cluster events.
+                    // member list is updated. Sent after connect + cluster events.
+                    var memberList = $('#members').find('tbody');
+                    memberList.empty();
+                    for (var i = 0; i < msg.members.length; i++) {
+                        var elem = $('<tr>')
+                            .append($('<td>')
+                                .text(msg.members[i].id));
+                        if (msg.members[i].id == msg.leaderId) {
+                            elem.append($('<td>').text("Leader"));
+                        } else {
+                            elem.append($('<td>').text("Follower"))
+                        }
+                        var link
+                        elem.append($('<td>')
+                            .append($('<a>')
+                                .attr('href', 'http://' + msg.members[i].http + '/')
+                                .text(msg.members[i].http)))
+                        memberList.append(elem);
+                    }
+                    break;
+
                 case "shards":
-                // shard list is updated. Sent after connect + cluster events.
+                    var shardList = $('#shards').find('tbody');
+                    shardList.empty();
+                    console.log(msg);
+                    for (var node in msg.shards) {
+                        shardList.append($('<tr>')
+                            .append('<td>' + node + '</td><td>' + msg.shards[node] + '</td>'));
+                    }
+                    // shard list is updated. Sent after connect + cluster events.
+                    break;
+                default:
+                    console.log('Unknown message', msg);
             }
         };
         ws.onerror = function (s, ev) {
             $('#status').removeClass('statusheading-ok');
             $('#status').removeClass('statusheading-error');
             $('#status').addClass('statusheading-error');
+            $('#status').text('error');
 
         };
         ws.onopen = function (s, ev) {
             $('#status').removeClass('statusheading-ok');
             $('#status').removeClass('statusheading-error');
             $('#status').addClass('statusheading-ok');
+            $('#status').text('connected');
         };
 
         ws.onclose = function (s, ev) {
             $('#status').removeClass('statusheading-ok');
             $('#status').removeClass('statusheading-error');
+            $('#status').text('closed');
         };
     });
 </script>

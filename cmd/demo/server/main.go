@@ -20,6 +20,7 @@ var config funk.Parameters
 var defaultLogger = log.New()
 var cluster funk.Cluster
 var shards sharding.ShardManager
+var webserverEndpoint string
 
 func init() {
 	flag.StringVar(&config.Serf.JoinAddress, "join", "", "Join address for cluster")
@@ -35,8 +36,7 @@ func init() {
 	config.Final()
 }
 func main() {
-	p := newProducer()
-	launchLocalWebserver(p)
+
 	// Set up the shard map.
 	shards = sharding.NewShardManager()
 	if err := shards.Init(numShards, nil); err != nil {
@@ -49,7 +49,7 @@ func main() {
 
 	// This is the demo gRPC service we'll run on each node.
 	demoServerEndpoint := toolbox.RandomPublicEndpoint()
-
+	webserverEndpoint = toolbox.RandomLocalEndpoint()
 	// Set up the local gRPC server.
 	liffServer := newLiffProxy(newLiffServer(cluster.NodeID()), shards, cluster, demoEndpoint)
 	go startDemoServer(demoServerEndpoint, liffServer)
@@ -64,6 +64,7 @@ func main() {
 	// itself with the endpoint already populated.
 	cluster.SetEndpoint(demoEndpoint, demoServerEndpoint)
 
+	cluster.SetEndpoint(httpConsoleEndpoint, webserverEndpoint)
 	// ...and start the cluster node. If the bootstrap flag is set a new cluster
 	// will be launched.
 	if err := cluster.Start(); err != nil {
@@ -77,10 +78,41 @@ func main() {
 }
 
 func clusterEventListener(ch <-chan funk.Event) {
+	p := newEventProducer()
+
+	launchLocalWebserver(p, webserverEndpoint)
+	const (
+		nodeInfoPreset = iota
+		memberListPreset
+		shardMapPreset
+		clusterStatusPreset
+	)
+
+	presets := make([]interface{}, 4)
+	presets[nodeInfoPreset] = newNodeInfo(cluster)
+	presets[memberListPreset] = newMemberList(cluster)
+	presets[shardMapPreset] = newShardMap(shards)
+	presets[clusterStatusPreset] = newClusterStatus(cluster)
+	p.SetPresets(presets)
+
 	for ev := range ch {
 		log.Infof("Cluster state: %s  role: %s", ev.State.String(), ev.Role.String())
 		if ev.State == funk.Operational {
 			printShardMap(shards, cluster, demoEndpoint)
+		}
+		status := newClusterStatus(cluster)
+		log.Info("sent status on socket")
+		p.Send(status)
+		if ev.State == funk.Operational {
+			// update member list and shards
+			shardMap := newShardMap(shards)
+			memberList := newMemberList(cluster)
+			presets[memberListPreset] = memberList
+			presets[shardMapPreset] = shardMap
+			presets[clusterStatusPreset] = status
+			p.SetPresets(presets)
+			p.Send(shardMap)
+			p.Send(memberList)
 		}
 	}
 }

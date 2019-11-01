@@ -61,6 +61,14 @@ func NewCluster(params Parameters, shardManager sharding.ShardManager) Cluster {
 	return ret
 }
 
+func (c *clusterfunkCluster) Nodes() []string {
+	return c.raftNode.Nodes.List()
+}
+
+func (c *clusterfunkCluster) Leader() string {
+	return c.raftNode.LeaderNodeID()
+}
+
 func (c *clusterfunkCluster) NodeID() string {
 	return c.config.NodeID
 }

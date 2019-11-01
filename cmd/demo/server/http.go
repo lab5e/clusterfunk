@@ -5,8 +5,9 @@ import (
 
 	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
-	"github.com/stalehd/clusterfunk/pkg/toolbox"
 )
+
+const httpConsoleEndpoint = "ep.httpConsole"
 
 const uiPath = "./cmd/demo/server/html"
 
@@ -15,17 +16,7 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-type producer interface {
-	Presets(msg []interface{})
-	Send(msg interface{})
-	Messages() <-chan interface{}
-}
-
-func newProducer() producer {
-	return &msgSender{}
-}
-
-var messageProducer producer
+var messageProducer eventProducer
 
 func websocketHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -34,19 +25,30 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.Close()
-	for msg := range messageProducer.Messages() {
+
+	// Send the preset events from the producer first
+	for _, msg := range messageProducer.Presets() {
 		if err := conn.WriteJSON(msg); err != nil {
 			log.WithError(err).Error(err)
+			return
+		}
+	}
+
+	p := messageProducer.Messages()
+	defer messageProducer.Done(p)
+	// ... then forward updated events
+	for msg := range p {
+		if err := conn.WriteJSON(msg); err != nil {
+			log.WithError(err).Error("error writing message")
 			return
 		}
 	}
 }
 
 // Start a very simple websocket handler. It can only handle a single client at a time
-func launchLocalWebserver(p producer) {
+func launchLocalWebserver(p eventProducer, hostport string) {
 	messageProducer = p
 	mux := http.NewServeMux()
-	hostport := toolbox.RandomLocalEndpoint()
 	mux.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir(uiPath))))
 	mux.HandleFunc("/statusws", websocketHandler)
 	log.WithField("endpoint", hostport).Info("HTTP server started")
@@ -61,37 +63,4 @@ func launchLocalWebserver(p producer) {
 			panic(err.Error())
 		}
 	}()
-}
-
-type msgSender struct {
-	presets []interface{}
-	chans   []chan interface{}
-}
-
-func (m *msgSender) Presets(presets []interface{}) {
-	m.presets = presets[:]
-}
-
-func (m *msgSender) Send(msg interface{}) {
-	for i, v := range m.chans {
-		select {
-		case v <- msg:
-			// ok - keep sending
-		default:
-			// drop the channel
-			close(v)
-			m.chans = append(m.chans[:i], m.chans[i+1:]...)
-		}
-	}
-}
-
-func (m *msgSender) Messages() <-chan interface{} {
-	newCh := make(chan interface{})
-	m.chans = append(m.chans, newCh)
-	go func() {
-		for _, v := range m.presets {
-			newCh <- v
-		}
-	}()
-	return newCh
 }
