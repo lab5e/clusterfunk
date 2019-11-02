@@ -30,3 +30,8 @@
   returns an error.
 
 * Consistent SerfNode/RaftNode interfaces
+
+* Quarantine nodes that doesn't answer reshards. Add timer for responses, if no response has been sent in x ms quarantine the node as "unresponsive" and do a new sharding round.
+
+* Run go test -race to ensure there's no race conditions (if possible -- there
+  might be libraries that have issues)
