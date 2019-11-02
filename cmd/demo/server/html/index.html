@@ -18,28 +18,65 @@
             color: #E00A13;
         }
 
-        .statusheading {
-            color: black;
-            background-color: #FFFF00;
-            font-size: smaller;
-            padding: 0.5em;
-        }
-
-        .statusheading-error {
-            color: white;
-            background-color: #E00A13;
-        }
-
-        .statusheading-ok {
-            color: white;
-            background-color: #00AA00;
-        }
 
         .l-box {
             padding: 1em;
         }
+
+        #status {
+            padding-top: 30px;
+            padding-bottom: 30px;
+            color: #E00A13;
+        }
+
+        #state-box {
+            border: 1px solid black;
+            height: 50px;
+            border-radius: 0.5em;
+            position: relative;
+        }
+
+        #node-state {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2em;
+            font-weight: bolder;
+        }
+
+        .operational {
+            background-color: greenyellow;
+            color: black;
+        }
+
+        .resharding {
+            background-color: lightblue;
+            color: black;
+        }
+
+        .voting {
+            background-color: yellow;
+            color: black;
+        }
+
+        .starting {
+            background-color: lightsalmon;
+            color: black;
+        }
+
+        .stopping {
+            background-color: lightsalmon;
+            color: black;
+        }
+
+        .stopping {
+            background-color: red;
+            color: white;
+        }
     </style>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.bundle.min.js"></script>
 
 </head>
 
@@ -56,23 +93,25 @@
                 <h1>Node <span id="node-id"></span></h1>
             </div>
         </div>
-        <div class="pure-u-1-1 statusheading" id="status">
-            disconnected
-        </div>
-        <div class="pure-u-1-3 miniheading">
+        <div id="state-content" class="pure-u-1-1 miniheading">
             <div class="l-box">
-                <h2>State</h2>
-                <div>State: <span id="node-state"></span></div>
-                <div>Role: <span id="node-role"></span></div>
+                <div id="state-box" class="state-box"><span id="node-state"></span></div>
 
             </div>
         </div>
-        <div class="pure-u-1-3 miniheading">
+        <!--- membership timeline -->
+        <div class="pure-u-1-1">
+            <div class="l-box">
+                <canvas id="member-timeline"></canvas>
+            </div>
+        </div>
+        <div id="member-content" class="pure-u-1-2 miniheading">
             <div class="l-box">
                 <h2>Members</h2>
-                <table class="pure-table" id="members">
+                <table class="pure-table pure-table-striped" id="members">
                     <thead>
                         <tr>
+                            <th>&nbsp;</th>
                             <th>Role</th>
                             <th>ID</th>
                             <th>Status page</th>
@@ -88,18 +127,14 @@
                 </table>
             </div>
         </div>
-        <div class="pure-u-1-3 miniheading">
+        <div id="shard-content" class="pure-u-1-2 miniheading">
             <div class="l-box">
                 <h2>Shards</h2>
-                <table class="pure-table" id="shards">
+                <table class="pure-table pure-table-striped" id="shards">
                     <thead>
                         <tr>
-                            <th>
-                                Node ID
-                            </th>
-                            <th>
-                                Number of shards
-                            </th>
+                            <th>Node ID</th>
+                            <th>Number of shards</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -111,89 +146,281 @@
                 </table>
             </div>
         </div>
+
+        <div class="pure-u-1-12">
+            <div class="l-box">
+                <svg id="spinner" style="width:48px;height:48px" width="100%" height="100%"
+                    xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid"
+                    class="lds-pacman">
+                    <g ng-attr-style="display:{{config.showBean}}" style="display:block">
+                        <circle cx="51.5753" cy="50" r="4" ng-attr-fill="{{config.c2}}" fill="#E00A13">
+                            <animate attributeName="cx" calcMode="linear" values="95;35" keyTimes="0;1" dur="2"
+                                begin="-1.34s" repeatCount="indefinite"></animate>
+                            <animate attributeName="fill-opacity" calcMode="linear" values="0;1;1" keyTimes="0;0.2;1"
+                                dur="2" begin="-1.34s" repeatCount="indefinite"></animate>
+                        </circle>
+                        <circle cx="71.9753" cy="50" r="4" ng-attr-fill="{{config.c2}}" fill="#E00A13">
+                            <animate attributeName="cx" calcMode="linear" values="95;35" keyTimes="0;1" dur="2"
+                                begin="-0.66s" repeatCount="indefinite"></animate>
+                            <animate attributeName="fill-opacity" calcMode="linear" values="0;1;1" keyTimes="0;0.2;1"
+                                dur="2" begin="-0.66s" repeatCount="indefinite"></animate>
+                        </circle>
+                        <circle cx="91.7753" cy="50" r="4" ng-attr-fill="{{config.c2}}" fill="#E00A13">
+                            <animate attributeName="cx" calcMode="linear" values="95;35" keyTimes="0;1" dur="2"
+                                begin="0s" repeatCount="indefinite"></animate>
+                            <animate attributeName="fill-opacity" calcMode="linear" values="0;1;1" keyTimes="0;0.2;1"
+                                dur="2" begin="0s" repeatCount="indefinite"></animate>
+                        </circle>
+                    </g>
+                    <g ng-attr-transform="translate({{config.showBeanOffset}} 0)" transform="translate(-15 0)">
+                        <path d="M50 50L20 50A30 30 0 0 0 80 50Z" ng-attr-fill="{{config.c1}}" fill="#E00A13"
+                            transform="rotate(4.837 50 50)">
+                            <animateTransform attributeName="transform" type="rotate" calcMode="linear"
+                                values="0 50 50;45 50 50;0 50 50" keyTimes="0;0.5;1" dur="2s" begin="0s"
+                                repeatCount="indefinite"></animateTransform>
+                        </path>
+                        <path d="M50 50L20 50A30 30 0 0 1 80 50Z" ng-attr-fill="{{config.c1}}" fill="#E00A13"
+                            transform="rotate(-4.837 50 50)">
+                            <animateTransform attributeName="transform" type="rotate" calcMode="linear"
+                                values="0 50 50;-45 50 50;0 50 50" keyTimes="0;0.5;1" dur="2s" begin="0s"
+                                repeatCount="indefinite"></animateTransform>
+                        </path>
+                    </g>
+                </svg>
+            </div>
+
+        </div>
+        <div class="pure-u-11-12" id="status">
+            disconnected
+        </div>
     </div>
 </body>
+
 <script lang="javascript">
+    var currentNodeId = '';
+    var currentMemberCount = 0;
+    var tickHandle = -1;
+
+    // Disable the display when there's an error with the websocket.
+    function disableDisplay(message) {
+        $('#spinner').hide();
+        $('#status').removeClass('statusheading-ok');
+        $('#status').removeClass('statusheading-error');
+        $('#status').text(message);
+        currentNodeId = '';
+        $('#state-content').hide();
+        $('#member-content').hide();
+        $('#shard-content').hide();
+        window.clearInterval(tickHandle);
+    }
+
+    // Enable the display when the websocket is connected
+    function enableDisplay() {
+        $('#spinner').show();
+        $('#status').removeClass('statusheading-ok');
+        $('#status').removeClass('statusheading-error');
+        $('#status').addClass('statusheading-ok');
+        $('#status').text('Connected to websocket, receiving events');
+        $('#state-content').show();
+        $('#member-content').show();
+        $('#shard-content').show();
+        currentNodeId = '';
+        tickHandle = window.setInterval(chartTick, 10 * 1000);
+    }
+
+    // Convert the node ID into a RGB hex colour.
+    function idToColor(id) {
+        return '#' + id.substring(0, 6);
+    }
+
+    function infoMessage(msg) {
+        // info on local node. Sent right after connect.
+        $('#node-id').text(msg.nodeId);
+        $('#node-state').text(msg.state);
+        $('#state-box').attr('class', msg.state.toLowerCase());
+        currentNodeId = msg.nodeId;
+    }
+
+    function statusMessage(msg) {
+        // Status has changed. Sent continuously and after connect.
+        $('#node-state').text(msg.state);
+        $('#state-box').attr('class', msg.state.toLowerCase());
+    }
+
+    function chartTick() {
+        var newData = {
+            x: new Date(),
+            y: currentMemberCount,
+        };
+        chartData.push(newData);
+        chartData.shift();
+        chart.update();
+    }
+
+    function memberMessage(msg) {
+        // member list is updated. Sent after connect + cluster events.
+        var memberList = $('#members').find('tbody');
+        memberList.empty();
+        currentMemberCount = msg.members.length;
+        for (var i = 0; i < currentMemberCount; i++) {
+
+            var firstCol = $('<td>')
+                .attr('style', 'background-color:' + idToColor(msg.members[i].id));
+
+            if (msg.members[i].id == currentNodeId) {
+                firstCol.append($('<img>').attr('src', 'cf_icon.png').attr('width', '24').text(' '));
+            } else {
+                firstCol.text(" ");
+            }
+
+            var secondCol = $('<td>')
+                .text(msg.members[i].id);
+
+            var thirdCol = $('<td>');
+            if (msg.members[i].id == msg.leaderId) {
+                thirdCol.text("Leader");
+            } else {
+                thirdCol.text("Follower");
+            }
+
+            var fourthCol = $('<td>')
+                .append($('<a>')
+                    .attr('href', 'http://' + msg.members[i].http + '/')
+                    .text(msg.members[i].http));
+
+            memberList.append($('<tr>')
+                .append(firstCol)
+                .append(secondCol)
+                .append(thirdCol)
+                .append(fourthCol));
+        }
+        var newData = {
+            x: new Date(),
+            y: msg.members.length,
+        };
+        chartData.push(newData);
+        chartData.shift();
+        chart.update();
+    }
+
+    function shardMessage(msg) {
+        var shardList = $('#shards').find('tbody');
+        shardList.empty();
+        console.log(msg);
+        for (var node in msg.shards) {
+            shardList.append($('<tr>')
+                .append('<td>' + node + '</td><td>' + msg.shards[node] + '</td>'));
+        }
+        // shard list is updated. Sent after connect + cluster events.
+    }
+
+    var chartData = new Array();
+
+    var config = {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Member count',
+                backgroundColor: 'silver',
+                borderColor: 'black',
+                fill: false,
+                data: chartData,
+            }]
+        },
+        options: {
+            title: {
+                text: 'Member count'
+            },
+            scales: {
+                xAxes: [{
+                    type: 'time',
+                    time: {
+                        parser: 'MM/DD/YYYY HH:mm',
+                        tooltipFormat: 'HH:mm',
+                    },
+                    scaleLabel: {
+                        display: false,
+                        labelString: 'Time',
+                    }
+                }],
+                yAxes: [{
+                    scaleLabel: {
+                        display: true,
+                        labelString: 'Count'
+                    },
+                    ticks: {
+                        suggestedMin: 0,
+                        suggestedMax: 10
+                    }
+                }]
+            },
+            maintainAspectRatio: false,
+        }
+    };
+
+    var ctx = document.getElementById('member-timeline').getContext('2d');
+    var chart = new Chart(ctx, config);
+    chart.canvas.parentNode.style.height = '150px';
+
+
 
     $(document).ready(function (e) {
-        // Connect to the web socket
+        // add 30 minutes worth of data
+        var tmpTime = new Date()
+        tmpTime -= 30 * 6000;
+        for (var i = 0; i < 30; i++) {
+            var newData = {
+                x: tmpTime,
+                y: 0,
+            };
+            config.data.datasets[0].data.push(newData);
+            tmpTime += 6000;
+        }
+        chart.update();
+
+        // Set up websocket
         var url = new URL('/statusws', window.location.href);
         url.protocol = url.protocol.replace('http', 'ws');
         var ws = new WebSocket(url.href);
         console.debug('Opening websocket ', url)
+
         ws.onmessage = function (ev) {
             var msg = JSON.parse(ev.data);
             switch (msg.type) {
 
                 case "info":
-                    // info on local node. Sent right after connect.
-                    $('#node-id').text(msg.nodeId);
-                    $('#node-state').text(msg.state);
-                    $('#node-role').text(msg.role);
+                    infoMessage(msg);
                     break;
 
                 case "status":
-                    // Status has changed. Sent continuously and after connect.
-                    $('#node-state').text(msg.state);
-                    $('#node-role').text(msg.role);
+                    statusMessage(msg);
                     break;
 
                 case "members":
-                    // member list is updated. Sent after connect + cluster events.
-                    var memberList = $('#members').find('tbody');
-                    memberList.empty();
-                    for (var i = 0; i < msg.members.length; i++) {
-                        var elem = $('<tr>')
-                            .append($('<td>')
-                                .text(msg.members[i].id));
-                        if (msg.members[i].id == msg.leaderId) {
-                            elem.append($('<td>').text("Leader"));
-                        } else {
-                            elem.append($('<td>').text("Follower"))
-                        }
-                        var link
-                        elem.append($('<td>')
-                            .append($('<a>')
-                                .attr('href', 'http://' + msg.members[i].http + '/')
-                                .text(msg.members[i].http)))
-                        memberList.append(elem);
-                    }
+                    memberMessage(msg);
+
                     break;
 
                 case "shards":
-                    var shardList = $('#shards').find('tbody');
-                    shardList.empty();
-                    console.log(msg);
-                    for (var node in msg.shards) {
-                        shardList.append($('<tr>')
-                            .append('<td>' + node + '</td><td>' + msg.shards[node] + '</td>'));
-                    }
-                    // shard list is updated. Sent after connect + cluster events.
+                    shardMessage(msg);
                     break;
                 default:
                     console.log('Unknown message', msg);
             }
         };
         ws.onerror = function (s, ev) {
-            $('#status').removeClass('statusheading-ok');
-            $('#status').removeClass('statusheading-error');
-            $('#status').addClass('statusheading-error');
-            $('#status').text('error');
-
+            disableDisplay('Error reading from websocket');
         };
         ws.onopen = function (s, ev) {
-            $('#status').removeClass('statusheading-ok');
-            $('#status').removeClass('statusheading-error');
-            $('#status').addClass('statusheading-ok');
-            $('#status').text('connected');
+            enableDisplay();
         };
-
         ws.onclose = function (s, ev) {
-            $('#status').removeClass('statusheading-ok');
-            $('#status').removeClass('statusheading-error');
-            $('#status').text('closed');
+            disableDisplay('Websocket closed');
         };
     });
+
+
 </script>
 
 </html>

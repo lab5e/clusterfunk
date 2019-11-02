@@ -1,6 +1,7 @@
 package main
 
 import (
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -16,23 +17,31 @@ type eventProducer interface {
 }
 
 func newEventProducer() eventProducer {
-	return &msgSender{}
+	return &msgSender{mutex: &sync.Mutex{}}
 }
 
 type msgSender struct {
+	mutex   *sync.Mutex
 	presets []interface{}
 	chans   []chan interface{}
 }
 
 func (m *msgSender) SetPresets(presets []interface{}) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 	m.presets = presets[:]
 }
 
 func (m *msgSender) Presets() []interface{} {
-	return m.presets
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	return m.presets[:]
 }
 
 func (m *msgSender) Send(msg interface{}) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
 	for i, v := range m.chans {
 		select {
 		case v <- msg:
@@ -47,6 +56,9 @@ func (m *msgSender) Send(msg interface{}) {
 }
 
 func (m *msgSender) Messages() <-chan interface{} {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
 	newCh := make(chan interface{})
 	m.chans = append(m.chans, newCh)
 	go func() {
@@ -58,6 +70,9 @@ func (m *msgSender) Messages() <-chan interface{} {
 }
 
 func (m *msgSender) Done(ch <-chan interface{}) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
 	for i, v := range m.chans {
 		if v == ch {
 			m.chans = append(m.chans[:i], m.chans[i+1:]...)
