@@ -44,12 +44,10 @@ func (p *GRPCClientProxy) clusterEventListener(evts <-chan funk.Event) {
 	once := &sync.Once{}
 	for ev := range evts {
 		if ev.State == funk.Operational {
-			logrus.Warn("Unlocking operational mutex since we're operational")
 			p.operationalMutex.Unlock()
 			once = &sync.Once{}
 		} else {
 			once.Do(func() {
-				logrus.Warnf("Locking operational mutex since state is %s", ev.State)
 				p.operationalMutex.Lock()
 			})
 		}
