@@ -19,44 +19,42 @@ import (
 
 // clusterfunkClusterß implements the Cluster interface
 type clusterfunkCluster struct {
-	name                  string                    // Name of cluster
-	shardManager          sharding.ShardManager     // Shard map
-	config                Parameters                // Configuration
-	serfNode              *SerfNode                 // Serf
-	raftNode              *RaftNode                 // Raft
-	eventChannels         []chan Event              // Event channels for subscribers
-	mgmtServer            *grpc.Server              // gRPC server for management
-	leaderServer          *grpc.Server              // gRPC server for leader
-	mutex                 *sync.RWMutex             // Mutex for events
-	stateMutex            *sync.RWMutex             // Mutex for state and role
-	currentShardMapIndex  uint64                    // The current acked, wanted or sent shard map index
-	proposedShardMapIndex uint64                    // The (leader's) propsed shard map index
-	processedIndex        uint64                    // The last processed index in the replicated log
-	state                 NodeState                 // Current cluster state for this node. Set based on events from Raft
-	role                  NodeRole                  // Current cluster role for this node. Set based on events from Raft-
-	unacknowledged        toolbox.StringSet         // The list of unacknowledged nodes. Only used by the leader.
-	registry              *toolbox.ZeroconfRegistry // Zeroconf lookups. Used when joining
-	livenessChecker       LivenessChecker           // Check for node liveness. The built-in heartbeats in Raft isn't exposed
-	livenessClient        LocalLivenessEndpoint
+	name                 string                    // Name of cluster
+	shardManager         sharding.ShardManager     // Shard map
+	config               Parameters                // Configuration
+	serfNode             *SerfNode                 // Serf
+	raftNode             *RaftNode                 // Raft
+	eventChannels        []chan Event              // Event channels for subscribers
+	mgmtServer           *grpc.Server              // gRPC server for management
+	leaderServer         *grpc.Server              // gRPC server for leader
+	mutex                *sync.RWMutex             // Mutex for events
+	stateMutex           *sync.RWMutex             // Mutex for state and role
+	currentShardMapIndex uint64                    // The current acked, wanted or sent shard map index
+	processedIndex       uint64                    // The last processed index in the replicated log
+	state                NodeState                 // Current cluster state for this node. Set based on events from Raft
+	role                 NodeRole                  // Current cluster role for this node. Set based on events from Raft-
+	unacknowledged       ackCollection             // The list of unacknowledged nodes. Only used by the leader.
+	registry             *toolbox.ZeroconfRegistry // Zeroconf lookups. Used when joining
+	livenessChecker      LivenessChecker           // Check for node liveness. The built-in heartbeats in Raft isn't exposed
+	livenessClient       LocalLivenessEndpoint
 }
 
 // NewCluster returns a new cluster (client)
 func NewCluster(params Parameters, shardManager sharding.ShardManager) Cluster {
 	ret := &clusterfunkCluster{
-		name:                  params.ClusterName,
-		shardManager:          shardManager,
-		config:                params,
-		serfNode:              NewSerfNode(),
-		raftNode:              NewRaftNode(),
-		eventChannels:         make([]chan Event, 0),
-		mutex:                 &sync.RWMutex{},
-		state:                 Invalid,
-		role:                  NonVoter,
-		stateMutex:            &sync.RWMutex{},
-		currentShardMapIndex:  0,
-		proposedShardMapIndex: 0,
-		unacknowledged:        toolbox.NewStringSet(),
-		livenessChecker:       NewLivenessChecker(params.LivenessInterval, params.LivenessRetries),
+		name:                 params.ClusterName,
+		shardManager:         shardManager,
+		config:               params,
+		serfNode:             NewSerfNode(),
+		raftNode:             NewRaftNode(),
+		eventChannels:        make([]chan Event, 0),
+		mutex:                &sync.RWMutex{},
+		state:                Invalid,
+		role:                 NonVoter,
+		stateMutex:           &sync.RWMutex{},
+		currentShardMapIndex: 0,
+		unacknowledged:       newAckCollection(),
+		livenessChecker:      NewLivenessChecker(params.LivenessInterval, params.LivenessRetries),
 	}
 	return ret
 }
@@ -179,7 +177,7 @@ func (c *clusterfunkCluster) raftEventLoop(ch <-chan RaftEventType) {
 	for e := range ch {
 		switch e {
 		case RaftClusterSizeChanged:
-			toolbox.TimeCall(func() { c.handleClusterSizeChanged() }, "ClusterSizeChanged")
+			toolbox.TimeCall(func() { c.handleClusterSizeChanged(c.raftNode.Nodes.List()) }, "ClusterSizeChanged")
 
 		case RaftLeaderLost:
 			c.livenessChecker.Clear()
@@ -205,7 +203,6 @@ func (c *clusterfunkCluster) raftEventLoop(ch <-chan RaftEventType) {
 func (c *clusterfunkCluster) handleLeaderEvent() {
 	c.setRole(Leader)
 	c.setCurrentShardMapIndex(0)
-	c.setProposedShardMapIndex(0)
 	// When assuming leadership the node list built by events won't be up to date
 	// with the list.  This forces an update of the node list.
 	c.raftNode.RefreshNodes()
@@ -214,29 +211,65 @@ func (c *clusterfunkCluster) handleLeaderEvent() {
 func (c *clusterfunkCluster) handleLeaderLost() {
 	c.setState(Voting)
 	c.setCurrentShardMapIndex(0)
-	c.setProposedShardMapIndex(0)
 }
 
 func (c *clusterfunkCluster) handleFollowerEvent() {
 	c.setRole(Follower)
 	c.setCurrentShardMapIndex(0)
-	c.setProposedShardMapIndex(0)
 }
 
-func (c *clusterfunkCluster) handleClusterSizeChanged() {
+const ackTimeout = 500 * time.Millisecond
+
+func (c *clusterfunkCluster) checkAckStatus() {
+	select {
+	case <-c.unacknowledged.Completed():
+		// ack is completed. Enable the new shard map for the cluster by
+		// sending a commit log message. No further processing is required
+		// here.
+		c.sendCommitMessage(c.unacknowledged.ShardIndex())
+		c.setState(Operational)
+		c.unacknowledged.Done()
+
+	case unackNodes := <-c.unacknowledged.MissingAck():
+		c.unacknowledged.Done()
+
+		if !c.raftNode.Leader() {
+			log.WithField("nodes", unackNodes).Warning("Ack timeout for nodes but I'm no longer the leader")
+			return
+		}
+
+		// TODO: rewrite a bit. There's a lot of shuffling around with types here.
+		log.WithField("nodes", unackNodes).Warning("Ack timed out for one or more nodes. Repeating sharding.")
+		if c.raftNode.Leader() {
+			// remove nodes from list, start new size change
+			list := c.raftNode.Nodes.List()
+			box := toolbox.NewStringSet()
+			box.Sync(list...)
+			for _, v := range unackNodes {
+				box.Remove(v)
+			}
+			if box.Size() == 0 {
+				// No nodes have responded to me. Step down as leader.
+				log.Warning("No nodes have acked. Stepping down as leader.")
+				if err := c.raftNode.StepDown(); err != nil {
+					log.Warning("Unable to step down as leader")
+				}
+				return
+			}
+			c.handleClusterSizeChanged(box.List())
+		}
+	}
+}
+func (c *clusterfunkCluster) handleClusterSizeChanged(nodeList []string) {
 	if c.Role() != Leader {
 		// I'm not the leader. Won't do anything.
 		return
 	}
-	c.setProposedShardMapIndex(0)
 
-	// Reset the list of acked nodes and
-	list := c.raftNode.Nodes.List()
-	c.unacknowledged.Sync(list...)
 	c.setState(Resharding)
 	// reshard cluster, distribute via replicated log.
 
-	c.shardManager.UpdateNodes(list...)
+	c.shardManager.UpdateNodes(nodeList...)
 	proposedShardMap, err := c.shardManager.MarshalBinary()
 	if err != nil {
 		panic(fmt.Sprintf("Can't marshal the shard map: %v", err))
@@ -256,7 +289,12 @@ func (c *clusterfunkCluster) handleClusterSizeChanged() {
 		// otherwise -- just log it and continue
 		log.WithError(err).Error("Could not write log entry for new shard map")
 	}
-	c.setProposedShardMapIndex(index)
+	// Reset the list of acked nodes and
+	c.unacknowledged = newAckCollection()
+	c.unacknowledged.StartAck(nodeList, index, ackTimeout)
+
+	go c.checkAckStatus()
+
 	log.WithFields(log.Fields{"index": index}).Debugf("Shard map index")
 
 	// Next messages will be ackReceived when the changes has replicated
@@ -268,23 +306,7 @@ func (c *clusterfunkCluster) handleClusterSizeChanged() {
 func (c *clusterfunkCluster) handleAckReceived(nodeID string, shardIndex uint64) bool {
 	// when a new ack message is received the ack is noted for the node and
 	// until all nodes have acked the state will stay the same.
-	if !c.unacknowledged.Remove(nodeID) {
-		// It's an unknown node or a duplicate. Just drop it
-		return false
-	}
-	// Timeouts are handled when calling the other nodes via gRPC
-
-	if c.unacknowledged.Size() == 0 {
-		// ack is completed. Enable the new shard map for the cluster by
-		// sending a commit log message. No further processing is required
-		// here.
-		c.setProposedShardMapIndex(0)
-		c.sendCommitMessage(shardIndex)
-		c.setState(Operational)
-
-	}
-	return true
-
+	return c.unacknowledged.Ack(nodeID, shardIndex)
 }
 func (c *clusterfunkCluster) handleReceiveLog() {
 	messages := c.raftNode.GetLogMessages(c.ProcessedIndex())
@@ -294,7 +316,7 @@ func (c *clusterfunkCluster) handleReceiveLog() {
 		case ProposedShardMap:
 			if c.Role() == Leader {
 				// Ack to myself - this skips the whole gRPC call
-				c.handleAckReceived(c.raftNode.LocalNodeID(), c.ProposedShardMapIndex())
+				c.handleAckReceived(c.raftNode.LocalNodeID(), c.unacknowledged.ShardIndex())
 				continue
 			}
 			c.processProposedShardMap(&msg)

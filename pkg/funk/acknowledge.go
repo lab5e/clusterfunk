@@ -1,6 +1,7 @@
 package funk
 
 import (
+	"sync/atomic"
 	"time"
 
 	"github.com/stalehd/clusterfunk/pkg/toolbox"
@@ -10,10 +11,15 @@ import (
 // The collection can be acked one time only and
 type ackCollection interface {
 	// StartAck starts the acking
-	StartAck(nodes []string, timeout time.Duration)
+	StartAck(nodes []string, shardIndex uint64, timeout time.Duration)
 
-	// Ack adds another node to the acknowledged list
-	Ack(nodeID string)
+	// Ack adds another node to the acknowledged list. Returns true if that node
+	// is in the list of nodes that should ack
+	Ack(nodeID string, shardIndex uint64) bool
+
+	// ShardIndex returns the shard index that is acked. This returns 0 when
+	// the ack is completed.
+	ShardIndex() uint64
 
 	// MissingAck returns a channel that sends a list of nodes that haven't acknowledged within the timeout.
 	// If something is sent on the MissingAck channel the Completed channel won't trigger.
@@ -32,6 +38,7 @@ func newAckCollection() ackCollection {
 		nodes:         toolbox.NewStringSet(),
 		completedChan: make(chan struct{}),
 		missingChan:   make(chan []string),
+		shardIndex:    new(uint64),
 	}
 }
 
@@ -39,9 +46,11 @@ type ackColl struct {
 	nodes         toolbox.StringSet
 	completedChan chan struct{}
 	missingChan   chan []string
+	shardIndex    *uint64
 }
 
-func (a *ackColl) StartAck(nodes []string, timeout time.Duration) {
+func (a *ackColl) StartAck(nodes []string, shardIndex uint64, timeout time.Duration) {
+	atomic.StoreUint64(a.shardIndex, shardIndex)
 	a.nodes.Sync(nodes...)
 	go func() {
 		time.Sleep(timeout)
@@ -51,10 +60,17 @@ func (a *ackColl) StartAck(nodes []string, timeout time.Duration) {
 	}()
 }
 
-func (a *ackColl) Ack(nodeID string) {
-	if a.nodes.Remove(nodeID) && a.nodes.Size() == 0 {
-		go func() { a.completedChan <- struct{}{} }()
+func (a *ackColl) Ack(nodeID string, shardIndex uint64) bool {
+	if atomic.LoadUint64(a.shardIndex) != shardIndex {
+		return false
 	}
+	if a.nodes.Remove(nodeID) {
+		if a.nodes.Size() == 0 {
+			go func() { a.completedChan <- struct{}{} }()
+		}
+		return true
+	}
+	return false
 }
 
 func (a *ackColl) MissingAck() <-chan []string {
@@ -68,4 +84,9 @@ func (a *ackColl) Completed() <-chan struct{} {
 func (a *ackColl) Done() {
 	close(a.missingChan)
 	close(a.completedChan)
+	atomic.StoreUint64(a.shardIndex, 0)
+}
+
+func (a *ackColl) ShardIndex() uint64 {
+	return atomic.LoadUint64(a.shardIndex)
 }

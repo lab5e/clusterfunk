@@ -64,23 +64,23 @@ func (c *clusterfunkCluster) ConfirmShardMap(ctx context.Context, req *clusterpr
 		return nil, errors.New("not in resharding mode")
 	}
 
-	logIndex := c.ProposedShardMapIndex()
-	if uint64(req.LogIndex) != logIndex {
+	if uint64(req.LogIndex) != c.unacknowledged.ShardIndex() {
 		// This is not the ack we're looking for
 		return &clusterproto.ConfirmShardMapResponse{
 			Success:      false,
-			CurrentIndex: int64(logIndex),
+			CurrentIndex: int64(c.unacknowledged.ShardIndex()),
 		}, nil
 	}
 
 	if c.handleAckReceived(req.NodeID, uint64(req.LogIndex)) {
 		return &clusterproto.ConfirmShardMapResponse{
 			Success:      true,
-			CurrentIndex: int64(logIndex),
+			CurrentIndex: req.LogIndex,
 		}, nil
 	}
+
 	return &clusterproto.ConfirmShardMapResponse{
 		Success:      false,
-		CurrentIndex: int64(logIndex),
+		CurrentIndex: int64(c.unacknowledged.ShardIndex()),
 	}, nil
 }

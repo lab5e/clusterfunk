@@ -13,12 +13,12 @@ func TestAckCollectionHappyPath(t *testing.T) {
 	c := newAckCollection()
 	assert.NotNil(c)
 
-	c.StartAck([]string{"A", "B", "C"}, 100*time.Millisecond)
+	c.StartAck([]string{"A", "B", "C"}, 1, 100*time.Millisecond)
 	defer c.Done()
 
-	c.Ack("A")
-	c.Ack("B")
-	c.Ack("C")
+	c.Ack("A", 1)
+	c.Ack("B", 1)
+	c.Ack("C", 1)
 
 	select {
 	case <-c.Completed():
@@ -36,11 +36,12 @@ func TestAckCollectionMissingAck(t *testing.T) {
 	c := newAckCollection()
 	assert.NotNil(c)
 
-	c.StartAck([]string{"A", "B", "C"}, 100*time.Millisecond)
+	c.StartAck([]string{"A", "B", "C"}, 1, 100*time.Millisecond)
 	defer c.Done()
 
-	c.Ack("A")
-	c.Ack("C")
+	c.Ack("A", 1)
+	c.Ack("B", 2)
+	c.Ack("C", 1)
 
 	select {
 	case <-c.Completed():
