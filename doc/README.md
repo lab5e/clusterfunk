@@ -2,6 +2,8 @@
 
 # Clustering library
 
+`clusterfunk` is a Go library that enables you to create clusters of services. The library assists you in setting up, configuration and spreading the load across the nodes in the cluster.
+
 ## Run the demo
 
 You probably want to see it in action before doing anything else so here we go:
@@ -37,7 +39,13 @@ A typical cluster of Raft nodes should not exceed 10-15 nodes. This is a limitat
 
 ## What it isn't
 
+* A silver bullet. You can't (at least not yet) throw it in front of a random service and tick the "redundant cluster" check box on your requirement list :) You have to spend a while thinking how you want the requests distributed across your nodes (that's the sharding bit) and how you are going to handle errors, what to shard and how to shard.
+* A load balancer. If you just need a load balancer in front of your service do use one. It's much easier to install, manage and use.
+* A performance enhancing library. If your service is slow it won't make it go faster. You might get better throughput if you do all the required steps (see [Little's Law](https://en.wikipedia.org/wiki/Little%27s_law)) but if your backend storage is a limiting factor it might end up being slower than before since it introduces network hops.
+
 ## How it works
+
+[Sharding](sharding.md) is a central feature in this library. Each node is responsible for a subset of the requests and there's only *one* node that can mutate data.
 
 ## How to use it
 
@@ -58,6 +66,7 @@ Describe server side library, how to implement services. What's included and wha
 ## Client side
 
 Describe client side library (`clientfunk`)
+
 ## Performance
 
 Describe expected performance
