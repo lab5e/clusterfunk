@@ -14,6 +14,8 @@ func (c *clusterfunkCluster) logStateChange() {
 }
 
 func (c *clusterfunkCluster) sendEvent(ev Event) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 	for _, v := range c.eventChannels {
 		select {
 		case v <- ev:
