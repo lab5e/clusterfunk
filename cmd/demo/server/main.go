@@ -101,7 +101,6 @@ func clusterEventListener(ch <-chan funk.Event) {
 			printShardMap(shards, cluster, demoEndpoint)
 		}
 		status := newClusterStatus(cluster)
-		log.Info("sent status on socket")
 		p.Send(status)
 		if ev.State == funk.Operational {
 			// update member list and shards
