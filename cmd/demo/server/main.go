@@ -2,6 +2,8 @@ package main
 
 import (
 	"flag"
+	"os"
+	"runtime/pprof"
 
 	golog "log"
 
@@ -21,6 +23,7 @@ var defaultLogger = log.New()
 var cluster funk.Cluster
 var shards sharding.ShardManager
 var webserverEndpoint string
+var cpuprofiler string
 
 func init() {
 	flag.StringVar(&config.Serf.JoinAddress, "join", "", "Join address for cluster")
@@ -31,11 +34,20 @@ func init() {
 	flag.StringVar(&config.ClusterName, "name", "demo", "Name of cluster")
 	flag.BoolVar(&config.AutoJoin, "autojoin", true, "Autojoin via Serf Events")
 	flag.StringVar(&logLevel, "loglevel", "info", "Logging level")
+	flag.StringVar(&cpuprofiler, "cpuprofiler", "", "Write cpu profiler to file")
 	flag.Parse()
 	config.NodeID = toolbox.RandomID()
 	config.Final()
 }
 func main() {
+	if cpuprofiler != "" {
+		f, err := os.Create(cpuprofiler)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
 
 	// Set up the shard map.
 	shards = sharding.NewShardManager()
