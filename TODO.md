@@ -1,9 +1,5 @@
 # TODOs
 
-* Rewrite client pool to block when getting a new client. Also rename
-  from "EndpointPool" to "ConnectionPool" since it isn't endpoint that
-  are pooled.
-
 * Non-members of the cluster, ie nodes that are part of the
   Serf cluster but not the Raft cluster. Useful for other kinds
   of services.
@@ -18,16 +14,17 @@
 
 * Complete demo with work spread across nodes
 
-* There's no smooth way to discover the internals from the outside. Make gRPC
-  interface on all nodes for discovery. Serf client is a bit clunky and creates
-  lots of failed/left Serf nodes in the cluster. Hashicorp has their own RPC
-  for each node. Might be an idea to implement a similar scheme (or just add to
-  the existing management gRPC since it's already running on all nodes. Make
-  utility functions to discover. Outside discovery might not be within the scope.
-  Management function w/ gRPC might also be used for this.
-
 * Consistent SerfNode/RaftNode interfaces
 
 * Quarantine nodes that doesn't answer reshards. Add timer for responses, if no
   response has been sent in x ms quarantine the node as "unresponsive" and do
   a new sharding round.
+
+* Prettify demo console
+
+* Docker stack for demo server
+
+* Metrics for proxying (preferrably not tied to any particular metrics library) and cluster.
+
+* Client connection pooling code
+
