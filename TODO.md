@@ -26,12 +26,8 @@
   utility functions to discover. Outside discovery might not be within the scope.
   Management function w/ gRPC might also be used for this.
 
-* Make sure bootstrapping a cluster with the same names as an existing one
-  returns an error.
-
 * Consistent SerfNode/RaftNode interfaces
 
-* Quarantine nodes that doesn't answer reshards. Add timer for responses, if no response has been sent in x ms quarantine the node as "unresponsive" and do a new sharding round.
-
-* Run go test -race to ensure there's no race conditions (if possible -- there
-  might be libraries that have issues)
+* Quarantine nodes that doesn't answer reshards. Add timer for responses, if no
+  response has been sent in x ms quarantine the node as "unresponsive" and do
+  a new sharding round.
