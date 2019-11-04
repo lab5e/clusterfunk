@@ -82,9 +82,11 @@ func (a *ackColl) Completed() <-chan struct{} {
 }
 
 func (a *ackColl) Done() {
-	atomic.StoreUint64(a.shardIndex, 0)
-	close(a.missingChan)
-	close(a.completedChan)
+	if atomic.LoadUint64(a.shardIndex) > 0 {
+		atomic.StoreUint64(a.shardIndex, 0)
+		close(a.missingChan)
+		close(a.completedChan)
+	}
 }
 
 func (a *ackColl) ShardIndex() uint64 {
