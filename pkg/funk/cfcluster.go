@@ -246,6 +246,7 @@ func (c *clusterfunkCluster) checkAckStatus() {
 			for _, v := range unackNodes {
 				box.Remove(v)
 			}
+
 			if box.Size() == 0 {
 				// No nodes have responded to me. Step down as leader.
 				log.Warning("No nodes have acked. Stepping down as leader.")
@@ -289,7 +290,6 @@ func (c *clusterfunkCluster) handleClusterSizeChanged(nodeList []string) {
 	}
 	// Reset the list of acked nodes and
 	c.unacknowledged = newAckCollection()
-	log.Warningf("Start ack collection with index %d", index)
 	c.unacknowledged.StartAck(nodeList, index, c.config.AckTimeout)
 
 	go c.checkAckStatus()
@@ -316,7 +316,6 @@ func (c *clusterfunkCluster) handleReceiveLog() {
 		case ProposedShardMap:
 			if c.Role() == Leader {
 				// Ack to myself - this skips the whole gRPC call
-				log.Warningf("Acking myself: %s (%d)", c.raftNode.LocalNodeID(), c.unacknowledged.ShardIndex())
 				c.handleAckReceived(c.raftNode.LocalNodeID(), c.unacknowledged.ShardIndex())
 				continue
 			}
