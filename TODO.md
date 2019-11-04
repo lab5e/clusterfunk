@@ -27,4 +27,3 @@
 * Metrics for proxying (preferrably not tied to any particular metrics library) and cluster.
 
 * Client connection pooling code
-

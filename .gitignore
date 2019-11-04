@@ -3,3 +3,4 @@ cmd/demo/demo
 tests/
 *.csv
 
+docker/demo/demo.linux

@@ -9,6 +9,10 @@ and automate clusters of nodes.
 
 A silver bullet.
 
+## Requirements
+
+clusterfunk requires Go version 1.12 or later.
+
 ## Setting up a cluster
 
 ## Managing the cluster
