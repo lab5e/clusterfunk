@@ -218,8 +218,6 @@ func (c *clusterfunkCluster) handleFollowerEvent() {
 	c.setCurrentShardMapIndex(0)
 }
 
-const ackTimeout = 500 * time.Millisecond
-
 func (c *clusterfunkCluster) checkAckStatus() {
 	select {
 	case <-c.unacknowledged.Completed():
@@ -291,7 +289,8 @@ func (c *clusterfunkCluster) handleClusterSizeChanged(nodeList []string) {
 	}
 	// Reset the list of acked nodes and
 	c.unacknowledged = newAckCollection()
-	c.unacknowledged.StartAck(nodeList, index, ackTimeout)
+	log.Warningf("Start ack collection with index %d", index)
+	c.unacknowledged.StartAck(nodeList, index, c.config.AckTimeout)
 
 	go c.checkAckStatus()
 
@@ -308,6 +307,7 @@ func (c *clusterfunkCluster) handleAckReceived(nodeID string, shardIndex uint64)
 	// until all nodes have acked the state will stay the same.
 	return c.unacknowledged.Ack(nodeID, shardIndex)
 }
+
 func (c *clusterfunkCluster) handleReceiveLog() {
 	messages := c.raftNode.GetLogMessages(c.ProcessedIndex())
 	for _, msg := range messages {
@@ -316,6 +316,7 @@ func (c *clusterfunkCluster) handleReceiveLog() {
 		case ProposedShardMap:
 			if c.Role() == Leader {
 				// Ack to myself - this skips the whole gRPC call
+				log.Warningf("Acking myself: %s (%d)", c.raftNode.LocalNodeID(), c.unacknowledged.ShardIndex())
 				c.handleAckReceived(c.raftNode.LocalNodeID(), c.unacknowledged.ShardIndex())
 				continue
 			}

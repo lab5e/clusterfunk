@@ -32,10 +32,11 @@ type Parameters struct {
 	Management       GRPCServerParameters
 	NonVoting        bool          `param:"desc=Nonvoting node;default=false"`
 	NonMember        bool          `param:"desc=Non-member;default=false"`
-	LivenessInterval time.Duration `param:"desc=Liveness checker intervals;default=10ms"`
+	LivenessInterval time.Duration `param:"desc=Liveness checker intervals;default=50ms"`
 	LivenessRetries  int           `param:"desc=Number of retries for liveness checks;default=3"`
 	LivenessEndpoint string        `param:"desc=Liveness UDP endpoint"`
 	LeaderEndpoint   string        // This isn't a parameter, it's set by the service
+	AckTimeout       time.Duration `param:"desc=Ack timeout for nodes in the cluster;default=500ms"`
 }
 
 func (p *Parameters) checkAndSetEndpoint(hostport *string) {
@@ -75,7 +76,9 @@ func (p *Parameters) Final() {
 	if p.LivenessRetries == 0 {
 		p.LivenessRetries = 3
 	}
-
+	if p.AckTimeout == 0 {
+		p.AckTimeout = 150 * time.Millisecond
+	}
 	if p.Verbose {
 		log.Infof("Configuration: %+v", p)
 	}

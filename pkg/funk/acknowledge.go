@@ -65,7 +65,7 @@ func (a *ackColl) Ack(nodeID string, shardIndex uint64) bool {
 		return false
 	}
 	if a.nodes.Remove(nodeID) {
-		if a.nodes.Size() == 0 {
+		if a.nodes.Size() == 0 && atomic.LoadUint64(a.shardIndex) > 0 {
 			go func() { a.completedChan <- struct{}{} }()
 		}
 		return true
@@ -82,9 +82,9 @@ func (a *ackColl) Completed() <-chan struct{} {
 }
 
 func (a *ackColl) Done() {
+	atomic.StoreUint64(a.shardIndex, 0)
 	close(a.missingChan)
 	close(a.completedChan)
-	atomic.StoreUint64(a.shardIndex, 0)
 }
 
 func (a *ackColl) ShardIndex() uint64 {
