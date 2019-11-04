@@ -132,17 +132,22 @@ func (c *clusterfunkCluster) Start() error {
 	if c.config.ZeroConf {
 		c.registry = toolbox.NewZeroconfRegistry(c.config.ClusterName)
 
+		var err error
+		addrs, err := c.registry.Resolve(ZeroconfSerfKind, 1*time.Second)
+		if err != nil {
+			return err
+		}
+
 		if !c.config.Raft.Bootstrap && c.config.Serf.JoinAddress == "" {
-			var err error
-			addrs, err := c.registry.Resolve(ZeroconfSerfKind, 1*time.Second)
-			if err != nil {
-				return err
-			}
 			if len(addrs) == 0 {
 				return errors.New("no serf instances found")
 			}
 			c.config.Serf.JoinAddress = addrs[0]
 		}
+		if c.config.Raft.Bootstrap && len(addrs) > 0 {
+			return errors.New("there's already a cluster with that name")
+		}
+
 		if err := c.registry.Register(ZeroconfSerfKind, c.config.NodeID, toolbox.PortOfHostPort(c.config.Serf.Endpoint)); err != nil {
 			return err
 		}
