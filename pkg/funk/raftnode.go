@@ -95,10 +95,12 @@ type RaftParameters struct {
 	RaftEndpoint string `param:"desc=Endpoint for Raft;default="`
 	DiskStore    bool   `param:"desc=Disk-based store;default=false"`
 	Bootstrap    bool   `param:"desc=Bootstrap a new Raft cluster;default=false"`
+	Verbose      bool   `param:"desc=Verbose Raft logging;default=false"`
+	DebugLog     bool   `param:"desc=Show debug log messages for Raft;default=false"`
 }
 
 // Start launches the node
-func (r *RaftNode) Start(nodeID string, verboseLog bool, cfg RaftParameters) error {
+func (r *RaftNode) Start(nodeID string, cfg RaftParameters) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	if r.ra != nil {
@@ -108,8 +110,11 @@ func (r *RaftNode) Start(nodeID string, verboseLog bool, cfg RaftParameters) err
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(nodeID)
 
-	if verboseLog {
-		config.LogLevel = "DEBUG"
+	if cfg.Verbose {
+		config.LogLevel = "INFO"
+		if cfg.DebugLog {
+			config.LogLevel = "DEBUG"
+		}
 	} else {
 		config.LogOutput = newMutedLogger().Writer()
 	}
@@ -143,7 +148,8 @@ func (r *RaftNode) Start(nodeID string, verboseLog bool, cfg RaftParameters) err
 
 	// The transport logging is separate form the configuration transport. Obviously.
 	logger := io.Writer(os.Stderr)
-	if !verboseLog {
+	if !cfg.DebugLog {
+		// Will only log the transport log as debug
 		logger = newMutedLogger().Writer()
 	}
 	transport, err := raft.NewTCPTransport(addr.String(), addr, 3, 500*time.Millisecond, logger)

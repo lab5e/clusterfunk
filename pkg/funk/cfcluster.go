@@ -161,7 +161,7 @@ func (c *clusterfunkCluster) Start() error {
 	}
 	go c.raftEventLoop(c.raftNode.Events())
 
-	if err := c.raftNode.Start(c.config.NodeID, c.config.Verbose, c.config.Raft); err != nil {
+	if err := c.raftNode.Start(c.config.NodeID, c.config.Raft); err != nil {
 		return err
 	}
 
@@ -171,7 +171,7 @@ func (c *clusterfunkCluster) Start() error {
 
 	go c.serfEventLoop(c.serfNode.Events())
 
-	if err := c.serfNode.Start(c.config.NodeID, c.config.Verbose, c.config.Serf); err != nil {
+	if err := c.serfNode.Start(c.config.NodeID, c.config.Serf); err != nil {
 		return err
 	}
 

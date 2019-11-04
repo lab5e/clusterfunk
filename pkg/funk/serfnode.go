@@ -75,10 +75,11 @@ func NewSerfNode() *SerfNode {
 type SerfParameters struct {
 	Endpoint    string `param:"desc=Endpoint for Serf;default="`
 	JoinAddress string `param:"desc=Join address and port for Serf cluster"`
+	Verbose     bool   `param:"desc=Verbose logging for Serf"`
 }
 
 // Start launches the serf node
-func (s *SerfNode) Start(nodeID string, verboseLogging bool, cfg SerfParameters) error {
+func (s *SerfNode) Start(nodeID string, cfg SerfParameters) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -116,7 +117,7 @@ func (s *SerfNode) Start(nodeID string, verboseLogging bool, cfg SerfParameters)
 	eventCh := make(chan serf.Event)
 	config.EventCh = eventCh
 
-	if verboseLogging {
+	if cfg.Verbose {
 		config.Logger = golog.New(os.Stderr, "serf", golog.LstdFlags)
 	} else {
 		mutedLogger := newMutedLogger()

@@ -98,7 +98,7 @@ func start(config funk.Parameters) error {
 
 	go raftEvents(raftNode.Events())
 
-	if err := raftNode.Start(config.NodeID, config.Verbose, config.Raft); err != nil {
+	if err := raftNode.Start(config.NodeID, config.Raft); err != nil {
 		return err
 	}
 
@@ -107,7 +107,7 @@ func start(config funk.Parameters) error {
 
 	go serfEvents(serfNode.Events())
 
-	if err := serfNode.Start(config.NodeID, config.Verbose, config.Serf); err != nil {
+	if err := serfNode.Start(config.NodeID, config.Serf); err != nil {
 		return err
 	}
 	log.Info("Starting")

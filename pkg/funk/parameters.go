@@ -21,22 +21,22 @@ type GRPCServerParameters struct {
 // Parameters is the parameters required for the cluster. The defaults are
 // suitable for a development cluster but not for a production cluster.
 type Parameters struct {
-	Raft             RaftParameters
-	Serf             SerfParameters
-	AutoJoin         bool   `param:"desc=Auto join via SerfEvents;default=true"`
-	ClusterName      string `param:"desc=Cluster name;default=clusterfunk"`
-	Interface        string `param:"desc=Interface address for services"`
-	Verbose          bool   `param:"desc=Verbose logging for Serf and Raft;default=false"`
-	NodeID           string `param:"desc=Node ID for Serf and Raft;default="`
-	ZeroConf         bool   `param:"desc=Zero-conf startup;default=true"`
-	Management       GRPCServerParameters
+	AutoJoin         bool          `param:"desc=Auto join via SerfEvents;default=true"`
+	ClusterName      string        `param:"desc=Cluster name;default=clusterfunk"`
+	Interface        string        `param:"desc=Interface address for services"`
+	Verbose          bool          `param:"desc=Verbose logging for Serf and Raft;default=false"`
+	NodeID           string        `param:"desc=Node ID for Serf and Raft;default="`
+	ZeroConf         bool          `param:"desc=Zero-conf startup;default=true"`
 	NonVoting        bool          `param:"desc=Nonvoting node;default=false"`
 	NonMember        bool          `param:"desc=Non-member;default=false"`
 	LivenessInterval time.Duration `param:"desc=Liveness checker intervals;default=50ms"`
 	LivenessRetries  int           `param:"desc=Number of retries for liveness checks;default=3"`
 	LivenessEndpoint string        `param:"desc=Liveness UDP endpoint"`
-	LeaderEndpoint   string        // This isn't a parameter, it's set by the service
 	AckTimeout       time.Duration `param:"desc=Ack timeout for nodes in the cluster;default=500ms"`
+	Raft             RaftParameters
+	Serf             SerfParameters
+	LeaderEndpoint   string // This isn't a parameter, it's set by the service
+	Management       GRPCServerParameters
 }
 
 func (p *Parameters) checkAndSetEndpoint(hostport *string) {
@@ -79,7 +79,12 @@ func (p *Parameters) Final() {
 	if p.AckTimeout == 0 {
 		p.AckTimeout = 150 * time.Millisecond
 	}
-	if p.Verbose {
-		log.Infof("Configuration: %+v", p)
-	}
+
+	// Log endpoints regardless of verbose or not.
+	log.WithFields(log.Fields{
+		"serfEndpoint":       p.Serf.Endpoint,
+		"raftEndpoint":       p.Raft.RaftEndpoint,
+		"managementEndpoint": p.Management.Endpoint,
+		"livenessEndpoint":   p.LivenessEndpoint,
+	}).Info("Endpoint configuration")
 }
