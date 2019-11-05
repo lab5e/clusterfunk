@@ -71,7 +71,7 @@ func (p *Parameters) Final() {
 
 	// TODO: Remove this when parameters are open sourced
 	if p.LivenessInterval == 0 {
-		p.LivenessInterval = 10 * time.Millisecond
+		p.LivenessInterval = 50 * time.Millisecond
 	}
 	if p.LivenessRetries == 0 {
 		p.LivenessRetries = 3

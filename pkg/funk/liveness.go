@@ -42,20 +42,20 @@ type LocalLivenessEndpoint interface {
 }
 
 type udpLivenessClient struct {
-	stopCh chan bool
+	stopCh chan struct{}
 }
 
 // NewLivenessClient creates a new liveness endpoint with the specified
 // port/address. Response is sent immideately
 func NewLivenessClient(ep string) LocalLivenessEndpoint {
-	ret := &udpLivenessClient{stopCh: make(chan bool)}
+	ret := &udpLivenessClient{stopCh: make(chan struct{})}
 	ret.launch(ep)
 	return ret
 }
 
 // Stop will cause the liveness client to stop
 func (u *udpLivenessClient) Stop() {
-	u.stopCh <- true
+	u.stopCh <- struct{}{}
 }
 
 func (u *udpLivenessClient) launch(endpoint string) {
@@ -140,6 +140,7 @@ func (c *singleChecker) checkerProc(id, endpoint string, interval time.Duration)
 	for {
 		select {
 		case <-c.stopCh:
+			log.Infof("Terminating leveness checker to %s", endpoint)
 			return
 		default:
 			// keep on running
@@ -214,9 +215,8 @@ func (c *singleChecker) checkerProc(id, endpoint string, interval time.Duration)
 func (c *singleChecker) Stop() {
 	select {
 	case c.stopCh <- struct{}{}:
-	default:
+	case <-time.After(10 * time.Millisecond):
 		// it's already stopping
-
 	}
 }
 
