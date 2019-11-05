@@ -70,7 +70,6 @@ type RaftNode struct {
 	raftEndpoint   string                        // Raft endpoint
 	ra             *raft.Raft                    // Raft instance
 	events         chan RaftEventType            // Events from Raft
-	internalEvents chan RaftEventType            // Internal event queue
 	state          map[LogMessageType]LogMessage // The internal FSM state
 	Nodes          toolbox.StringSet
 }
@@ -85,7 +84,6 @@ func NewRaftNode() *RaftNode {
 		scheduledMutex: &sync.Mutex{},
 		scheduled:      make(map[RaftEventType]time.Time),
 		events:         make(chan RaftEventType, 10), // tiny buffer here to make multiple events feasable.
-		internalEvents: make(chan RaftEventType, 10),
 		state:          make(map[LogMessageType]LogMessage),
 	}
 }
@@ -211,7 +209,6 @@ func (r *RaftNode) Start(nodeID string, cfg RaftParameters) error {
 	// This node will - surprise - be a member of the cluster
 	r.addNode(nodeID)
 
-	go r.coalescingEvents()
 	go r.observerFunc(observerChan)
 
 	r.ra.RegisterObserver(raft.NewObserver(observerChan, true, func(*raft.Observation) bool { return true }))
@@ -471,7 +468,7 @@ func (r *RaftNode) RefreshNodes() {
 
 func (r *RaftNode) sendInternalEvent(ev RaftEventType) {
 	select {
-	case r.internalEvents <- ev:
+	case r.events <- ev:
 		// Remove aync scheduled events of this type.
 		r.scheduledMutex.Lock()
 		delete(r.scheduled, ev)
@@ -503,37 +500,6 @@ func (r *RaftNode) scheduleInternalEvent(ev RaftEventType, timeout time.Duration
 			r.sendInternalEvent(ev)
 		}
 	}()
-}
-
-func (r *RaftNode) coalescingEvents() {
-	eventsToGenerate := make([]RaftEventType, 0)
-	for {
-		timedOut := false
-		select {
-		case ev := <-r.internalEvents:
-			found := false
-			for i := range eventsToGenerate {
-				if eventsToGenerate[i] == ev {
-					found = true
-					break
-				}
-			}
-			if !found {
-				eventsToGenerate = append(eventsToGenerate, ev)
-			}
-			continue
-
-		case <-time.After(1 * time.Millisecond):
-			timedOut = true
-		}
-		if timedOut {
-			for i := range eventsToGenerate {
-				// generate appropriate event
-				r.events <- eventsToGenerate[i]
-			}
-			eventsToGenerate = make([]RaftEventType, 0)
-		}
-	}
 }
 
 // EnableNode enables a node that has been disabled. The node might be a part of the
