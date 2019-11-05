@@ -1,12 +1,13 @@
 package main
 
 import (
-	"flag"
+	"fmt"
 	"os"
 	"runtime/pprof"
 
 	golog "log"
 
+	"github.com/ExploratoryEngineering/params"
 	log "github.com/sirupsen/logrus"
 	"github.com/stalehd/clusterfunk/pkg/funk"
 	"github.com/stalehd/clusterfunk/pkg/funk/sharding"
@@ -18,30 +19,26 @@ const numShards = 10000
 const demoEndpoint = "ep.demo"
 
 var logLevel = "info"
-var config funk.Parameters
+var config parameters
 var defaultLogger = log.New()
 var cluster funk.Cluster
 var shards sharding.ShardManager
 var webserverEndpoint string
 var cpuprofiler string
 
-func init() {
-	flag.StringVar(&config.Serf.JoinAddress, "join", "", "Join address for cluster")
-	flag.BoolVar(&config.Raft.Bootstrap, "bootstrap", false, "Bootstrap a new cluster")
-	flag.BoolVar(&config.Raft.DiskStore, "disk", false, "Use disk store")
-	flag.BoolVar(&config.Verbose, "verbose", false, "Verbose logging")
-	flag.BoolVar(&config.ZeroConf, "zeroconf", true, "Use zeroconf (mDNS) to discover nodes")
-	flag.StringVar(&config.ClusterName, "name", "demo", "Name of cluster")
-	flag.BoolVar(&config.AutoJoin, "autojoin", true, "Autojoin via Serf Events")
-	flag.StringVar(&logLevel, "loglevel", "info", "Logging level")
-	flag.StringVar(&cpuprofiler, "cpuprofiler", "", "Write cpu profiler to file")
-	flag.Parse()
-	config.NodeID = toolbox.RandomID()
-	config.Final()
+type parameters struct {
+	CPUProfilerFile string `param:"desc=Turn on profiling and store the profile data in a file"`
+	Cluster         funk.Parameters
 }
+
 func main() {
-	if cpuprofiler != "" {
-		f, err := os.Create(cpuprofiler)
+	if err := params.NewEnvFlag(&config, os.Args[1:]); err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	if config.CPUProfilerFile != "" {
+		f, err := os.Create(config.CPUProfilerFile)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -55,7 +52,7 @@ func main() {
 		panic(err)
 	}
 
-	cluster = funk.NewCluster(config, shards)
+	cluster = funk.NewCluster(config.Cluster, shards)
 
 	setupLogging()
 

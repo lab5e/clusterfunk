@@ -20,6 +20,7 @@ type GRPCServerParameters struct {
 
 // Parameters is the parameters required for the cluster. The defaults are
 // suitable for a development cluster but not for a production cluster.
+// The struct uses annotations from https://github.com/ExploratoryEngineering/params
 type Parameters struct {
 	AutoJoin         bool          `param:"desc=Auto join via SerfEvents;default=true"`
 	ClusterName      string        `param:"desc=Cluster name;default=clusterfunk"`

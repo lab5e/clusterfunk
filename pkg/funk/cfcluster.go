@@ -138,11 +138,14 @@ func (c *clusterfunkCluster) Start() error {
 			return err
 		}
 
-		if !c.config.Raft.Bootstrap && c.config.Serf.JoinAddress == "" {
-			if len(addrs) == 0 {
-				return errors.New("no serf instances found")
+		if c.config.Serf.JoinAddress == "" {
+			if len(addrs) > 0 {
+				c.config.Serf.JoinAddress = addrs[0]
 			}
-			c.config.Serf.JoinAddress = addrs[0]
+			if len(addrs) == 0 {
+				log.Debug("No Serf nodes found, bootstrapping cluster")
+				c.config.Raft.Bootstrap = true
+			}
 		}
 		if c.config.Raft.Bootstrap && len(addrs) > 0 {
 			return errors.New("there's already a cluster with that name")

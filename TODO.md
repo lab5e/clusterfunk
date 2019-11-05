@@ -10,8 +10,6 @@
   having one or more nodes registered in DNS makes sense. Might need
   some additional machinery on the outside.
 
-* Open source the parameters library (flags is cumbersome)
-
 * Complete demo with work spread across nodes
 
 * Consistent SerfNode/RaftNode interfaces
@@ -26,4 +24,6 @@
 
 * Metrics for proxying (preferrably not tied to any particular metrics library) and cluster.
 
-* Client connection pooling code
+* Client connection pooling code. Use interceptor feature to do proxying on server side.
+
+* Investigate high CPU use. There's a lot of waiting going on.
