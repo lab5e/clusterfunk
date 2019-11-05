@@ -1,3 +1,2 @@
 #!/bin/sh
-echo Bootstrap=${BOOTSTRAP}
-./demo --bootstrap=${BOOTSTRAP}
+./demo --cluster-ack-timeout=1s

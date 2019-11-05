@@ -13,8 +13,4 @@ EXPOSE 1234/tcp
 ADD demo.linux /demo
 ADD run-demo.sh /run-demo.sh
 
-# Serf, Raft zerconf and other are all networked internally so there's no
-# need to expose those ports.
-ENV BOOTSTRAP=false
-
 CMD ["/bin/sh", "/run-demo.sh"]

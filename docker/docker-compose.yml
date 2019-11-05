@@ -3,17 +3,5 @@
 version: '3'
 
 services:
-  leader:
-    image: clusterfunk-demo
-    ports:
-      - "8080:8080/tcp"
-      - "1234:1234/tcp"
-    environment:
-      BOOTSTRAP: "true"
-
   node:
     image: clusterfunk-demo
-    depends_on:
-      - leader
-    environment:
-      BOOTSTRAP: "false"
