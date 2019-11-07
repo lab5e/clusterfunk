@@ -5,10 +5,13 @@ import (
 	"os"
 	"runtime/pprof"
 
+	"github.com/stalehd/clusterfunk/cmd/demo/server/grpcserver"
+
 	golog "log"
 
 	"github.com/ExploratoryEngineering/params"
 	log "github.com/sirupsen/logrus"
+	"github.com/stalehd/clusterfunk/cmd/demo/server/http"
 	"github.com/stalehd/clusterfunk/pkg/funk"
 	"github.com/stalehd/clusterfunk/pkg/funk/sharding"
 	"github.com/stalehd/clusterfunk/pkg/toolbox"
@@ -56,73 +59,36 @@ func main() {
 
 	setupLogging()
 
-	// This is the demo gRPC service we'll run on each node.
+	http.StartWebserver(webserverEndpoint, cluster, shards)
+
 	demoServerEndpoint := toolbox.RandomPublicEndpoint()
 	webserverEndpoint = toolbox.RandomLocalEndpoint()
-	// Set up the local gRPC server.
-	liffServer := newLiffProxy(newLiffServer(cluster.NodeID()), shards, cluster, demoEndpoint)
-	go startDemoServer(demoServerEndpoint, liffServer)
 
-	// This logs a message every time the cluster changes state.
-	go clusterEventListener(cluster.Events())
+	go grpcserver.StartDemoServer(demoServerEndpoint, demoEndpoint, cluster, shards)
 
-	// ...announce the endpoint. This is sent via Serf so this should be set before
-	// starting the cluster. Serf updates are slower than the leader election so
-	// the nodes might not pick up the endpoint until after the election. If we
-	// set the endpoint before the cluster is started the serf client will announce
-	// itself with the endpoint already populated.
+	go func(ch <-chan funk.Event) {
+		for ev := range ch {
+			log.Infof("Cluster state: %s  role: %s", ev.State.String(), ev.Role.String())
+
+			http.UpdateClusterStatus(cluster)
+
+			if ev.State == funk.Operational {
+				printShardMap(shards, cluster, demoEndpoint)
+				http.ClusterOperational(cluster, shards)
+			}
+		}
+	}(cluster.Events())
+
 	cluster.SetEndpoint(demoEndpoint, demoServerEndpoint)
+	cluster.SetEndpoint(http.ConsoleEndpoint, webserverEndpoint)
 
-	cluster.SetEndpoint(httpConsoleEndpoint, webserverEndpoint)
-	// ...and start the cluster node. If the bootstrap flag is set a new cluster
-	// will be launched.
 	if err := cluster.Start(); err != nil {
 		log.WithError(err).Error("Error starting cluster")
 		return
 	}
 	defer cluster.Stop()
 
-	// Nothing blocks here so wait for an interrupt signal.
 	toolbox.WaitForCtrlC()
-}
-
-func clusterEventListener(ch <-chan funk.Event) {
-	p := newEventProducer()
-
-	launchLocalWebserver(p, webserverEndpoint)
-	const (
-		nodeInfoPreset = iota
-		memberListPreset
-		shardMapPreset
-		clusterStatusPreset
-	)
-
-	presets := make([]interface{}, 4)
-	presets[nodeInfoPreset] = newNodeInfo(cluster)
-	presets[memberListPreset] = newMemberList(cluster)
-	presets[shardMapPreset] = newShardMap(shards)
-	presets[clusterStatusPreset] = newClusterStatus(cluster)
-	p.SetPresets(presets)
-
-	for ev := range ch {
-		log.Infof("Cluster state: %s  role: %s", ev.State.String(), ev.Role.String())
-		if ev.State == funk.Operational {
-			printShardMap(shards, cluster, demoEndpoint)
-		}
-		status := newClusterStatus(cluster)
-		p.Send(status)
-		if ev.State == funk.Operational {
-			// update member list and shards
-			shardMap := newShardMap(shards)
-			memberList := newMemberList(cluster)
-			presets[memberListPreset] = memberList
-			presets[shardMapPreset] = shardMap
-			presets[clusterStatusPreset] = status
-			p.SetPresets(presets)
-			p.Send(shardMap)
-			p.Send(memberList)
-		}
-	}
 }
 
 // This prints the shard map and nodes in the cluster with the endpoint for

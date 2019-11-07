@@ -1,4 +1,4 @@
-package main
+package http
 
 import (
 	"sync"
@@ -7,7 +7,14 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// The event producer is used to distribute the events to the websockets
+// The event producer is used to distribute the events to the websockets.There
+// might be more than one client connected to a websocket so we'll have to
+// dispatch the events to more than one channel.
+//
+// If one of the clients stops listening the channel will block and we close and
+// drop the channel.
+//
+
 type eventProducer interface {
 	SetPresets(msg []interface{})
 	Presets() []interface{}

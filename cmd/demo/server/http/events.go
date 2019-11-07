@@ -1,11 +1,13 @@
-package main
+package http
 
 import (
 	"github.com/stalehd/clusterfunk/pkg/funk"
 	"github.com/stalehd/clusterfunk/pkg/funk/sharding"
 )
 
-// This file contains the websocket events that will be sent
+// This file contains the websocket events that will be sent to the client
+// from the web server. It's mostly just reformatting of data.
+
 type clusterStatus struct {
 	Type  string `json:"type"`
 	State string `json:"state"`
@@ -58,7 +60,7 @@ func newMemberList(cluster funk.Cluster) memberList {
 	for _, v := range cluster.Nodes() {
 		ret.Members = append(ret.Members, memberNode{
 			ID:          v,
-			WebEndpoint: cluster.GetEndpoint(v, httpConsoleEndpoint),
+			WebEndpoint: cluster.GetEndpoint(v, ConsoleEndpoint),
 		})
 	}
 	return ret

@@ -1,4 +1,4 @@
-package main
+package grpcserver
 
 import (
 	"context"
@@ -6,6 +6,8 @@ import (
 	"net"
 
 	"github.com/stalehd/clusterfunk/cmd/demo"
+	"github.com/stalehd/clusterfunk/pkg/funk"
+	"github.com/stalehd/clusterfunk/pkg/funk/sharding"
 
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -14,7 +16,10 @@ import (
 // This is the core demo service. It's a simple gRPC service with a single
 // method.
 
-func startDemoServer(endpoint string, liffServer demo.DemoServiceServer) {
+func StartDemoServer(endpoint string, endpointName string, cluster funk.Cluster, shards sharding.ShardManager) {
+	// Set up the local gRPC server.
+	liffServer := newLiffProxy(newLiffServer(cluster.NodeID()), shards, cluster, endpointName)
+
 	server := grpc.NewServer()
 	demo.RegisterDemoServiceServer(server, liffServer)
 	listener, err := net.Listen("tcp", endpoint)
