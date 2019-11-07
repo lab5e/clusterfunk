@@ -4,6 +4,7 @@ go 1.12
 
 require (
 	github.com/ExploratoryEngineering/params v1.0.0
+	github.com/aclements/go-moremath v0.0.0-20190830160640-d16893ddf098
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/golang/protobuf v1.3.2
 	github.com/gorilla/websocket v1.4.1

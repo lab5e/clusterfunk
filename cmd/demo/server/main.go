@@ -54,16 +54,14 @@ func main() {
 	if err := shards.Init(numShards, nil); err != nil {
 		panic(err)
 	}
-
 	cluster = funk.NewCluster(config.Cluster, shards)
 
 	setupLogging()
 
-	http.StartWebserver(webserverEndpoint, cluster, shards)
-
 	demoServerEndpoint := toolbox.RandomPublicEndpoint()
 	webserverEndpoint = toolbox.RandomLocalEndpoint()
 
+	http.StartWebserver(webserverEndpoint, cluster, shards)
 	go grpcserver.StartDemoServer(demoServerEndpoint, demoEndpoint, cluster, shards)
 
 	go func(ch <-chan funk.Event) {

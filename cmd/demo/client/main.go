@@ -3,15 +3,18 @@ package main
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"math/rand"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/ExploratoryEngineering/params"
+
 	"github.com/stalehd/clusterfunk/pkg/toolbox"
 
+	"github.com/aclements/go-moremath/stats"
 	"github.com/stalehd/clusterfunk/cmd/demo"
 	"github.com/stalehd/clusterfunk/pkg/clientfunk"
 	"google.golang.org/grpc"
@@ -19,25 +22,19 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type parameters struct {
-	Endpoints    string
-	Repeats      int
-	Sleep        time.Duration
-	LogTiming    bool
-	PrintSummary bool
-}
+const grpcServiceEndpointName = "ep.demo"
 
-const numWorkers = 3
+type parameters struct {
+	Endpoints    string        `param:"desc=Comma-separated list of endpoints to use. Will use zeroconf to find the parameters"`
+	ClusterName  string        `param:"desc=Cluster name;default=clusterfunk"`
+	Repeats      int           `param:"desc=Number of times to repeat rpc call;default=50"`
+	Sleep        time.Duration `param:"desc=Sleep between invocations;default=100ms"`
+	LogTiming    bool          `param:"desc=Log timings to a CSV file;default=false"`
+	PrintSummary bool          `param:"desc=Print summary when finished;default=true"`
+	NumWorkers   int           `param:"desc=Number of workers to run;default=3"`
+}
 
 var config parameters
-
-func init() {
-	flag.IntVar(&config.Repeats, "repeat", 50, "Number of times to repeat the command")
-	flag.DurationVar(&config.Sleep, "sleep", 100*time.Millisecond, "Time to sleep between calls")
-	flag.BoolVar(&config.LogTiming, "log", true, "Log timings to a CSV file")
-	flag.BoolVar(&config.PrintSummary, "print-summary", true, "Print summary when finished")
-	flag.Parse()
-}
 
 type result struct {
 	Time    float64
@@ -46,31 +43,42 @@ type result struct {
 }
 
 func refreshPool(pool *clientfunk.ClientPool) {
-	ep, err := clientfunk.ZeroconfManagementLookup("demo")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to do zeroconf lookup: %v\n", err)
+	if config.Endpoints != "" {
+		eps := strings.Split(config.Endpoints, ",")
+		pool.Sync(eps)
 		return
 	}
-	endpoints, err := clientfunk.GetEndpoints("ep.demo", toolbox.GRPCClientParam{ServerEndpoint: ep})
+	ep, err := clientfunk.ZeroconfManagementLookup(config.ClusterName)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to locate endpoints: %v\n", err)
+		panic(fmt.Sprintf("Unable to do zeroconf lookup for cluster %s: %v", config.ClusterName, err))
 	}
-	pool.Sync(endpoints)
+	eps, err := clientfunk.GetEndpoints(grpcServiceEndpointName, toolbox.GRPCClientParam{ServerEndpoint: ep})
+	if err != nil {
+		panic(fmt.Sprintf("Unable to locate endpoints: %v", err))
+	}
+	pool.Sync(eps)
 }
+
 func main() {
+	if err := params.NewEnvFlag(&config, os.Args[1:]); err != nil {
+		fmt.Println(err)
+		return
+	}
+
 	clientPool := clientfunk.NewClientPool([]grpc.DialOption{grpc.WithInsecure()})
+
 	refreshPool(clientPool)
 	lowWatermark := clientPool.Size() - 1
 	// Seed is quite important here
 	rand.Seed(time.Now().UnixNano())
 
 	wg := &sync.WaitGroup{}
-	wg.Add(numWorkers)
+	wg.Add(config.NumWorkers)
 	// Timings are reported as positive values for successful calls, negative
 	// otherwise.
 	timings := make(chan result)
 
-	for worker := 0; worker < numWorkers; worker++ {
+	for worker := 0; worker < config.NumWorkers; worker++ {
 		go func(timingCh chan<- result, times int) {
 			for i := 0; i < times; i++ {
 				time.Sleep(config.Sleep)
@@ -78,6 +86,8 @@ func main() {
 				conn, err := clientPool.Take(ctx)
 				done()
 				if err != nil {
+					fmt.Fprintf(os.Stderr, "Unable to take client connection: %v", err)
+					timingCh <- result{Success: false}
 					continue
 				}
 				ctx, done = context.WithTimeout(context.Background(), 3*time.Second)
@@ -112,9 +122,6 @@ func main() {
 		}(timings, config.Repeats)
 	}
 
-	nodes := make(map[string]int)
-	totals := make(map[string]float64)
-
 	var csvFile *os.File
 	if config.LogTiming {
 		var err error
@@ -135,42 +142,39 @@ func main() {
 		}
 	}()
 
-	success := 0
-	received := 0
-	total := 0.0
-	max := 0.0
-	min := 99999999.9
+	stats := make(map[string]stats.StreamStats)
+	errors := 0
+	itemNo := 0
 	go func() {
 		for result := range timings {
-			received++
-			fmt.Printf("\rReceived %d responses", received)
+			itemNo++
+			fmt.Printf("\rReceived %d responses", itemNo)
 			if !result.Success {
+				errors++
 				fmt.Printf("Error     : %f ms\n", result.Time)
 				continue
 			}
-			success++
-			total += result.Time
-			if max < result.Time {
-				max = result.Time
-			}
-			if min > result.Time {
-				min = result.Time
-			}
-			nodes[result.NodeID]++
-			totals[result.NodeID] += result.Time
+			s := stats[result.NodeID]
+			s.Add(result.Time)
+			stats[result.NodeID] = s
 			// Log call time to CSV
-			fmt.Fprintf(csvFile, "%d,%s,%f\n", received, result.NodeID, result.Time)
+			fmt.Fprintf(csvFile, "%d,%s,%f\n", itemNo, result.NodeID, result.Time)
 		}
 	}()
 
 	wg.Wait()
+	// Wait for the reader to finish. Not pretty but I'll fix it.
+	time.Sleep(100 * time.Millisecond)
+
 	if config.PrintSummary {
-		fmt.Println("=================================================")
-		fmt.Printf("average: %6.2f   min: %6.2f  max: %6.2f\n", total/float64(success), min, max)
-		fmt.Printf("%d calls in total, %d successful, %d failed\n", config.Repeats*numWorkers, success, (numWorkers*config.Repeats)-success)
-		for k, v := range nodes {
-			fmt.Printf("%20s: %d calls - %f ms average\n", k, v, totals[k]/float64(v))
+
+		fmt.Println("\n=================================================")
+		total := uint(0)
+		for k, v := range stats {
+			fmt.Printf("%20s: %d items min: %6.3f  max: %6.3f  mean: %6.3f  stddev: %6.3f\n", k, v.Count, v.Min, v.Max, v.Mean(), v.StdDev())
+			total += v.Count
 		}
+		fmt.Printf("%d in total, %d with errors\n", total, errors)
 	}
 }
 
