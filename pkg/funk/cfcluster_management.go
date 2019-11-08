@@ -217,6 +217,25 @@ func (c *clusterfunkCluster) FindEndpoint(ctx context.Context, req *clustermgmt.
 	return ret, nil
 }
 
+func (c *clusterfunkCluster) ListEndpoints(ctx context.Context, req *clustermgmt.ListEndpointRequest) (*clustermgmt.ListEndpointResponse, error) {
+	ret := &clustermgmt.ListEndpointResponse{
+		NodeId:    c.NodeID(),
+		Endpoints: make([]*clustermgmt.EndpointInfo, 0),
+	}
+	for _, v := range c.serfNode.Nodes() {
+		for k, val := range v.Tags {
+			if strings.HasPrefix(k, clusterEndpointPrefix) {
+				ret.Endpoints = append(ret.Endpoints, &clustermgmt.EndpointInfo{
+					NodeId:   v.NodeID,
+					Name:     k,
+					HostPort: val,
+				})
+			}
+		}
+	}
+	return ret, nil
+}
+
 func (c *clusterfunkCluster) AddNode(ctx context.Context, req *clustermgmt.AddNodeRequest) (*clustermgmt.AddNodeResponse, error) {
 	if c.State() != Operational {
 		return &clustermgmt.AddNodeResponse{

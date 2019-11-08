@@ -68,6 +68,10 @@ func (d *dummyManagement) FindEndpoint(ctx context.Context, req *clustermgmt.End
 	}, nil
 }
 
+func (d *dummyManagement) ListEndpoints(ctx context.Context, req *clustermgmt.ListEndpointRequest) (*clustermgmt.ListEndpointResponse, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (d *dummyManagement) AddNode(context.Context, *clustermgmt.AddNodeRequest) (*clustermgmt.AddNodeResponse, error) {
 	return nil, errors.New("not implemented")
 }
