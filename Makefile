@@ -1,4 +1,4 @@
-all: test bins
+all: test bins lint
 
 clean:
 	go clean
@@ -15,6 +15,13 @@ test:
 
 generate:
 	go generate ./...
+
+lint:
+	golint ./...
+	go vet ./...
+	staticcheck ./...
+	revive ./...
+	golangci-lint run
 
 # The linux build uses the docker core images to build. If you are running on Linux you might as well just
 # build it directly (use go build -installsuffix cgo -o ...)
