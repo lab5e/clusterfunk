@@ -432,10 +432,7 @@ func (r *RaftNode) StepDown() error {
 	if !r.Leader() {
 		return errors.New("not the leader")
 	}
-	if err := r.ra.LeadershipTransfer().Error(); err != nil {
-		return err
-	}
-	return nil
+	return r.ra.LeadershipTransfer().Error()
 }
 
 func (r *RaftNode) addNode(id string) {

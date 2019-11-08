@@ -17,7 +17,7 @@ const poolElements = 20
 func TestEndpointPool(t *testing.T) {
 	assert := require.New(t)
 
-	pool := NewClientPool([]grpc.DialOption{grpc.WithInsecure()})
+	pool := NewPool([]grpc.DialOption{grpc.WithInsecure()})
 	// Make a pool of 10 servers. These are just to avoid errors
 	var endpoints []string
 
@@ -86,7 +86,7 @@ func TestEndpointPool(t *testing.T) {
 }
 
 func BenchmarkPoolGetRelease(b *testing.B) {
-	pool := NewClientPool([]grpc.DialOption{grpc.WithInsecure()})
+	pool := NewPool([]grpc.DialOption{grpc.WithInsecure()})
 	// Make a pool of 10 servers. These are just to avoid errors
 	var endpoints []string
 

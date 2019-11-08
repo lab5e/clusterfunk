@@ -16,6 +16,7 @@ import (
 // This is the core demo service. It's a simple gRPC service with a single
 // method.
 
+// StartDemoServer starts the demo (gRPC) server.
 func StartDemoServer(endpoint string, endpointName string, cluster funk.Cluster, shards sharding.ShardManager) {
 	// Set up the local gRPC server.
 	liffServer := newLiffProxy(newLiffServer(cluster.NodeID()), shards, cluster, endpointName)

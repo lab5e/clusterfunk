@@ -174,11 +174,7 @@ func (c *clusterfunkCluster) Start() error {
 
 	go c.serfEventLoop(c.serfNode.Events())
 
-	if err := c.serfNode.Start(c.config.NodeID, c.config.Serf); err != nil {
-		return err
-	}
-
-	return nil
+	return c.serfNode.Start(c.config.NodeID, c.config.Serf)
 }
 
 func (c *clusterfunkCluster) raftEventLoop(ch <-chan RaftEventType) {

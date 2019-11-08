@@ -50,7 +50,11 @@ func main() {
 		panic(err)
 	}
 
-	defer raftNode.Stop()
+	defer func() {
+		if err := raftNode.Stop(); err != nil {
+			log.WithError(err).Info("Got error when stopping Raft node. Ignoring it since I'm shutting down.")
+		}
+	}()
 	waitForExit()
 }
 

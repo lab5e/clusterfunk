@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// ConsoleEndpoint is the name of the HTTP endpoint in the cluster
 const ConsoleEndpoint = "ep.httpConsole"
 
 const uiPath = "./cmd/demo/server/html"
@@ -57,6 +58,7 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// StartWebserver starts the web server that hosts the status page.
 func StartWebserver(endpoint string, cluster funk.Cluster, shards sharding.ShardManager) {
 	messageProducer = newEventProducer()
 	presets = make([]interface{}, lastPreset)
@@ -85,10 +87,13 @@ func StartWebserver(endpoint string, cluster funk.Cluster, shards sharding.Shard
 	}()
 }
 
+// UpdateClusterStatus updates the cluster status
 func UpdateClusterStatus(cluster funk.Cluster) {
 	messageProducer.Send(newClusterStatus(cluster))
 }
 
+// ClusterOperational sends notification to the connected HTTP clients
+// TODO: naming. It makes zero sense.
 func ClusterOperational(cluster funk.Cluster, shards sharding.ShardManager) {
 	// update member list and shards
 	shardMap := newShardMap(shards)
