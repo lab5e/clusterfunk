@@ -42,7 +42,7 @@ type clusterfunkCluster struct {
 // NewCluster returns a new cluster (client)
 func NewCluster(params Parameters, shardManager sharding.ShardManager) Cluster {
 	ret := &clusterfunkCluster{
-		name:                 params.ClusterName,
+		name:                 params.Name,
 		shardManager:         shardManager,
 		config:               params,
 		serfNode:             NewSerfNode(),
@@ -116,7 +116,7 @@ func (c *clusterfunkCluster) Events() <-chan Event {
 
 func (c *clusterfunkCluster) Start() error {
 	c.config.Final()
-	if c.config.ClusterName == "" {
+	if c.config.Name == "" {
 		return errors.New("cluster name not specified")
 	}
 
@@ -130,7 +130,7 @@ func (c *clusterfunkCluster) Start() error {
 		log.WithError(err).Error("Error starting leader gRPC interface")
 	}
 	if c.config.ZeroConf {
-		c.registry = toolbox.NewZeroconfRegistry(c.config.ClusterName)
+		c.registry = toolbox.NewZeroconfRegistry(c.config.Name)
 
 		var err error
 		addrs, err := c.registry.Resolve(ZeroconfSerfKind, 1*time.Second)
@@ -277,6 +277,10 @@ func (c *clusterfunkCluster) handleClusterSizeChanged(nodeList []string) {
 	// reshard cluster, distribute via replicated log.
 
 	c.shardManager.UpdateNodes(nodeList...)
+	if len(nodeList) == 0 {
+		log.Error("Cluster does not contain any nodes. Nothing to do when size changes")
+		return
+	}
 	proposedShardMap, err := c.shardManager.MarshalBinary()
 	if err != nil {
 		panic(fmt.Sprintf("Can't marshal the shard map: %v", err))

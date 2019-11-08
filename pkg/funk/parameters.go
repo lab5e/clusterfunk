@@ -23,7 +23,7 @@ type GRPCServerParameters struct {
 // The struct uses annotations from https://github.com/ExploratoryEngineering/params
 type Parameters struct {
 	AutoJoin         bool          `param:"desc=Auto join via SerfEvents;default=true"`
-	ClusterName      string        `param:"desc=Cluster name;default=clusterfunk"`
+	Name             string        `param:"desc=Cluster name;default=clusterfunk"`
 	Interface        string        `param:"desc=Interface address for services"`
 	Verbose          bool          `param:"desc=Verbose logging for Serf and Raft;default=false"`
 	NodeID           string        `param:"desc=Node ID for Serf and Raft;default="`
@@ -51,7 +51,9 @@ func (p *Parameters) checkAndSetEndpoint(hostport *string) {
 	*hostport = fmt.Sprintf("%s:%d", p.Interface, port)
 }
 
-// Final sets the defaults for the parameters
+// Final sets the defaults for the parameters that haven't got a sensible value,
+// f.e. endpoints and defaults. Defaults that are random values can't be
+// set via the parameter library. Yet.
 func (p *Parameters) Final() {
 	if p.NodeID == "" {
 		p.NodeID = toolbox.RandomID()
@@ -69,17 +71,6 @@ func (p *Parameters) Final() {
 	p.checkAndSetEndpoint(&p.Management.Endpoint)
 	p.checkAndSetEndpoint(&p.LeaderEndpoint)
 	p.checkAndSetEndpoint(&p.LivenessEndpoint)
-
-	// TODO: Remove this when parameters are open sourced
-	if p.LivenessInterval == 0 {
-		p.LivenessInterval = 50 * time.Millisecond
-	}
-	if p.LivenessRetries == 0 {
-		p.LivenessRetries = 3
-	}
-	if p.AckTimeout == 0 {
-		p.AckTimeout = 150 * time.Millisecond
-	}
 
 	// Log endpoints regardless of verbose or not.
 	log.WithFields(log.Fields{

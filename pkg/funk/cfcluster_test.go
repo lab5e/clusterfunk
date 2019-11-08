@@ -41,10 +41,12 @@ func TestCfCluster(t *testing.T) {
 			Endpoint:    toolbox.RandomLocalEndpoint(),
 			JoinAddress: "",
 		},
-		AutoJoin:    true,
-		ClusterName: "testCluster",
-		ZeroConf:    true,
-		NodeID:      toolbox.RandomID(),
+		AutoJoin:         true,
+		Name:             "testCluster",
+		ZeroConf:         true,
+		NodeID:           toolbox.RandomID(),
+		LivenessInterval: 150 * time.Millisecond,
+		AckTimeout:       1 * time.Second,
 	}
 	params1.Final()
 	clusterNode1 := NewCluster(params1, sm1)

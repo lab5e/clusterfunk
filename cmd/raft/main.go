@@ -29,7 +29,7 @@ func main() {
 	flag.BoolVar(&config.Raft.DiskStore, "disk", false, "Use disk store")
 	flag.BoolVar(&config.Verbose, "verbose", false, "Verbose logging")
 	flag.BoolVar(&config.ZeroConf, "zeroconf", true, "Use zeroconf (mDNS) to discover nodes")
-	flag.StringVar(&config.ClusterName, "name", "demo", "Name of cluster")
+	flag.StringVar(&config.Name, "name", "demo", "Name of cluster")
 	flag.BoolVar(&config.AutoJoin, "autojoin", true, "Autojoin via Serf Events")
 	flag.Parse()
 
@@ -64,7 +64,7 @@ const livenessEndpoint = "ep.live"
 
 func start(config funk.Parameters) error {
 	config.Final()
-	if config.ClusterName == "" {
+	if config.Name == "" {
 		return errors.New("cluster name not specified")
 	}
 
@@ -76,7 +76,7 @@ func start(config funk.Parameters) error {
 	funk.NewLivenessClient(localLiveEndpoint)
 
 	if config.ZeroConf {
-		registry = toolbox.NewZeroconfRegistry(config.ClusterName)
+		registry = toolbox.NewZeroconfRegistry(config.Name)
 
 		if !config.Raft.Bootstrap && config.Serf.JoinAddress == "" {
 			var err error
