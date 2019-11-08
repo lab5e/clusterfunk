@@ -37,6 +37,12 @@ func TestEndpointLookup(t *testing.T) {
 	_, err = GetEndpoints("ep.test", toolbox.GRPCClientParam{ServerEndpoint: toolbox.RandomLocalEndpoint()})
 	assert.Error(err)
 
+	eps, err = GetAllEndpoints(toolbox.GRPCClientParam{ServerEndpoint: ep})
+	assert.NoError(err)
+	assert.Len(eps, 2)
+
+	_, err = GetAllEndpoints(toolbox.GRPCClientParam{ServerEndpoint: toolbox.RandomLocalEndpoint()})
+	assert.Error(err)
 }
 
 // Dummy gRPC test server
@@ -69,7 +75,12 @@ func (d *dummyManagement) FindEndpoint(ctx context.Context, req *clustermgmt.End
 }
 
 func (d *dummyManagement) ListEndpoints(ctx context.Context, req *clustermgmt.ListEndpointRequest) (*clustermgmt.ListEndpointResponse, error) {
-	return nil, errors.New("not implemented")
+	return &clustermgmt.ListEndpointResponse{
+		Endpoints: []*clustermgmt.EndpointInfo{
+			&clustermgmt.EndpointInfo{Name: "ep.a", HostPort: "127.1.2.3:1234"},
+			&clustermgmt.EndpointInfo{Name: "ep.b", HostPort: "127.4.3.2:4321"},
+		},
+	}, nil
 }
 
 func (d *dummyManagement) AddNode(context.Context, *clustermgmt.AddNodeRequest) (*clustermgmt.AddNodeResponse, error) {
