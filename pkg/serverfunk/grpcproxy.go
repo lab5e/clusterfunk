@@ -11,6 +11,8 @@ import (
 	"google.golang.org/grpc"
 )
 
+// TODO: See if this can be replaced with gRPC features, maybe interceptors.
+
 // ClientFactoryFunc is a factory function for gRPC clients
 type ClientFactoryFunc func(*grpc.ClientConn) interface{}
 
