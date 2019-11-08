@@ -470,7 +470,7 @@ func (r *RaftNode) sendInternalEvent(ev RaftEventType) {
 		r.scheduledMutex.Lock()
 		delete(r.scheduled, ev)
 		r.scheduledMutex.Unlock()
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(100 * time.Millisecond):
 		panic("Unable to send internal event. Channel full?")
 	}
 }

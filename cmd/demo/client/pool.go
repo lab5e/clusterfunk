@@ -1,11 +1,10 @@
 package main
 
-import (
-	"context"
+/*
+// TODO: docs, name
 
-	"google.golang.org/grpc"
-)
-
+// ClientfunkConnectionPool is a client pool for gRPC connections to the cluster.
+// The connections are replaced in interceptors on the client connection.
 type ClientfunkConnectionPool interface {
 	// Connection returns a dummy collection you should use to create the
 	// gRPC client. This connection might not work with gRPC connections but
@@ -17,15 +16,19 @@ type ClientfunkConnectionPool interface {
 	ClusterDialOptions() []grpc.DialOption
 }
 
-func NewClientfunkConnectionPool() ClientfunkConnectionPool {
-	return &funkClientPool{}
+// NewClientfunkConnectionPool creates a new ClientFunkConnectionPool instance.
+func NewClientfunkConnectionPool(pool clientfunk.Pool) ClientfunkConnectionPool {
+	return &funkClientPool{Pool: pool}
+
 }
 
 type funkClientPool struct {
+	Pool            clientfunk.Pool
+	DummyConnection *grpc.ClientConn
 }
 
 func (f *funkClientPool) Connection() *grpc.ClientConn {
-	return nil
+	return f.DummyConnection
 }
 
 func (f *funkClientPool) ClusterDialOptions() []grpc.DialOption {
@@ -36,9 +39,26 @@ func (f *funkClientPool) ClusterDialOptions() []grpc.DialOption {
 }
 
 func (f *funkClientPool) unaryInterceptor(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
-	return invoker(ctx, method, req, reply, cc, opts...)
+	if cc != f.DummyConnection {
+		panic("This is not the connection I expected")
+	}
+	conn, err := f.Pool.Take(ctx)
+	if err != nil {
+		return err
+	}
+	defer f.Pool.Release(conn)
+	return invoker(ctx, method, req, reply, conn, opts...)
 }
 
 func (f *funkClientPool) streamInterceptor(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
-	return streamer(ctx, desc, cc, method, opts...)
+	if cc != f.DummyConnection {
+		panic("This is not the connection I expected")
+	}
+	conn, err := f.Pool.Take(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Pool.Release(conn)
+	return streamer(ctx, desc, conn, method, opts...)
 }
+*/

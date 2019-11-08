@@ -27,7 +27,6 @@ var defaultLogger = log.New()
 var cluster funk.Cluster
 var shards sharding.ShardManager
 var webserverEndpoint string
-var cpuprofiler string
 
 type parameters struct {
 	CPUProfilerFile string `param:"desc=Turn on profiling and store the profile data in a file"`
@@ -45,7 +44,9 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		pprof.StartCPUProfile(f)
+		if err := pprof.StartCPUProfile(f); err != nil {
+			panic(fmt.Sprintf("Error starting CPU profiler: %v", err))
+		}
 		defer pprof.StopCPUProfile()
 	}
 

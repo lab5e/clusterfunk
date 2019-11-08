@@ -108,9 +108,7 @@ message EndpointResponse {
 };
 
 // ListEndpointRequest is a request to list all known endpoints
-message ListEndpointRequest {
-
-};
+message ListEndpointRequest {};
 
 // ListEndpointResponse is a list of all known endpoints on this node. There is
 // no filtering on the endpoints.

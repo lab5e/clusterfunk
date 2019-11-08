@@ -37,12 +37,6 @@ func TestEndpointLookup(t *testing.T) {
 	_, err = GetEndpoints("ep.test", toolbox.GRPCClientParam{ServerEndpoint: toolbox.RandomLocalEndpoint()})
 	assert.Error(err)
 
-	eps, err = GetAllEndpoints(toolbox.GRPCClientParam{ServerEndpoint: ep})
-	assert.NoError(err)
-	assert.Len(eps, 2)
-
-	_, err = GetAllEndpoints(toolbox.GRPCClientParam{ServerEndpoint: toolbox.RandomLocalEndpoint()})
-	assert.Error(err)
 }
 
 // Dummy gRPC test server
