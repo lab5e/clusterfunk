@@ -76,19 +76,20 @@ func main() {
 	}
 
 	// Notice the three slashes here. It's *really* important. If you use a custom scheme in gRPC the authority field must be included
-	grpcConnection, err := grpc.Dial("cluster:///ep.demo", grpc.WithInsecure(), grpc.WithDefaultServiceConfig(clientfunk.GRPCServiceConfig))
-	if err != nil {
-		panic(err)
-	}
-	liffClient := demo.NewDemoServiceClient(grpcConnection)
-	if err != nil {
-		panic(fmt.Sprintf("Unable to create"))
-	}
 	for worker := 0; worker < config.NumWorkers; worker++ {
 		go func(timingCh chan<- result, times int) {
 			for i := 0; i < times; i++ {
 				time.Sleep(config.Sleep)
-				ctx, done := context.WithTimeout(context.Background(), 3*time.Second)
+				grpcConnection, err := grpc.Dial("cluster:///ep.demo", grpc.WithInsecure(), grpc.WithDefaultServiceConfig(clientfunk.GRPCServiceConfig))
+				if err != nil {
+					panic(err)
+				}
+				liffClient := demo.NewDemoServiceClient(grpcConnection)
+				if err != nil {
+					panic(fmt.Sprintf("Unable to create"))
+				}
+
+				ctx, done := context.WithTimeout(context.Background(), 1*time.Second)
 				start := time.Now()
 				res, err := liffClient.Liff(ctx, &demo.LiffRequest{ID: int64(rand.Int())})
 				stop := time.Now()
@@ -109,7 +110,7 @@ func main() {
 					NodeID:  res.NodeID,
 					Success: true,
 					Time:    float64(stop.Sub(start)) / float64(time.Millisecond)}
-
+				grpcConnection.Close()
 			}
 			wg.Done()
 		}(timings, config.Repeats)
