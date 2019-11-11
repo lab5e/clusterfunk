@@ -17,7 +17,7 @@ func init() {
 // ClusterfunkSchemaName is the schema used for the connections. Each server
 // connection uses clusterfunk://[endpointname] when resolving. This should be
 // combined with the service config settings included in this package.
-const ClusterfunkSchemaName = "clusterfunk"
+const ClusterfunkSchemaName = "cluster"
 
 // GRPCServiceConfig is the default service config for Clusterfunk clients. It will enable retries.
 const GRPCServiceConfig = `{

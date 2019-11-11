@@ -76,7 +76,7 @@ func main() {
 	}
 
 	// Notice the three slashes here. It's *really* important. If you use a custom scheme in gRPC the authority field must be included
-	grpcConnection, err := grpc.Dial("clusterfunk:///ep.demo", grpc.WithInsecure(), grpc.WithDefaultServiceConfig(clientfunk.GRPCServiceConfig))
+	grpcConnection, err := grpc.Dial("cluster:///ep.demo", grpc.WithInsecure(), grpc.WithDefaultServiceConfig(clientfunk.GRPCServiceConfig))
 	if err != nil {
 		panic(err)
 	}
