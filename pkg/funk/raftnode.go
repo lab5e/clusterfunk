@@ -32,6 +32,8 @@ const (
 	RaftBecameFollower
 	// RaftReceivedLog is emitted when a log entry is receievd
 	RaftReceivedLog
+	// RaftUndefinedEvent is the undefined event type
+	RaftUndefinedEvent
 )
 
 // String is the string representation of the event
@@ -62,29 +64,31 @@ func (r RaftEventType) String() string {
 // be up to date or correct for the followers. The followers will only
 // interact with the leader of the cluster.
 type RaftNode struct {
-	mutex          *sync.RWMutex // Mutex for the attributes
-	fsmMutex       *sync.RWMutex // Mutex for the FSM
-	scheduledMutex *sync.Mutex   // Mutex for scheduled events
-	scheduled      map[RaftEventType]time.Time
-	localNodeID    string                        // The local node ID
-	raftEndpoint   string                        // Raft endpoint
-	ra             *raft.Raft                    // Raft instance
-	events         chan RaftEventType            // Events from Raft
-	state          map[LogMessageType]LogMessage // The internal FSM state
-	Nodes          toolbox.StringSet
+	mutex            *sync.RWMutex // Mutex for the attributes
+	fsmMutex         *sync.RWMutex // Mutex for the FSM
+	scheduledMutex   *sync.Mutex   // Mutex for scheduled events
+	scheduled        map[RaftEventType]time.Time
+	localNodeID      string                        // The local node ID
+	raftEndpoint     string                        // Raft endpoint
+	ra               *raft.Raft                    // Raft instance
+	events           chan RaftEventType            // Coalesced events from Raft
+	unfilteredEvents chan RaftEventType            // Unfiltered events from Raft
+	state            map[LogMessageType]LogMessage // The internal FSM state
+	Nodes            toolbox.StringSet
 }
 
 // NewRaftNode creates a new RaftNode instance
 func NewRaftNode() *RaftNode {
 	return &RaftNode{
-		Nodes:          toolbox.NewStringSet(),
-		localNodeID:    "",
-		mutex:          &sync.RWMutex{},
-		fsmMutex:       &sync.RWMutex{},
-		scheduledMutex: &sync.Mutex{},
-		scheduled:      make(map[RaftEventType]time.Time),
-		events:         make(chan RaftEventType, 10), // tiny buffer here to make multiple events feasable.
-		state:          make(map[LogMessageType]LogMessage),
+		Nodes:            toolbox.NewStringSet(),
+		localNodeID:      "",
+		mutex:            &sync.RWMutex{},
+		fsmMutex:         &sync.RWMutex{},
+		scheduledMutex:   &sync.Mutex{},
+		scheduled:        make(map[RaftEventType]time.Time),
+		events:           make(chan RaftEventType),    // tiny buffer here to make multiple events feasable.
+		unfilteredEvents: make(chan RaftEventType, 5), // unfiltered events that gets coalesced into one big
+		state:            make(map[LogMessageType]LogMessage),
 	}
 }
 
@@ -210,12 +214,39 @@ func (r *RaftNode) Start(nodeID string, cfg RaftParameters) error {
 	r.addNode(nodeID)
 
 	go r.observerFunc(observerChan)
-
+	go r.coalesceEvents()
 	r.ra.RegisterObserver(raft.NewObserver(observerChan, true, func(*raft.Observation) bool { return true }))
 	r.localNodeID = nodeID
 	r.sendInternalEvent(RaftBecameFollower)
 
 	return nil
+}
+
+func (r *RaftNode) coalesceEvents() {
+	for ev := range r.unfilteredEvents {
+		timeout := false
+		lastEvent := ev
+		for !timeout {
+			select {
+			case ev := <-r.unfilteredEvents:
+				if ev == lastEvent {
+					continue
+				}
+				r.events <- lastEvent
+				lastEvent = ev
+				timeout = true
+			case <-time.After(1 * time.Millisecond):
+				timeout = true
+			}
+		}
+		select {
+		case r.events <- lastEvent:
+		case <-time.After(1 * time.Second):
+			panic("Event listener is too slow")
+
+		}
+	}
+	panic("Coalescing function has stopped")
 }
 
 func (r *RaftNode) observerFunc(ch chan raft.Observation) {
@@ -465,13 +496,13 @@ func (r *RaftNode) RefreshNodes() {
 
 func (r *RaftNode) sendInternalEvent(ev RaftEventType) {
 	select {
-	case r.events <- ev:
+	case r.unfilteredEvents <- ev:
 		// Remove aync scheduled events of this type.
 		r.scheduledMutex.Lock()
 		delete(r.scheduled, ev)
 		r.scheduledMutex.Unlock()
-	case <-time.After(100 * time.Millisecond):
-		panic("Unable to send internal event. Channel full?")
+	case <-time.After(500 * time.Millisecond):
+		panic(fmt.Sprintf("Unable to send internal event %s. Channel full?", ev.String()))
 	}
 }
 
