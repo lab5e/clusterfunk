@@ -11,38 +11,31 @@ import (
 	"google.golang.org/grpc"
 )
 
-// TODO: See if this can be replaced with gRPC features, maybe interceptors.
-
-// ClientFactoryFunc is a factory function for gRPC clients
-type ClientFactoryFunc func(*grpc.ClientConn) interface{}
-
-// GRPCClientProxy can automatically resolve the client proxying
-type GRPCClientProxy struct {
+// ProxyConnections manages grpc.ClientConn connections to proxies.
+type ProxyConnections struct {
 	Shards           sharding.ShardManager
 	Cluster          funk.Cluster
 	EndpointName     string
 	mutex            *sync.Mutex
-	grpcClients      map[string]interface{}
-	clientFactory    ClientFactoryFunc
+	grpcClients      map[string]*grpc.ClientConn
 	operationalMutex *sync.RWMutex
 }
 
-// NewGRPCClientProxy creates a new GRPCClientProxy
-func NewGRPCClientProxy(endpointName string, clientFactory ClientFactoryFunc, shards sharding.ShardManager, cluster funk.Cluster) *GRPCClientProxy {
-	ret := &GRPCClientProxy{
+// NewProxyConnections creates a new GRPCClientProxy
+func NewProxyConnections(endpointName string, shards sharding.ShardManager, cluster funk.Cluster) *ProxyConnections {
+	ret := &ProxyConnections{
 		Shards:           shards,
 		Cluster:          cluster,
 		EndpointName:     endpointName,
 		mutex:            &sync.Mutex{},
-		grpcClients:      make(map[string]interface{}),
-		clientFactory:    clientFactory,
+		grpcClients:      make(map[string]*grpc.ClientConn),
 		operationalMutex: &sync.RWMutex{},
 	}
 	go ret.clusterEventListener(cluster.Events())
 	return ret
 }
 
-func (p *GRPCClientProxy) clusterEventListener(evts <-chan funk.Event) {
+func (p *ProxyConnections) clusterEventListener(evts <-chan funk.Event) {
 	once := &sync.Once{}
 	for ev := range evts {
 		if ev.State == funk.Operational {
@@ -56,10 +49,15 @@ func (p *GRPCClientProxy) clusterEventListener(evts <-chan funk.Event) {
 	}
 }
 
-// GetProxyClient returns the proxy client for the given shard. If there's an
-// error the client will be nil and the error is set. If  both fields are nil
-// the local node is the one serving the request
-func (p *GRPCClientProxy) GetProxyClient(shard int) (interface{}, error) {
+// Options returns the grpc.DialOption to use when creating new connections
+func (p *ProxyConnections) Options() []grpc.DialOption {
+	return []grpc.DialOption{
+		grpc.WithInsecure(),
+	}
+}
+
+// GetConnection returns the
+func (p *ProxyConnections) GetConnection(shard int) (*grpc.ClientConn, error) {
 	p.operationalMutex.RLock()
 	defer p.operationalMutex.RUnlock()
 	nodeID := p.Shards.MapToNode(shard).NodeID()
@@ -77,16 +75,16 @@ func (p *GRPCClientProxy) GetProxyClient(shard int) (interface{}, error) {
 	// Look up the client in the map
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
-	ret, ok := p.grpcClients[endpoint]
+	conn, ok := p.grpcClients[endpoint]
 	if !ok {
 		// Create a new client
-		opts := []grpc.DialOption{grpc.WithInsecure()}
-		conn, err := grpc.Dial(endpoint, opts...)
+		opts := p.Options()
+		var err error
+		conn, err = grpc.Dial(endpoint, opts...)
 		if err != nil {
 			return nil, err
 		}
-		ret = p.clientFactory(conn)
-		p.grpcClients[endpoint] = ret
+		p.grpcClients[endpoint] = conn
 	}
-	return ret, nil
+	return conn, nil
 }

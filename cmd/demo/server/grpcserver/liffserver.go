@@ -2,12 +2,14 @@ package grpcserver
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"net"
 
 	"github.com/stalehd/clusterfunk/cmd/demo"
 	"github.com/stalehd/clusterfunk/pkg/funk"
 	"github.com/stalehd/clusterfunk/pkg/funk/sharding"
+	"github.com/stalehd/clusterfunk/pkg/serverfunk"
 
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -19,22 +21,45 @@ import (
 // StartDemoServer starts the demo (gRPC) server.
 func StartDemoServer(endpoint string, endpointName string, cluster funk.Cluster, shards sharding.ShardManager) {
 	// Set up the local gRPC server.
-	liffServer := newLiffProxy(newLiffServer(cluster.NodeID()), shards, cluster, endpointName)
+	liffServer := newLiffServer(cluster.NodeID())
 
-	server := grpc.NewServer()
+	clientProxy := serverfunk.NewProxyConnections(endpointName, shards, cluster)
+
+	// The dial options takes care of all proxying but you must provide a shard
+	// conversion function (see below)
+	server := grpc.NewServer(serverfunk.WithClusterFunk(
+		createShardConversionFunc(shards), clientProxy)...)
+
 	demo.RegisterDemoServiceServer(server, liffServer)
+
 	listener, err := net.Listen("tcp", endpoint)
 	if err != nil {
 		log.WithError(err).
 			WithField("endpoint", endpoint).
 			Panic("Unable to create TCP listener")
 	}
+
 	log.WithField("endpoint", endpoint).Info("Lauching gRPC demo server")
 
 	if err := server.Serve(listener); err != nil {
 		log.WithError(err).
 			WithField("endpoint", endpoint).
 			Panic("Unable to launch node management gRPC interface")
+	}
+}
+
+// The shard conversion function is used by the interceptor and returns two parameters:
+// The computed shard (id) for the request and the expected return type. The return type
+// must be returned by the internal interceptors so that the type is
+func createShardConversionFunc(shardMap sharding.ShardManager) serverfunk.ShardConversionFunc {
+	shardFunc := sharding.NewIntSharder(int64(len(shardMap.Shards())))
+
+	return func(request interface{}) (int, interface{}) {
+		switch v := request.(type) {
+		case *demo.LiffRequest:
+			return shardFunc(v.ID), &demo.LiffResponse{}
+		}
+		panic(fmt.Sprintf("Unknown request type %T", request))
 	}
 }
 
