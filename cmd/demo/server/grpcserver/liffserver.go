@@ -19,7 +19,7 @@ import (
 // method.
 
 // StartDemoServer starts the demo (gRPC) server.
-func StartDemoServer(endpoint string, endpointName string, cluster funk.Cluster, shards sharding.ShardManager) {
+func StartDemoServer(endpoint string, endpointName string, cluster funk.Cluster, shards sharding.ShardMap) {
 	// Set up the local gRPC server.
 	liffServer := newLiffServer(cluster.NodeID())
 
@@ -51,7 +51,7 @@ func StartDemoServer(endpoint string, endpointName string, cluster funk.Cluster,
 // The shard conversion function is used by the interceptor and returns two parameters:
 // The computed shard (id) for the request and the expected return type. The return type
 // must be returned by the internal interceptors so that the type is
-func createShardConversionFunc(shardMap sharding.ShardManager) serverfunk.ShardConversionFunc {
+func createShardConversionFunc(shardMap sharding.ShardMap) serverfunk.ShardConversionFunc {
 	shardFunc := sharding.NewIntSharder(int64(len(shardMap.Shards())))
 
 	return func(request interface{}) (int, interface{}) {

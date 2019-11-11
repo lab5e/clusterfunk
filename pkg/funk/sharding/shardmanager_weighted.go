@@ -55,16 +55,16 @@ func (nd *nodeData) RemoveShard(preferredWeight int) Shard {
 	return ret
 }
 
-type weightedShardManager struct {
+type weightedShardMap struct {
 	shards      []Shard
 	mutex       *sync.RWMutex
 	totalWeight int
 	nodes       map[string]*nodeData
 }
 
-// NewShardManager creates a new ShardManager instance.
-func NewShardManager() ShardManager {
-	return &weightedShardManager{
+// NewShardMap creates a new shard mapper instance.
+func NewShardMap() ShardMap {
+	return &weightedShardMap{
 		shards:      make([]Shard, 0),
 		mutex:       &sync.RWMutex{},
 		totalWeight: 0,
@@ -72,7 +72,7 @@ func NewShardManager() ShardManager {
 	}
 }
 
-func (sm *weightedShardManager) Init(maxShards int, weights []int) error {
+func (sm *weightedShardMap) Init(maxShards int, weights []int) error {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 	if maxShards < 1 {
@@ -101,7 +101,7 @@ func (sm *weightedShardManager) Init(maxShards int, weights []int) error {
 	return nil
 }
 
-func (sm *weightedShardManager) UpdateNodes(nodeID ...string) {
+func (sm *weightedShardMap) UpdateNodes(nodeID ...string) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
@@ -137,7 +137,7 @@ func (sm *weightedShardManager) UpdateNodes(nodeID ...string) {
 	}
 }
 
-func (sm *weightedShardManager) addNode(nodeID string) {
+func (sm *weightedShardMap) addNode(nodeID string) {
 	newNode := newNodeData(nodeID)
 
 	// Invariant: First node
@@ -162,7 +162,7 @@ func (sm *weightedShardManager) addNode(nodeID string) {
 	sm.nodes[nodeID] = newNode
 }
 
-func (sm *weightedShardManager) removeNode(nodeID string) {
+func (sm *weightedShardMap) removeNode(nodeID string) {
 	nodeToRemove, exists := sm.nodes[nodeID]
 	if !exists {
 		panic(fmt.Sprintf("Unknown node ID: %s", nodeID))
@@ -188,7 +188,7 @@ func (sm *weightedShardManager) removeNode(nodeID string) {
 	}
 }
 
-func (sm *weightedShardManager) MapToNode(shardID int) Shard {
+func (sm *weightedShardMap) MapToNode(shardID int) Shard {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 	if shardID > len(sm.shards) || shardID < 0 {
@@ -202,7 +202,7 @@ func (sm *weightedShardManager) MapToNode(shardID int) Shard {
 	return sm.shards[shardID]
 }
 
-func (sm *weightedShardManager) Shards() []Shard {
+func (sm *weightedShardMap) Shards() []Shard {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 	ret := make([]Shard, len(sm.shards))
@@ -210,19 +210,19 @@ func (sm *weightedShardManager) Shards() []Shard {
 	return ret
 }
 
-func (sm *weightedShardManager) TotalWeight() int {
+func (sm *weightedShardMap) TotalWeight() int {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 	return sm.totalWeight
 }
 
-func (sm *weightedShardManager) ShardCount() int {
+func (sm *weightedShardMap) ShardCount() int {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 	return len(sm.shards)
 }
 
-func (sm *weightedShardManager) NodeList() []string {
+func (sm *weightedShardMap) NodeList() []string {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 
@@ -233,7 +233,7 @@ func (sm *weightedShardManager) NodeList() []string {
 	return ret
 }
 
-func (sm *weightedShardManager) MarshalBinary() ([]byte, error) {
+func (sm *weightedShardMap) MarshalBinary() ([]byte, error) {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 
@@ -268,7 +268,7 @@ func (sm *weightedShardManager) MarshalBinary() ([]byte, error) {
 	return buf, nil
 }
 
-func (sm *weightedShardManager) UnmarshalBinary(buf []byte) error {
+func (sm *weightedShardMap) UnmarshalBinary(buf []byte) error {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 

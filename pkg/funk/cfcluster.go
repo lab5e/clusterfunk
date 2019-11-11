@@ -20,7 +20,7 @@ import (
 // clusterfunkClusterß implements the Cluster interface
 type clusterfunkCluster struct {
 	name                 string                    // Name of cluster
-	shardManager         sharding.ShardManager     // Shard map
+	shardManager         sharding.ShardMap         // Shard map
 	config               Parameters                // Configuration
 	serfNode             *SerfNode                 // Serf
 	raftNode             *RaftNode                 // Raft
@@ -40,7 +40,7 @@ type clusterfunkCluster struct {
 }
 
 // NewCluster returns a new cluster (client)
-func NewCluster(params Parameters, shardManager sharding.ShardManager) Cluster {
+func NewCluster(params Parameters, shardManager sharding.ShardMap) Cluster {
 	ret := &clusterfunkCluster{
 		name:                 params.Name,
 		shardManager:         shardManager,

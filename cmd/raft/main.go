@@ -33,7 +33,7 @@ func main() {
 	flag.BoolVar(&config.AutoJoin, "autojoin", true, "Autojoin via Serf Events")
 	flag.Parse()
 
-	shards := sharding.NewShardManager()
+	shards := sharding.NewShardMap()
 	if err := shards.Init(numShards, nil); err != nil {
 		panic(err)
 	}

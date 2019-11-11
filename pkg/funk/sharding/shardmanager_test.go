@@ -7,7 +7,7 @@ import (
 )
 
 // verifyDistribution ensures that the
-func verifyDistribution(t *testing.T, manager ShardManager) {
+func verifyDistribution(t *testing.T, manager ShardMap) {
 	assert := require.New(t)
 
 	nodes := make(map[string]int)
@@ -34,7 +34,7 @@ func verifyDistribution(t *testing.T, manager ShardManager) {
 }
 
 // verifyShards ensures all shards are distributed to nodes
-func verifyShards(t *testing.T, manager ShardManager, maxShards int) {
+func verifyShards(t *testing.T, manager ShardMap, maxShards int) {
 	assert := require.New(t)
 	check := make(map[int]int)
 	shards := manager.Shards()
@@ -53,7 +53,7 @@ func verifyShards(t *testing.T, manager ShardManager, maxShards int) {
 	}
 }
 
-func testShardManager(t *testing.T, manager ShardManager, maxShards int, weights []int) {
+func testShardManager(t *testing.T, manager ShardMap, maxShards int, weights []int) {
 	assert := require.New(t)
 	assert.Error(manager.Init(0, nil), "Expected error when maxShards = 0")
 	assert.Error(manager.Init(len(weights), []int{}), "Expected error when weights != maxShards")

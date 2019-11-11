@@ -25,7 +25,7 @@ var logLevel = "info"
 var config parameters
 var defaultLogger = log.New()
 var cluster funk.Cluster
-var shards sharding.ShardManager
+var shards sharding.ShardMap
 var webserverEndpoint string
 
 type parameters struct {
@@ -51,7 +51,7 @@ func main() {
 	}
 
 	// Set up the shard map.
-	shards = sharding.NewShardManager()
+	shards = sharding.NewShardMap()
 	if err := shards.Init(numShards, nil); err != nil {
 		panic(err)
 	}
@@ -92,7 +92,7 @@ func main() {
 
 // This prints the shard map and nodes in the cluster with the endpoint for
 // each node's gRPC service.
-func printShardMap(shards sharding.ShardManager, c funk.Cluster, endpoint string) {
+func printShardMap(shards sharding.ShardMap, c funk.Cluster, endpoint string) {
 	allShards := shards.Shards()
 	myShards := 0
 	for _, v := range allShards {

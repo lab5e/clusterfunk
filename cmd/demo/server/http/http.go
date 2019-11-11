@@ -59,7 +59,7 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // StartWebserver starts the web server that hosts the status page.
-func StartWebserver(endpoint string, cluster funk.Cluster, shards sharding.ShardManager) {
+func StartWebserver(endpoint string, cluster funk.Cluster, shards sharding.ShardMap) {
 	messageProducer = newEventProducer()
 	presets = make([]interface{}, lastPreset)
 
@@ -94,7 +94,7 @@ func UpdateClusterStatus(cluster funk.Cluster) {
 
 // ClusterOperational sends notification to the connected HTTP clients
 // TODO: naming. It makes zero sense.
-func ClusterOperational(cluster funk.Cluster, shards sharding.ShardManager) {
+func ClusterOperational(cluster funk.Cluster, shards sharding.ShardMap) {
 	// update member list and shards
 	shardMap := newShardMap(shards)
 	memberList := newMemberList(cluster)

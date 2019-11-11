@@ -27,9 +27,9 @@ type shardMap struct {
 	Shards map[string]int `json:"shards"`
 }
 
-func newShardMap(shardManager sharding.ShardManager) shardMap {
+func newShardMap(shardMapper sharding.ShardMap) shardMap {
 	m := make(map[string]int)
-	for _, v := range shardManager.Shards() {
+	for _, v := range shardMapper.Shards() {
 		n := m[v.NodeID()]
 		n += v.Weight()
 		m[v.NodeID()] = n

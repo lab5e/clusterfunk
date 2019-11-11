@@ -13,7 +13,7 @@ import (
 
 // ProxyConnections manages grpc.ClientConn connections to proxies.
 type ProxyConnections struct {
-	Shards           sharding.ShardManager
+	Shards           sharding.ShardMap
 	Cluster          funk.Cluster
 	EndpointName     string
 	mutex            *sync.Mutex
@@ -22,7 +22,7 @@ type ProxyConnections struct {
 }
 
 // NewProxyConnections creates a new GRPCClientProxy
-func NewProxyConnections(endpointName string, shards sharding.ShardManager, cluster funk.Cluster) *ProxyConnections {
+func NewProxyConnections(endpointName string, shards sharding.ShardMap, cluster funk.Cluster) *ProxyConnections {
 	ret := &ProxyConnections{
 		Shards:           shards,
 		Cluster:          cluster,
