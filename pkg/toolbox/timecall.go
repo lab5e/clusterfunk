@@ -1,7 +1,8 @@
 package toolbox
 
 import (
-	"log"
+	log "github.com/sirupsen/logrus"
+
 	"time"
 )
 
@@ -11,5 +12,5 @@ func TimeCall(call func(), description string) {
 	start := time.Now()
 	call()
 	diff := time.Since(start)
-	log.Printf("%s took %f ms to execute", description, float64(diff)/float64(time.Millisecond))
+	log.Infof("%s took %f ms to execute", description, float64(diff)/float64(time.Millisecond))
 }
