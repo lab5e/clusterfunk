@@ -47,18 +47,18 @@ func main() {
 		fmt.Println(`
 ctrlc [--cluster-name] [--zeroconf] [--endpoint] [cmd]
 
-	--cluster-name: Name of cluster")
-	--zeroconf     Enable or disable zeroconf")
-		--endpoint     Management endpoint to use")
+	--cluster-name: Name of cluster
+	--zeroconf     Enable or disable zeroconf
+		--endpoint     Management endpoint to use
 
-Available commands:")
+Available commands:
 
-	status           Show node and cluster status")
-	nodes            List nodes in cluster")
-	endpoints [name] List endpoints")
-	add-node [id]    Add node to cluster")
-	remove-node [id] Remove node from cluster")
-	shards           List shard distribution")
+	status           Show node and cluster status
+	nodes            List nodes in cluster
+	endpoints [name] List endpoints
+	add-node [id]    Add node to cluster
+	remove-node [id] Remove node from cluster
+	shards           List shard distribution
 	step-down        Leader step down
 	`)
 		return
