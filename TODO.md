@@ -12,8 +12,6 @@
 
 * Complete demo with work spread across nodes
 
-* Consistent SerfNode/RaftNode interfaces
-
 * Quarantine nodes that doesn't answer reshards. Add timer for responses, if no
   response has been sent in x ms quarantine the node as "unresponsive" and do
   a new sharding round.
@@ -24,6 +22,4 @@
 
 * Metrics for proxying (preferrably not tied to any particular metrics library) and cluster.
 
-* Client connection pooling code. Use interceptor feature to do proxying on server side.
-
-* Investigate high CPU use. There's a lot of waiting going on.
+* Streaming interceptors on server side.
