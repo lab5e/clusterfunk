@@ -7,6 +7,7 @@ This library requires a fairly recent version of Go, at least 1.12. If you are m
 Run `make` to build the demo service. The build uses a host of checkers (golint, go vet, staticcheck, revive and golangci-lint) so you might get some errors if you miss one or more of those.
 
 Get them the usual way:
+
 ```text
 go get -u golang.org/x/lint/golint
 go get honnef.co/go/tools/cmd/staticcheck

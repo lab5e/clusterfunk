@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stalehd/clusterfunk/pkg/funk/metrics"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/golang/protobuf/proto"
@@ -37,6 +39,7 @@ type clusterfunkCluster struct {
 	registry             *toolbox.ZeroconfRegistry // Zeroconf lookups. Used when joining
 	livenessChecker      LivenessChecker           // Check for node liveness. The built-in heartbeats in Raft isn't exposed
 	livenessClient       LocalLivenessEndpoint
+	cfmetrics            metrics.Sink
 }
 
 // NewCluster returns a new cluster (client)
@@ -55,6 +58,7 @@ func NewCluster(params Parameters, shardManager sharding.ShardMap) Cluster {
 		currentShardMapIndex: 0,
 		unacknowledged:       newAckCollection(),
 		livenessChecker:      NewLivenessChecker(params.LivenessInterval, params.LivenessRetries),
+		cfmetrics:            metrics.NewSinkFromString(params.Metrics),
 	}
 	return ret
 }
@@ -182,6 +186,7 @@ func (c *clusterfunkCluster) raftEventLoop(ch <-chan RaftEventType) {
 		switch e {
 		case RaftClusterSizeChanged:
 			toolbox.TimeCall(func() { c.handleClusterSizeChanged(c.raftNode.Nodes.List()) }, "ClusterSizeChanged")
+			c.cfmetrics.SetClusterSize(c.raftNode.LocalNodeID(), c.raftNode.Nodes.Size())
 
 		case RaftLeaderLost:
 			c.livenessChecker.Clear()
@@ -301,6 +306,8 @@ func (c *clusterfunkCluster) handleClusterSizeChanged(nodeList []string) {
 	c.unacknowledged.StartAck(nodeList, index, c.config.AckTimeout)
 
 	go c.checkAckStatus()
+	c.cfmetrics.SetShardCount(c.raftNode.LocalNodeID(), c.shardManager.ShardCountForNode(c.raftNode.LocalNodeID()))
+	c.cfmetrics.SetShardIndex(c.raftNode.LocalNodeID(), index)
 
 	log.WithFields(log.Fields{"index": index}).Debugf("Shard map index")
 
@@ -376,6 +383,9 @@ func (c *clusterfunkCluster) processProposedShardMap(msg *LogMessage) {
 
 	// Ack it. If the leader doesn't recognize it we can ignore the response.
 	c.ackShardMap(uint64(msg.Index), msg.AckEndpoint)
+
+	c.cfmetrics.SetShardCount(c.raftNode.LocalNodeID(), c.shardManager.ShardCountForNode(c.raftNode.LocalNodeID()))
+	c.cfmetrics.SetShardIndex(c.raftNode.LocalNodeID(), uint64(msg.Index))
 }
 
 // processShardMapCommitMessage processes the commit message from the leader.

@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	gohttp "net/http"
 	"os"
 	"runtime/pprof"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/stalehd/clusterfunk/cmd/demo/server/grpcserver"
 
 	golog "log"
@@ -19,7 +21,8 @@ import (
 
 const numShards = 10000
 
-const demoEndpoint = "ep.demo"
+const demoEndpointName = "ep.demo"
+const metricsEndpointName = "ep.metrics"
 
 var logLevel = "info"
 var config parameters
@@ -27,6 +30,7 @@ var defaultLogger = log.New()
 var cluster funk.Cluster
 var shards sharding.ShardMap
 var webserverEndpoint string
+var metricsEndpoint string
 
 type parameters struct {
 	CPUProfilerFile string `param:"desc=Turn on profiling and store the profile data in a file"`
@@ -61,9 +65,16 @@ func main() {
 
 	demoServerEndpoint := toolbox.RandomPublicEndpoint()
 	webserverEndpoint = toolbox.RandomLocalEndpoint()
+	metricsEndpoint = toolbox.RandomLocalEndpoint()
+
+	gohttp.Handle("/metrics", promhttp.Handler())
+	go func() {
+		log.WithField("endpoint", metricsEndpoint).Info("Prometheus metrics endpoint starting")
+		fmt.Println("Error serving metrics: ", gohttp.ListenAndServe(metricsEndpoint, nil))
+	}()
 
 	http.StartWebserver(webserverEndpoint, cluster, shards)
-	go grpcserver.StartDemoServer(demoServerEndpoint, demoEndpoint, cluster, shards)
+	go grpcserver.StartDemoServer(demoServerEndpoint, demoEndpointName, cluster, shards, config.Cluster.Metrics)
 
 	go func(ch <-chan funk.Event) {
 		for ev := range ch {
@@ -72,15 +83,15 @@ func main() {
 			http.UpdateClusterStatus(cluster)
 
 			if ev.State == funk.Operational {
-				printShardMap(shards, cluster, demoEndpoint)
+				printShardMap(shards, cluster, demoEndpointName)
 				http.ClusterOperational(cluster, shards)
 			}
 		}
 	}(cluster.Events())
 
-	cluster.SetEndpoint(demoEndpoint, demoServerEndpoint)
-	cluster.SetEndpoint(http.ConsoleEndpoint, webserverEndpoint)
-
+	cluster.SetEndpoint(demoEndpointName, demoServerEndpoint)
+	cluster.SetEndpoint(http.ConsoleEndpointName, webserverEndpoint)
+	cluster.SetEndpoint(metricsEndpointName, metricsEndpoint)
 	if err := cluster.Start(); err != nil {
 		log.WithError(err).Error("Error starting cluster")
 		return

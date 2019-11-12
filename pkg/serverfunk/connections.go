@@ -56,20 +56,20 @@ func (p *ProxyConnections) Options() []grpc.DialOption {
 	}
 }
 
-// GetConnection returns the
-func (p *ProxyConnections) GetConnection(shard int) (*grpc.ClientConn, error) {
+// GetConnection returns a gRPC connection and node ID to the service handling the shard (ID). If the shard is handled locally it will return a nil connection
+func (p *ProxyConnections) GetConnection(shard int) (*grpc.ClientConn, string, error) {
 	p.operationalMutex.RLock()
 	defer p.operationalMutex.RUnlock()
 	nodeID := p.Shards.MapToNode(shard).NodeID()
 	if nodeID == p.Cluster.NodeID() {
-		return nil, nil
+		return nil, nodeID, nil
 	}
 	endpoint := p.Cluster.GetEndpoint(nodeID, p.EndpointName)
 	if endpoint == "" {
 		logrus.WithFields(logrus.Fields{
 			"nodeid":   nodeID,
 			"endpoint": p.EndpointName}).Error("Can't find endpoint for node")
-		return nil, errors.New("can't map request to node")
+		return nil, nodeID, errors.New("can't map request to node")
 	}
 
 	// Look up the client in the map
@@ -82,9 +82,9 @@ func (p *ProxyConnections) GetConnection(shard int) (*grpc.ClientConn, error) {
 		var err error
 		conn, err = grpc.Dial(endpoint, opts...)
 		if err != nil {
-			return nil, err
+			return nil, nodeID, err
 		}
 		p.grpcClients[endpoint] = conn
 	}
-	return conn, nil
+	return conn, nodeID, nil
 }

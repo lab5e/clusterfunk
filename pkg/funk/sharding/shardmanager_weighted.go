@@ -294,3 +294,14 @@ func (sm *weightedShardMap) UnmarshalBinary(buf []byte) error {
 	}
 	return nil
 }
+
+func (sm *weightedShardMap) ShardCountForNode(nodeid string) int {
+	sm.mutex.RLock()
+	defer sm.mutex.RUnlock()
+
+	node, ok := sm.nodes[nodeid]
+	if !ok {
+		return 0
+	}
+	return len(node.Shards)
+}

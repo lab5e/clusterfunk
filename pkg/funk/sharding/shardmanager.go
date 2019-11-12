@@ -60,6 +60,9 @@ type ShardMap interface {
 	// NodeList returns a list of nodes in the shard map
 	NodeList() []string
 
+	// ShardCountForNode returns the number of shards allocated to a particular node.
+	ShardCountForNode(nodeid string) int
+
 	// The marshaling methods are used to save and restore the shard manager
 	// from the Raft log.
 

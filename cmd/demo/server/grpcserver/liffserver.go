@@ -19,7 +19,7 @@ import (
 // method.
 
 // StartDemoServer starts the demo (gRPC) server.
-func StartDemoServer(endpoint string, endpointName string, cluster funk.Cluster, shards sharding.ShardMap) {
+func StartDemoServer(endpoint string, endpointName string, cluster funk.Cluster, shards sharding.ShardMap, metricsType string) {
 	// Set up the local gRPC server.
 	liffServer := newLiffServer(cluster.NodeID())
 
@@ -27,8 +27,8 @@ func StartDemoServer(endpoint string, endpointName string, cluster funk.Cluster,
 
 	// The dial options takes care of all proxying but you must provide a shard
 	// conversion function (see below)
-	server := grpc.NewServer(serverfunk.WithClusterFunk(
-		createShardConversionFunc(shards), clientProxy)...)
+	server := grpc.NewServer(serverfunk.WithClusterFunk(cluster,
+		createShardConversionFunc(shards), clientProxy, metricsType)...)
 
 	demo.RegisterDemoServiceServer(server, liffServer)
 

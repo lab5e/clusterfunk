@@ -3,6 +3,9 @@ package serverfunk
 import (
 	"context"
 
+	"github.com/stalehd/clusterfunk/pkg/funk"
+	"github.com/stalehd/clusterfunk/pkg/funk/metrics"
+
 	"google.golang.org/grpc"
 )
 
@@ -13,32 +16,36 @@ type ShardConversionFunc func(request interface{}) (shard int, response interfac
 
 // WithClusterFunk returns server options for Clusterfunk gRPC servers. This
 // will add a stream and unary interceptor to the server that will proxy the
-// requests to the correct peer.
+// requests to the correct peer. The metrics string is the one used in the
+// Parameters struct from the funk package.
 // Streams are not proxied.
-func WithClusterFunk(shardFn ShardConversionFunc, clientProxy *ProxyConnections) []grpc.ServerOption {
+func WithClusterFunk(cluster funk.Cluster, shardFn ShardConversionFunc, clientProxy *ProxyConnections, metricsType string) []grpc.ServerOption {
+	m := metrics.NewSinkFromString(metricsType)
 	return []grpc.ServerOption{
-		grpc.StreamInterceptor(createClusterfunkStreamInterceptor(shardFn, clientProxy)),
-		grpc.UnaryInterceptor(createClusterfunkUnaryInterceptor(shardFn, clientProxy)),
+		grpc.StreamInterceptor(createClusterfunkStreamInterceptor(cluster.NodeID(), shardFn, clientProxy, m)),
+		grpc.UnaryInterceptor(createClusterfunkUnaryInterceptor(cluster.NodeID(), shardFn, clientProxy, m)),
 	}
 }
 
-func createClusterfunkUnaryInterceptor(shardFn ShardConversionFunc, clientProxy *ProxyConnections) grpc.UnaryServerInterceptor {
+func createClusterfunkUnaryInterceptor(localID string, shardFn ShardConversionFunc, clientProxy *ProxyConnections, m metrics.Sink) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		shard, ret := shardFn(req)
-		client, err := clientProxy.GetConnection(shard)
+		client, nodeID, err := clientProxy.GetConnection(shard)
 		if err != nil {
 			return nil, err
 		}
 		if client != nil {
 			err := client.Invoke(ctx, info.FullMethod, req, ret)
+			m.LogRequest(localID, nodeID, info.FullMethod)
 			return ret, err
 		}
-
-		return handler(ctx, req)
+		ret, err = handler(ctx, req)
+		m.LogRequest(localID, localID, info.FullMethod)
+		return ret, err
 	}
 }
 
-func createClusterfunkStreamInterceptor(shardFn ShardConversionFunc, clientProxy *ProxyConnections) grpc.StreamServerInterceptor {
+func createClusterfunkStreamInterceptor(localID string, shardFn ShardConversionFunc, clientProxy *ProxyConnections, m metrics.Sink) grpc.StreamServerInterceptor {
 	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		// TODO: Handle later
 		return handler(srv, ss)

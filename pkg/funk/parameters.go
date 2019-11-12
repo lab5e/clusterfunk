@@ -34,6 +34,7 @@ type Parameters struct {
 	LivenessRetries  int           `param:"desc=Number of retries for liveness checks;default=3"`
 	LivenessEndpoint string        `param:"desc=Liveness UDP endpoint"`
 	AckTimeout       time.Duration `param:"desc=Ack timeout for nodes in the cluster;default=500ms"`
+	Metrics          string        `param:"desc=Metrics sink to use;options=blackhole,prometheus;default=prometheus"`
 	Raft             RaftParameters
 	Serf             SerfParameters
 	LeaderEndpoint   string // This isn't a parameter, it's set by the service

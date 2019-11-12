@@ -10,8 +10,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// ConsoleEndpoint is the name of the HTTP endpoint in the cluster
-const ConsoleEndpoint = "ep.httpConsole"
+// ConsoleEndpointName is the name of the HTTP endpoint in the cluster
+const ConsoleEndpointName = "ep.httpConsole"
 
 const uiPath = "./cmd/demo/server/html"
 

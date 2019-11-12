@@ -60,7 +60,7 @@ func newMemberList(cluster funk.Cluster) memberList {
 	for _, v := range cluster.Nodes() {
 		ret.Members = append(ret.Members, memberNode{
 			ID:          v,
-			WebEndpoint: cluster.GetEndpoint(v, ConsoleEndpoint),
+			WebEndpoint: cluster.GetEndpoint(v, ConsoleEndpointName),
 		})
 	}
 	return ret
