@@ -290,8 +290,9 @@ func (r *RaftNode) observerFunc(ch chan raft.Observation) {
 	}
 }
 
-// Stop stops the node
-func (r *RaftNode) Stop() error {
+// Stop stops the node. If the removeWhenStopping flag is set and the server is
+// the leader it will remove itself.
+func (r *RaftNode) Stop(removeWhenStopping bool) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -299,7 +300,7 @@ func (r *RaftNode) Stop() error {
 		return errors.New("raft cluster is already stopped")
 	}
 
-	if r.ra.VerifyLeader().Error() == nil {
+	if removeWhenStopping && r.ra.VerifyLeader().Error() == nil {
 		// Make sure all entries are replicated. If there's an error just log
 		// it and continue to stop
 		if err := r.ra.Barrier(2 * time.Second).Error(); err != nil {

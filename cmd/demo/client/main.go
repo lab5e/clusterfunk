@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc"
@@ -57,23 +58,10 @@ func main() {
 	// otherwise.
 	timings := make(chan result)
 
-	ep, err := clientfunk.ZeroconfManagementLookup(config.ClusterName)
-	if err != nil {
-		panic(fmt.Sprintf("Unable to do zeroconf lookup for cluster %s: %v", config.ClusterName, err))
-	}
+	updateEndpoints(config.ClusterName, config.Endpoints)
 
-	var eps []string
-
-	if config.Endpoints != "" {
-		eps = strings.Split(config.Endpoints, ",")
-		clientfunk.UpdateClusterEndpoints(grpcServiceEndpointName, eps)
-	} else {
-		eps, err = clientfunk.GetEndpoints(grpcServiceEndpointName, toolbox.GRPCClientParam{ServerEndpoint: ep})
-		if err != nil {
-			panic(fmt.Sprintf("Unable to locate endpoints: %v", err))
-		}
-		clientfunk.UpdateClusterEndpoints(grpcServiceEndpointName, eps)
-	}
+	successful := new(uint64)
+	atomic.StoreUint64(successful, 0)
 
 	// Notice the three slashes here. It's *really* important. If you use a custom scheme in gRPC the authority field must be included
 	for worker := 0; worker < config.NumWorkers; worker++ {
@@ -95,6 +83,11 @@ func main() {
 				stop := time.Now()
 				done()
 				if err != nil {
+					if atomic.LoadUint64(successful) > 0 {
+						atomic.StoreUint64(successful, 0)
+						updateEndpoints(config.ClusterName, config.Endpoints)
+					}
+
 					code := status.Code(err)
 					switch code {
 					case codes.Unavailable /*, codes.DeadlineExceeded*/ :
@@ -105,7 +98,7 @@ func main() {
 					timingCh <- result{Success: false}
 					continue
 				}
-
+				atomic.AddUint64(successful, 1)
 				timingCh <- result{
 					NodeID:  res.NodeID,
 					Success: true,
@@ -162,4 +155,25 @@ func main() {
 		}
 		fmt.Printf("%d in total, %d with errors\n", total, errors)
 	}
+}
+
+func updateEndpoints(clusterName, configuredEndpoints string) {
+	ep, err := clientfunk.ZeroconfManagementLookup(clusterName)
+	if err != nil {
+		panic(fmt.Sprintf("Unable to do zeroconf lookup for cluster %s: %v", clusterName, err))
+	}
+
+	var eps []string
+
+	if configuredEndpoints != "" {
+		eps = strings.Split(configuredEndpoints, ",")
+		clientfunk.UpdateClusterEndpoints(grpcServiceEndpointName, eps)
+	} else {
+		eps, err = clientfunk.GetEndpoints(grpcServiceEndpointName, toolbox.GRPCClientParam{ServerEndpoint: ep})
+		if err != nil {
+			panic(fmt.Sprintf("Unable to locate endpoints: %v", err))
+		}
+		clientfunk.UpdateClusterEndpoints(grpcServiceEndpointName, eps)
+	}
+	fmt.Printf("Endpoints updated")
 }

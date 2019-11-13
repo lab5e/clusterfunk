@@ -41,9 +41,9 @@ func TestRaftCluster(t *testing.T) {
 	waitForEvent(RaftBecameLeader, evts1)
 	assert.Equal(node1.LocalNodeID(), id1)
 
-	assert.NoError(node1.Stop(), "Did not expect error when stopping")
+	assert.NoError(node1.Stop(true), "Did not expect error when stopping")
 
-	assert.Error(node1.Stop(), "Expected error when stopping a 2nd time")
+	assert.Error(node1.Stop(false), "Expected error when stopping a 2nd time")
 
 	assert.NoError(node1.Start(id1, params1), "2nd start should be success")
 	waitForEvent(RaftBecameLeader, evts1)
@@ -91,12 +91,12 @@ func TestRaftCluster(t *testing.T) {
 	assert.NoError(node1.RemoveClusterNode(id2, params2.RaftEndpoint))
 	assert.NoError(node1.AddClusterNode(id2, params2.RaftEndpoint))
 
-	assert.NoError(node1.Stop())
+	assert.NoError(node1.Stop(true))
 
 	waitForEvent(RaftLeaderLost, evts2)
 	waitForEvent(RaftLeaderLost, evts3)
 
-	assert.NoError(node3.Stop())
-	assert.NoError(node2.Stop())
+	assert.NoError(node3.Stop(true))
+	assert.NoError(node2.Stop(true))
 
 }

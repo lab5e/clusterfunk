@@ -89,7 +89,7 @@ func (c *clusterfunkCluster) GetEndpoint(nodeID string, endpointName string) str
 func (c *clusterfunkCluster) Stop() {
 	c.setState(Stopping)
 
-	if err := c.raftNode.Stop(); err != nil {
+	if err := c.raftNode.Stop(c.config.AutoJoin); err != nil {
 		log.WithError(err).Warning("Error stopping Raft node. Will stop anyways")
 	}
 	if err := c.serfNode.Stop(); err != nil {
@@ -172,6 +172,10 @@ func (c *clusterfunkCluster) Start() error {
 		return err
 	}
 
+	// TODO: Start Serf node when Raft node has joined the cluster, not before
+	// if the autojoin parameter is set to false. Raft nodes that haven't joined
+	// will show up as members of the cluster (for the ctrlc tool) but they
+	// aren't members until they're added to the cluster.
 	c.serfNode.SetTag(RaftEndpoint, c.raftNode.Endpoint())
 	c.serfNode.SetTag(SerfEndpoint, c.config.Serf.Endpoint)
 	c.serfNode.SetTag(LivenessEndpoint, c.config.LivenessEndpoint)
@@ -215,6 +219,16 @@ func (c *clusterfunkCluster) handleLeaderEvent() {
 	// When assuming leadership the node list built by events won't be up to date
 	// with the list.  This forces an update of the node list.
 	c.raftNode.RefreshNodes()
+
+	// Ensure we've picked up all nodes in the cluster by checking the Serf list
+	for _, node := range c.serfNode.Nodes() {
+		if node.Tags[RaftEndpoint] != "" {
+			// this is a Raft member
+			if !c.raftNode.Nodes.Contains(node.NodeID) {
+				log.WithField("nodeid", node.NodeID).Error("Raft configuration does not contain node")
+			}
+		}
+	}
 }
 
 func (c *clusterfunkCluster) handleLeaderLost() {

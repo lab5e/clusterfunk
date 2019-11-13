@@ -51,7 +51,7 @@ func main() {
 	}
 
 	defer func() {
-		if err := raftNode.Stop(); err != nil {
+		if err := raftNode.Stop(config.AutoJoin); err != nil {
 			log.WithError(err).Info("Got error when stopping Raft node. Ignoring it since I'm shutting down.")
 		}
 	}()
