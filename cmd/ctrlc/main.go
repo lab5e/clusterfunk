@@ -2,12 +2,12 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
 	"sort"
 	"time"
 
+	"github.com/ExploratoryEngineering/params"
 	"github.com/stalehd/clusterfunk/pkg/clientfunk"
 	"github.com/stalehd/clusterfunk/pkg/funk/clustermgmt"
 	"github.com/stalehd/clusterfunk/pkg/toolbox"
@@ -15,7 +15,7 @@ import (
 )
 
 type parameters struct {
-	ClusterName string `param:"desc=Cluster name;default=demo"`
+	ClusterName string `param:"desc=Cluster name;default=clusterfunk"`
 	Zeroconf    bool   `param:"desc=Use zeroconf discovery for Serf;default=true"`
 	Endpoint    string `param:"desc=Management endpoint to use"`
 }
@@ -32,18 +32,28 @@ const (
 )
 
 func main() {
-	var config parameters
-	flag.StringVar(&config.ClusterName, "cluster-name", "demo", "Name of cluster to connect with")
-	flag.BoolVar(&config.Zeroconf, "zeroconf", true, "Use Zeroconf to locate endpoints")
-	flag.StringVar(&config.Endpoint, "endpoint", "", "Management endpoint")
-	flag.Parse()
+	rootArgs := []string{}
+	remainingArgs := []string{}
+	for i, v := range os.Args[1:] {
+		if v[0] == '-' {
+			rootArgs = append(rootArgs, v)
+		} else {
+			remainingArgs = append(remainingArgs, os.Args[i+1:]...)
+			break
+		}
 
-	args := flag.Args()
-	if len(args) == 0 {
+	}
+	var config parameters
+	if err := params.NewEnvFlag(&config, rootArgs); err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	if len(remainingArgs) == 0 {
 		fmt.Fprintf(os.Stderr, "No command specfied\n")
 		return
 	}
-	if args[0] == cmdHelp {
+	if remainingArgs[0] == cmdHelp {
 		fmt.Println(`
 ctrlc [--cluster-name] [--zeroconf] [--endpoint] [cmd]
 
@@ -96,28 +106,28 @@ Available commands:
 	}
 	client := clustermgmt.NewClusterManagementClient(conn)
 
-	switch args[0] {
+	switch remainingArgs[0] {
 	case cmdStatus:
 		status(client)
 
 	case cmdAddNode:
-		if len(args) != 2 {
+		if len(remainingArgs) != 2 {
 			fmt.Fprintf(os.Stderr, "Need ID for %s\n", cmdAddNode)
 			return
 		}
-		addNode(args[1], client)
+		addNode(remainingArgs[1], client)
 
 	case cmdRemoveNode:
-		if len(args) != 2 {
+		if len(remainingArgs) != 2 {
 			fmt.Fprintf(os.Stderr, "Need ID for %s\n", cmdRemoveNode)
 			return
 		}
-		removeNode(args[1], client)
+		removeNode(remainingArgs[1], client)
 
 	case cmdEndpoints:
 		epFilter := ""
-		if len(args) > 1 {
-			epFilter = args[1]
+		if len(remainingArgs) > 1 {
+			epFilter = remainingArgs[1]
 		}
 		listEndpoints(epFilter, client)
 
@@ -131,7 +141,7 @@ Available commands:
 		stepDown(client)
 
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", args[0])
+		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", remainingArgs[0])
 		return
 	}
 }

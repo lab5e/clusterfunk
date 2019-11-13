@@ -136,6 +136,9 @@ func (zr *ZeroconfRegistry) ResolveFirst(kind string, waitTime time.Duration) (s
 	for {
 		select {
 		case entry := <-entries:
+			if entry == nil {
+				return "", errors.New("no entry returned")
+			}
 			if entry.Service == serviceString {
 				if strings.HasPrefix(entry.Instance, clusterPrefix) {
 					for i := range entry.AddrIPv4 {
