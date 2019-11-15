@@ -25,6 +25,15 @@ const (
 	SerfNodeUpdated                      // A node's tags are updated
 )
 
+var (
+	// SerfLeft is the status of the serf node when it has left the cluster
+	SerfLeft = serf.StatusLeft.String()
+	// SerfAlive is the status of the serf node when it is alive and well
+	SerfAlive = serf.StatusAlive.String()
+	// SerfFailed is the status of the serf node when it has failed
+	SerfFailed = serf.StatusFailed.String()
+)
+
 func (s SerfEventType) String() string {
 	switch s {
 	case SerfNodeJoined:
@@ -47,6 +56,7 @@ type NodeEvent struct {
 // SerfMember holds information on members in the Serf cluster.
 type SerfMember struct {
 	NodeID string
+	State  string
 	Tags   map[string]string
 }
 
@@ -234,12 +244,12 @@ func (s *SerfNode) Size() int {
 }
 
 // addMember adds a new member. Returns true if the member does not exist
-func (s *SerfNode) addMember(nodeID string, tags map[string]string) {
+func (s *SerfNode) addMember(nodeID string, state string, tags map[string]string) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	existing, ok := s.members[nodeID]
 	if !ok {
-		existing = SerfMember{NodeID: nodeID, Tags: tags}
+		existing = SerfMember{NodeID: nodeID, Tags: tags, State: state}
 		s.members[nodeID] = existing
 		s.sendEvent(NodeEvent{
 			Event: SerfNodeJoined,
@@ -311,7 +321,7 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 				continue
 			}
 			for _, v := range e.Members {
-				s.addMember(v.Name, v.Tags)
+				s.addMember(v.Name, v.Status.String(), v.Tags)
 			}
 		case serf.EventMemberLeave:
 			e, ok := ev.(serf.MemberEvent)

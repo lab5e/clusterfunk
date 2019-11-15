@@ -54,6 +54,10 @@ func (a *ackColl) StartAck(nodes []string, shardIndex uint64, timeout time.Durat
 	a.nodes.Sync(nodes...)
 	go func() {
 		time.Sleep(timeout)
+		if atomic.LoadUint64(a.shardIndex) == 0 {
+			// Done() has been called on this so just terminate
+			return
+		}
 		if a.nodes.Size() > 0 {
 			a.missingChan <- a.nodes.List()
 		}
@@ -64,8 +68,11 @@ func (a *ackColl) Ack(nodeID string, shardIndex uint64) bool {
 	if atomic.LoadUint64(a.shardIndex) != shardIndex {
 		return false
 	}
+	if atomic.LoadUint64(a.shardIndex) == 0 {
+		return false
+	}
 	if a.nodes.Remove(nodeID) {
-		if a.nodes.Size() == 0 && atomic.LoadUint64(a.shardIndex) > 0 {
+		if a.nodes.Size() == 0 {
 			go func() { a.completedChan <- struct{}{} }()
 		}
 		return true

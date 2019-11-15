@@ -30,7 +30,7 @@ type Parameters struct {
 	ZeroConf         bool          `param:"desc=Zero-conf startup;default=true"`
 	NonVoting        bool          `param:"desc=Nonvoting node;default=false"`
 	NonMember        bool          `param:"desc=Non-member;default=false"`
-	LivenessInterval time.Duration `param:"desc=Liveness checker intervals;default=50ms"`
+	LivenessInterval time.Duration `param:"desc=Liveness checker intervals;default=150ms"`
 	LivenessRetries  int           `param:"desc=Number of retries for liveness checks;default=3"`
 	LivenessEndpoint string        `param:"desc=Liveness UDP endpoint"`
 	AckTimeout       time.Duration `param:"desc=Ack timeout for nodes in the cluster;default=500ms"`

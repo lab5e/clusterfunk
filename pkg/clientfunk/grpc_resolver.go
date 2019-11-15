@@ -21,6 +21,10 @@ const ClusterfunkSchemaName = "cluster"
 
 // GRPCServiceConfig is the default service config for Clusterfunk clients. It will enable retries.
 const GRPCServiceConfig = `{
+	"loadBalancingPolicy": "round_robin"
+}`
+/*
+`{
 	"loadBalancingPolicy": "round_robin",
 	"methodConfig": [{
 		"retryPolicy": {
@@ -31,8 +35,7 @@ const GRPCServiceConfig = `{
 			"RetryableStatusCodes": [ "UNAVAILABLE" ]
 		}
 	}]
-}`
-
+}`*/
 var resolverBuilder *clusterResolverBuilder
 var mutex = &sync.RWMutex{}
 var cfEndpoints = make(map[string][]resolver.Address)
@@ -56,10 +59,7 @@ func (b *clusterResolverBuilder) Build(target resolver.Target, cc resolver.Clien
 	cc.UpdateState(resolver.State{
 		Addresses: addrs,
 	})
-	return &clusterResolver{
-		Target:     target.Endpoint,
-		ClientConn: cc,
-	}, nil
+	return &clusterResolver{}, nil
 }
 
 func (b *clusterResolverBuilder) Scheme() string {
@@ -85,8 +85,6 @@ func UpdateClusterEndpoints(endpointName string, endpoints []string) {
 }
 
 type clusterResolver struct {
-	Target     string
-	ClientConn resolver.ClientConn
 }
 
 func (c *clusterResolver) ResolveNow(resolver.ResolveNowOption) {

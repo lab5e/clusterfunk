@@ -89,6 +89,11 @@ func (c *clusterfunkCluster) GetEndpoint(nodeID string, endpointName string) str
 func (c *clusterfunkCluster) Stop() {
 	c.setState(Stopping)
 
+	if c.raftNode.Leader() {
+		if err := c.raftNode.StepDown(); err != nil {
+			log.WithError(err).Warning("Unable to step down as leader before leaving")
+		}
+	}
 	if err := c.raftNode.Stop(c.config.AutoJoin); err != nil {
 		log.WithError(err).Warning("Error stopping Raft node. Will stop anyways")
 	}
@@ -161,6 +166,34 @@ func (c *clusterfunkCluster) Start() error {
 		if err := c.registry.Register(ZeroconfManagementKind, c.config.NodeID, toolbox.PortOfHostPort(c.config.Management.Endpoint)); err != nil {
 			return err
 		}
+
+		// If we're using zeroconf + serf to automatically expand and shrink the cluster
+		// leaders might linger in the Raft cluster even if they've shut down so
+		// purge old nodes that have left the Serf cluster regularly
+		go func() {
+			log.Info("Starting stale node check for ZeroConf cluster")
+			for {
+				time.Sleep(10 * time.Second)
+				if !c.raftNode.Leader() {
+					continue
+				}
+				raftList, err := c.raftNode.memberList()
+				if err != nil {
+					log.WithError(err).Warning("Unable to check member list in Raft cluster")
+					continue
+				}
+				for _, rn := range raftList {
+					sn := c.serfNode.Node(rn.ID)
+					if sn.State != SerfAlive {
+						// purge the node from the Raft cluster
+						log.WithField("node", rn.ID).Info("Removing stale Raft node")
+						if err := c.raftNode.RemoveClusterNode(rn.ID, sn.Tags[RaftEndpoint]); err != nil {
+							log.WithError(err).Warning("Unable to remove stale Raft node")
+						}
+					}
+				}
+			}
+		}()
 	}
 	if c.livenessClient == nil {
 		c.livenessClient = NewLivenessClient(c.config.LivenessEndpoint)
@@ -515,10 +548,14 @@ func (c *clusterfunkCluster) serfEventLoop(ch <-chan NodeEvent) {
 						}
 					}
 				case SerfNodeLeft:
-					if knownNodes.Remove(ev.Node.NodeID) && c.config.AutoJoin && c.Role() == Leader {
-						log.Warnf("Removing serf node %s from cluster", ev.Node.NodeID)
+					known := knownNodes.Remove(ev.Node.NodeID)
+
+					if c.config.AutoJoin && c.Role() == Leader {
+						log.WithField("node", ev.Node.NodeID).Info("Removing serf node")
 						if err := c.raftNode.RemoveClusterNode(ev.Node.NodeID, ev.Node.Tags[RaftEndpoint]); err != nil {
-							log.WithError(err).WithField("event", ev).Error("Error removing member")
+							if known {
+								log.WithError(err).WithField("event", ev).Error("Error removing member")
+							}
 						}
 						c.livenessChecker.Remove(ev.Node.NodeID)
 					}
