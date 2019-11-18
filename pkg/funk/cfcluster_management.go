@@ -203,7 +203,7 @@ func (c *clusterfunkCluster) FindEndpoint(ctx context.Context, req *clustermgmt.
 	}
 	for _, v := range c.serfNode.Nodes() {
 		for k, val := range v.Tags {
-			if strings.HasPrefix(k, clusterEndpointPrefix) {
+			if strings.HasPrefix(k, EndpointPrefix) {
 				if strings.Contains(k, req.EndpointName) {
 					ret.Endpoints = append(ret.Endpoints, &clustermgmt.EndpointInfo{
 						NodeId:   v.NodeID,
@@ -224,7 +224,7 @@ func (c *clusterfunkCluster) ListEndpoints(ctx context.Context, req *clustermgmt
 	}
 	for _, v := range c.serfNode.Nodes() {
 		for k, val := range v.Tags {
-			if strings.HasPrefix(k, clusterEndpointPrefix) {
+			if strings.HasPrefix(k, EndpointPrefix) {
 				ret.Endpoints = append(ret.Endpoints, &clustermgmt.EndpointInfo{
 					NodeId:   v.NodeID,
 					Name:     k,

@@ -126,7 +126,7 @@ type Cluster interface {
 
 // The following are internal tags and values for nodes
 const (
-	clusterEndpointPrefix = "ep."
+	EndpointPrefix = "ep."
 )
 
 const (

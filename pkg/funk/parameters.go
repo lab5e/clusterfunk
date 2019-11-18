@@ -67,8 +67,8 @@ func (p *Parameters) Final() {
 			p.Interface = "localhost"
 		}
 	}
+	p.Serf.Final()
 	p.checkAndSetEndpoint(&p.Raft.RaftEndpoint)
-	p.checkAndSetEndpoint(&p.Serf.Endpoint)
 	p.checkAndSetEndpoint(&p.Management.Endpoint)
 	p.checkAndSetEndpoint(&p.LeaderEndpoint)
 	p.checkAndSetEndpoint(&p.LivenessEndpoint)

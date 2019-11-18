@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/resolver"
 )
 
@@ -19,23 +20,13 @@ func init() {
 // combined with the service config settings included in this package.
 const ClusterfunkSchemaName = "cluster"
 
-// GRPCServiceConfig is the default service config for Clusterfunk clients. It will enable retries.
+// GRPCServiceConfig is the default service config for Clusterfunk clients.
+// It will enable retries when the service is down but not when the call times
+// out.
 const GRPCServiceConfig = `{
 	"loadBalancingPolicy": "round_robin"
 }`
-/*
-`{
-	"loadBalancingPolicy": "round_robin",
-	"methodConfig": [{
-		"retryPolicy": {
-			"MaxAttempts": 10,
-			"InitialBackoff": ".1s",
-			"MaxBackoff": "2s",
-			"BackoffMultiplier": 3.0,
-			"RetryableStatusCodes": [ "UNAVAILABLE" ]
-		}
-	}]
-}`*/
+
 var resolverBuilder *clusterResolverBuilder
 var mutex = &sync.RWMutex{}
 var cfEndpoints = make(map[string][]resolver.Address)
@@ -50,24 +41,47 @@ func (b *clusterResolverBuilder) Build(target resolver.Target, cc resolver.Clien
 	mutex.RLock()
 	defer mutex.RUnlock()
 
-	addrs, ok := cfEndpoints[target.Endpoint]
-	if !ok {
-		return nil, fmt.Errorf("unknown endpoint: %s", target.Endpoint)
+	ret := &clusterResolver{
+		cc:     cc,
+		target: target,
 	}
-
-	// Look up the name and respond with the updated list.
-	cc.UpdateState(resolver.State{
-		Addresses: addrs,
-	})
-	return &clusterResolver{}, nil
+	return ret, ret.updateState()
 }
 
 func (b *clusterResolverBuilder) Scheme() string {
 	return ClusterfunkSchemaName
 }
 
-// UpdateClusterEndpoints updates the cluster endpoints for the gRPC resolver.
-// This will update the list of endpoints with the given name.
+type clusterResolver struct {
+	cc     resolver.ClientConn
+	target resolver.Target
+}
+
+func (c *clusterResolver) updateState() error {
+	addrs, ok := cfEndpoints[c.target.Endpoint]
+	if !ok {
+		return fmt.Errorf("unknown endpoint (%s) for resolver", c.target.Endpoint)
+	}
+	// Look up the name and respond with the updated list.
+	c.cc.UpdateState(resolver.State{
+		Addresses: addrs,
+	})
+	return nil
+}
+
+func (c *clusterResolver) ResolveNow(resolver.ResolveNowOption) {
+	if err := c.updateState(); err != nil {
+		log.WithError(err).Error("couldn't re-resolve endpoint")
+	}
+}
+
+func (c *clusterResolver) Close() {
+	// nothing to do
+}
+
+// UpdateClusterEndpoints updates all of the cluster endpoints with a given
+// name. The existing cluster endpoints with that name is removed from the
+// collection used by the gRPC resolver.
 func UpdateClusterEndpoints(endpointName string, endpoints []string) {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -84,12 +98,37 @@ func UpdateClusterEndpoints(endpointName string, endpoints []string) {
 	cfEndpoints[endpointName] = list
 }
 
-type clusterResolver struct {
+// AddClusterEndpoint adds a single cluster endpoint to the collection used by
+// the gRPC resolver. The same endpoint can be added multiple times.
+func AddClusterEndpoint(endpointName, endpoint string) {
+	mutex.Lock()
+	defer mutex.Unlock()
+	eps, ok := cfEndpoints[endpointName]
+	if !ok {
+		eps = make([]resolver.Address, 0)
+	}
+	eps = append(eps, resolver.Address{Addr: endpoint})
+	cfEndpoints[endpointName] = eps
 }
 
-func (c *clusterResolver) ResolveNow(resolver.ResolveNowOption) {
-}
-
-func (c *clusterResolver) Close() {
-	// nothing to do
+// RemoveClusterEndpoint removes a single cluster endpoint from the collection
+// used by the gRPC resolver. All endpoints with the given name and endpoint
+// will be removed from the collection.
+func RemoveClusterEndpoint(endpointName, endpoint string) {
+	mutex.Lock()
+	defer mutex.Unlock()
+	eps, ok := cfEndpoints[endpointName]
+	if !ok {
+		return
+	}
+	for i, v := range eps {
+		if v.Addr == endpoint {
+			eps = append(eps[:i], eps[i+1:]...)
+		}
+	}
+	if len(eps) == 0 {
+		delete(cfEndpoints, endpointName)
+		return
+	}
+	cfEndpoints[endpointName] = eps
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/stalehd/clusterfunk/pkg/toolbox"
 
 	"github.com/hashicorp/serf/serf"
 )
@@ -86,6 +87,13 @@ type SerfParameters struct {
 	Endpoint    string `param:"desc=Endpoint for Serf;default="`
 	JoinAddress string `param:"desc=Join address and port for Serf cluster"`
 	Verbose     bool   `param:"desc=Verbose logging for Serf"`
+}
+
+// Final populates empty fields with default values
+func (s *SerfParameters) Final() {
+	if s.Endpoint == "" {
+		s.Endpoint = toolbox.RandomPublicEndpoint()
+	}
 }
 
 // Start launches the serf node
@@ -315,6 +323,7 @@ func (s *SerfNode) sendEvent(ev NodeEvent) {
 func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 	for ev := range events {
 		switch ev.EventType() {
+
 		case serf.EventMemberJoin:
 			e, ok := ev.(serf.MemberEvent)
 			if !ok {
@@ -323,6 +332,7 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 			for _, v := range e.Members {
 				s.addMember(v.Name, v.Status.String(), v.Tags)
 			}
+
 		case serf.EventMemberLeave:
 			e, ok := ev.(serf.MemberEvent)
 			if !ok {
@@ -331,7 +341,7 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 			for _, v := range e.Members {
 				s.removeMember(v.Name)
 			}
-		case serf.EventMemberReap:
+
 		case serf.EventMemberUpdate:
 			// No need to process member updates
 			e, ok := ev.(serf.MemberEvent)
@@ -341,8 +351,7 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 			for _, v := range e.Members {
 				s.updateMember(v.Name, v.Tags)
 			}
-		case serf.EventUser:
-		case serf.EventQuery:
+
 		case serf.EventMemberFailed:
 			e, ok := ev.(serf.MemberEvent)
 			if !ok {
@@ -352,10 +361,30 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 				s.removeMember(v.Name)
 			}
 
+		case serf.EventMemberReap, serf.EventUser, serf.EventQuery:
+			// Do nothing
+
 		default:
 			log.WithField("event", ev).Error("Unknown event")
 		}
 	}
+}
+
+// LoadMembers reads the list of existing members in the Serf cluster
+func (s *SerfNode) LoadMembers() []SerfMember {
+	var ret []SerfMember
+	for _, v := range s.se.Members() {
+		newNode := SerfMember{
+			NodeID: v.Name,
+			State:  v.Status.String(),
+			Tags:   make(map[string]string),
+		}
+		for k, v := range v.Tags {
+			newNode.Tags[k] = v
+		}
+		ret = append(ret, newNode)
+	}
+	return ret
 }
 
 func (s *SerfNode) memberList() []nodeItem {
