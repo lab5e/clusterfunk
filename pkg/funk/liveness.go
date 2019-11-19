@@ -1,6 +1,7 @@
 package funk
 
 import (
+	"fmt"
 	"net"
 	"time"
 
@@ -61,8 +62,9 @@ func (u *udpLivenessClient) Stop() {
 func (u *udpLivenessClient) launch(endpoint string) {
 	conn, err := net.ListenPacket("udp", endpoint)
 	if err != nil {
-		log.WithField("endpoint", endpoint).WithError(err).Error("unable to create local connection")
-		return
+		// This is panic-worthy material since the other members of the cluster might think that
+		// this node is dead
+		panic(fmt.Sprintf("liveness: unable to listen on %s: %v", endpoint, err))
 	}
 	go func(conn net.PacketConn) {
 		buf := make([]byte, 2)
