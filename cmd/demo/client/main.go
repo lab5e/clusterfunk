@@ -25,6 +25,7 @@ type parameters struct {
 	Sleep        time.Duration `param:"desc=Sleep between invocations;default=100ms"`
 	PrintSummary bool          `param:"desc=Print summary when finished;default=true"`
 	ZeroConf     bool          `param:"desc=ZeroConf lookups for cluster;default=true"`
+	Retry        bool          `param:"desc=Do a single retry for failed requests;default=true"`
 	Serf         funk.SerfParameters
 }
 
@@ -73,8 +74,23 @@ func main() {
 	}
 	defer grpcConnection.Close()
 
+	// Since we're going to do a single retry we'll just make a function that
+	// we call multiple times.
+	liffCall := func() (*demo.LiffResponse, error) {
+		// The call is quite straightforward. The timeout is set to 1 second
+		// so it should handle the cluster resharding without problems. There
+		// *will* be issues when a node goes away since the client calls happens
+		// at a steady rate but only the clients currently connected to the node
+		// that fails are affected.
+		liffClient := demo.NewDemoServiceClient(grpcConnection)
+		ctx, done := context.WithTimeout(context.Background(), 1*time.Second)
+		defer done()
+		return liffClient.Liff(ctx, &demo.LiffRequest{ID: int64(rand.Int())})
+	}
+
 	// Start the calls.
 	success := 0
+	retries := 0
 	for i := 0; i < config.Repeats; i++ {
 		waitCh := time.After(config.Sleep)
 
@@ -83,30 +99,23 @@ func main() {
 		// This is used to measure the time for the call. The results will be
 		// shown at the end.
 		start := time.Now()
-
-		// The call is quite straightforward. The timeout is set to 1 second
-		// so it should handle the cluster resharding without problems. There
-		// *will* be issues when a node goes away since the client calls happens
-		// at a steady rate but only the clients currently connected to the node
-		// that fails are affected.
-		liffClient := demo.NewDemoServiceClient(grpcConnection)
-		ctx, done := context.WithTimeout(context.Background(), 1*time.Second)
-		res, err := liffClient.Liff(ctx, &demo.LiffRequest{ID: int64(rand.Int())})
-		done()
+		res, err := liffCall()
+		if err != nil {
+			retries++
+			res, err = liffCall()
+		}
+		duration := time.Since(start)
 
 		if err != nil {
 			fmt.Println()
 			fmt.Println(err.Error())
 			fmt.Println()
 		} else {
+			s := stats[res.NodeID]
+			s.Add(float64(duration) / float64(time.Millisecond))
+			stats[res.NodeID] = s
 			success++
 		}
-
-		// Record stats for call.
-		duration := time.Since(start)
-		s := stats[res.NodeID]
-		s.Add(float64(duration) / float64(time.Millisecond))
-		stats[res.NodeID] = s
 
 		<-waitCh
 	}
@@ -120,7 +129,7 @@ func main() {
 			fmt.Printf("%20s: %d items min: %6.3f  max: %6.3f  mean: %6.3f  stddev: %6.3f\n", k, v.Count, v.Min, v.Max, v.Mean(), v.StdDev())
 			total += v.Count
 		}
-		fmt.Printf("%d in total, %d with errors\n", config.Repeats, config.Repeats-int(total))
+		fmt.Printf("%d in total, %d retries, %d with errors\n", config.Repeats, retries, config.Repeats-success)
 		fmt.Printf("%6.3f reqs/sec on average\n", float64(config.Repeats)/(float64(totalDuration)/float64(time.Second)))
 	}
 }
