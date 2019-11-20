@@ -9,16 +9,18 @@ import (
 // from the web server. It's mostly just reformatting of data.
 
 type clusterStatus struct {
-	Type  string `json:"type"`
-	State string `json:"state"`
-	Role  string `json:"role"`
+	Type   string `json:"type"`
+	NodeID string `json:"nodeId"`
+	State  string `json:"state"`
+	Role   string `json:"role"`
 }
 
 func newClusterStatus(cluster funk.Cluster) clusterStatus {
 	return clusterStatus{
-		Type:  "status",
-		State: cluster.State().String(),
-		Role:  cluster.Role().String(),
+		Type:   "status",
+		NodeID: cluster.NodeID(),
+		State:  cluster.State().String(),
+		Role:   cluster.Role().String(),
 	}
 }
 
@@ -41,8 +43,9 @@ func newShardMap(shardMapper sharding.ShardMap) shardMap {
 }
 
 type memberNode struct {
-	ID          string `json:"id"`
-	WebEndpoint string `json:"http"`
+	ID              string `json:"id"`
+	WebEndpoint     string `json:"http"`
+	MetricsEndpoint string `json:"metrics"`
 }
 
 type memberList struct {
@@ -59,25 +62,10 @@ func newMemberList(cluster funk.Cluster) memberList {
 	}
 	for _, v := range cluster.Nodes() {
 		ret.Members = append(ret.Members, memberNode{
-			ID:          v,
-			WebEndpoint: cluster.GetEndpoint(v, ConsoleEndpointName),
+			ID:              v,
+			WebEndpoint:     cluster.GetEndpoint(v, ConsoleEndpointName),
+			MetricsEndpoint: cluster.GetEndpoint(v, MetricsEndpointName),
 		})
 	}
 	return ret
-}
-
-type nodeInfo struct {
-	Type   string `json:"type"`
-	NodeID string `json:"nodeId"`
-	State  string `json:"state"`
-	Role   string `json:"role"`
-}
-
-func newNodeInfo(cluster funk.Cluster) nodeInfo {
-	return nodeInfo{
-		Type:   "info",
-		NodeID: cluster.NodeID(),
-		State:  cluster.State().String(),
-		Role:   cluster.Role().String(),
-	}
 }

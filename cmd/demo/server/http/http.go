@@ -13,6 +13,9 @@ import (
 // ConsoleEndpointName is the name of the HTTP endpoint in the cluster
 const ConsoleEndpointName = "ep.httpConsole"
 
+// MetricsEndpointName is the name of the metrics endpoint for each node
+const MetricsEndpointName = "ep.metrics"
+
 const uiPath = "./cmd/demo/server/html"
 
 var upgrader = websocket.Upgrader{
@@ -24,10 +27,9 @@ var messageProducer eventProducer
 var presets []interface{}
 
 const (
-	nodeInfoPreset = iota
-	memberListPreset
-	shardMapPreset
+	memberListPreset = iota
 	clusterStatusPreset
+	shardMapPreset
 	lastPreset
 )
 
@@ -64,7 +66,6 @@ func StartWebserver(endpoint string, cluster funk.Cluster, shards sharding.Shard
 	presets = make([]interface{}, lastPreset)
 
 	presets := make([]interface{}, 4)
-	presets[nodeInfoPreset] = newNodeInfo(cluster)
 	presets[memberListPreset] = newMemberList(cluster)
 	presets[shardMapPreset] = newShardMap(shards)
 	presets[clusterStatusPreset] = newClusterStatus(cluster)
@@ -102,6 +103,6 @@ func ClusterOperational(cluster funk.Cluster, shards sharding.ShardMap) {
 	presets[shardMapPreset] = shardMap
 	presets[clusterStatusPreset] = newClusterStatus(cluster)
 	messageProducer.SetPresets(presets)
-	messageProducer.Send(shardMap)
 	messageProducer.Send(memberList)
+	messageProducer.Send(shardMap)
 }

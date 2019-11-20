@@ -12,6 +12,7 @@ import (
 	golog "log"
 
 	"github.com/ExploratoryEngineering/params"
+	"github.com/ExploratoryEngineering/rest"
 	log "github.com/sirupsen/logrus"
 	"github.com/stalehd/clusterfunk/cmd/demo/server/http"
 	"github.com/stalehd/clusterfunk/pkg/funk"
@@ -22,7 +23,6 @@ import (
 const numShards = 10000
 
 const demoEndpointName = "ep.demo"
-const metricsEndpointName = "ep.metrics"
 
 var logLevel = "info"
 var config parameters
@@ -67,7 +67,7 @@ func main() {
 	webserverEndpoint = toolbox.RandomLocalEndpoint()
 	metricsEndpoint = toolbox.RandomLocalEndpoint()
 
-	gohttp.Handle("/metrics", promhttp.Handler())
+	gohttp.Handle("/metrics", rest.AddCORSHeaders(promhttp.Handler().ServeHTTP))
 	go func() {
 		log.WithField("endpoint", metricsEndpoint).Info("Prometheus metrics endpoint starting")
 		fmt.Println("Error serving metrics: ", gohttp.ListenAndServe(metricsEndpoint, nil))
@@ -91,7 +91,7 @@ func main() {
 
 	cluster.SetEndpoint(demoEndpointName, demoServerEndpoint)
 	cluster.SetEndpoint(http.ConsoleEndpointName, webserverEndpoint)
-	cluster.SetEndpoint(metricsEndpointName, metricsEndpoint)
+	cluster.SetEndpoint(http.MetricsEndpointName, metricsEndpoint)
 	if err := cluster.Start(); err != nil {
 		log.WithError(err).Error("Error starting cluster")
 		return
