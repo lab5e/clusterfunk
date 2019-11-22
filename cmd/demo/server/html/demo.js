@@ -106,6 +106,7 @@ var app = new Vue({
             app.members = app.members.filter(function (m, i) {
                 return !m.remove;
             });
+            showCluster(app.members);
         },
         shardMessage: function (msg) {
             app.members.forEach(function (m, i) {
