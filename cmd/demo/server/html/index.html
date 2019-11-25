@@ -17,6 +17,12 @@
             width: 600px;
             height: 500px;
         }
+
+        #proxyingChart {
+            border: solid 1px black;
+            width: 600px;
+            height: 600px;
+        }
     </style>
 </head>
 
@@ -25,6 +31,8 @@
         <g id="clusterLinks"></g>
         <g id="clusterNodes"></g>
     </svg>
+    <svg id="proxyingChart"></svg>
+    <svg id="proxyStream"></svg>
 
     <div id="demoApp">
         <img src="clusterfunk_logo.png" /> {{ websocketStatus }}
@@ -87,7 +95,7 @@
         </table>
     </div>
 
-    <script src="demo.js"></script>
     <script src="vis.js"></script>
+    <script src="demo.js"></script>
 
 </html>

@@ -52,19 +52,6 @@ var app = new Vue({
         };
     },
     methods: {
-        toColor: function (nodeId) {
-            // This converts a string into a color. Each charater is xor'ed together to make a
-            // single byte and the six lower bits define the hex value. Each value is multiplied up to
-            // make 4 discrete values for each r, g, b value.
-            v = 255;
-            for (var i = 0; i < nodeId.length; i++) {
-                v = (v ^ (nodeId.charCodeAt(i)));
-            }
-            r = ((v & 60) >> 4) << 6;
-            g = ((v & 12) >> 2) << 6;
-            b = (v & 3) << 6;
-            return '#' + ("00" + r.toString(16)).substr(-2) + ("00" + g.toString(16)).substr(-2) + ("00" + b.toString(16)).substr(-2);
-        },
         statusMessage: function (msg) {
             app.nodeId = msg.nodeId;
             app.state = msg.state;
@@ -83,6 +70,7 @@ var app = new Vue({
             app.members.forEach(function (m, i) {
                 m.remove = true;
             });
+            let urls = [];
             msg.members.forEach(function (m, i) {
                 const index = app.members.findIndex((member) => member.nodeId == m.id);
                 if (index > -1) {
@@ -90,6 +78,7 @@ var app = new Vue({
                     app.members[index].metricsEndpoint = 'http://' + m.metrics + '/metrics';
                     app.members[index].remove = false;
                     app.members[index].leader = (m.id == msg.leaderId);
+                    urls.push(app.members[index].metricsEndpoint);
                     return;
                 }
                 var newMember = {
@@ -101,12 +90,14 @@ var app = new Vue({
                     leader: (m.id == msg.leaderId)
                 };
                 app.members.push(newMember);
+                urls.push(newMember.metricsEndpoint);
             });
 
             app.members = app.members.filter(function (m, i) {
                 return !m.remove;
             });
             showCluster(app.members);
+            retrieveAllMetrics(urls).then(showProxying);
         },
         shardMessage: function (msg) {
             app.members.forEach(function (m, i) {
@@ -138,6 +129,9 @@ var app = new Vue({
                 .catch(function (error) {
                     console.log('Error reading metrics: ', error);
                 });
+        },
+        toColor: function (nodeId) {
+            return nodeIdToColor(nodeId);
         }
     }
 });
