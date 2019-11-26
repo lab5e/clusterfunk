@@ -23,6 +23,12 @@
             width: 600px;
             height: 600px;
         }
+
+        #proxyStream {
+            width: 600px;
+            height: 200px;
+            border: solid 1px black;
+        }
     </style>
 </head>
 
@@ -32,7 +38,9 @@
         <g id="clusterNodes"></g>
     </svg>
     <svg id="proxyingChart"></svg>
-    <svg id="proxyStream"></svg>
+    <svg id="proxyStream">
+        <g class="plot"></g>
+    </svg>
 
     <div id="demoApp">
         <img src="clusterfunk_logo.png" /> {{ websocketStatus }}

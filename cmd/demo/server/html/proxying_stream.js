@@ -11,7 +11,11 @@ function pollMetrics() {
     });
 }
 
-//window.setInterval(pollMetrics, 2000);
+window.setInterval(pollMetrics, 1000);
+const flowChartWidth = 600;
+const flowChartHeight = 200;
+const maxSampleCount = 50;
+
 
 // This array contains a list of changes since last time, ie the difference in count from the last array.
 let proxyData = [];
@@ -22,61 +26,94 @@ function updateProxyData(metrics) {
 
     // push the first element
     if (proxyData.length == 0) {
-        newItem.time = newDate();
+        for (var p in newItem) {
+            currentCount[p] = newItem[p];
+            newItem[p] = 0;
+        }
         proxyData.push(newItem);
-        currentCount = newItem
         return
     }
 
     // Calculate difference, if none -- skip it.
     let changes = 0;
-    newElement = { time: new Date() }
-    for (var prop in newItem) {
+    let newElement = {};
+
+    for (var prop in currentCount) {
+        if (isNaN(newItem[prop])) {
+            newItem[prop] = 0;
+        }
+        if (isNaN(currentCount[prop])) {
+            currentCount[prop] = 0;
+        }
         newElement[prop] = newItem[prop] - currentCount[prop]
         changes += newElement[prop]
     }
-    if (changes > 0) {
-        proxyData.push(newElement);
-        currentCount = newItem
-    }
-
-    if (proxyData.length > 100) {
+    proxyData.push(newElement);
+    currentCount = newItem;
+    if (proxyData.length > maxSampleCount) {
         proxyData.shift();
     }
 
-    console.log(JSON.stringify(proxyData))
+}
+
+function dataKeys(data) {
+    let ret = new Map()
+    data.forEach(d => {
+        for (var p in d) {
+            ret.set(p, 0);
+        }
+    });
+    r = []
+    ret.forEach((v, k) => r.push(k));
+    return r;
+}
+
+function domainY(data) {
+    let ret = [100, -100];
+    data.forEach(d => {
+        d.forEach(i => {
+            ret[0] = Math.min(ret[0], i[0])
+            ret[0] = Math.min(ret[0], i[1])
+            ret[1] = Math.max(ret[1], i[1])
+            ret[1] = Math.max(ret[1], i[0])
+        })
+    })
+    return ret
+}
+
+function updateFlowChart(data) {
+    let keys = dataKeys(data);
+    let stack = d3.stack().keys(keys).value((d, key) => {
+        if (isNaN(d[key])) { return 0; }
+        return d[key];
+    }).order(d3.stackOrderDescending) // .offset(d3.stackOffsetWiggle);
+    let series = stack(data);
+
+    let xScale = d3.scaleLinear()
+        .domain([0, maxSampleCount - 1])
+        .range([0, flowChartWidth]);
+
+    let yScale = d3.scaleLinear()
+        .domain(domainY(series))
+        .range([flowChartHeight, 0]);
+
+    let area = d3.area()
+        //.curve(d3.curveNatural)
+        .x((d, i) => xScale(i))
+        .y0((d) => yScale(d[0]))
+        .y1((d) => yScale(d[1]));
+
+    const svg = d3.select('#proxyStream').select('g.plot');
+    svg.selectAll("path")
+        .data(series)
+        .join("path")
+        .transition()
+        .style("fill", (d, i) => nodeIdToColor(keys[i]))
+        .attr("d", area);
+
+    //svg.append("g")
+    //    .call(xAxis);
 }
 
 
 
-
-/*
-[{"time":"2019-11-25T23:34:09.184Z","18bfdaa96cc77b24":5,"4ccff194d95142c1":7,"a468d5959ff93323":8}]
-[{"time":"2019-11-25T23:34:09.184Z","18bfdaa96cc77b24":5,"4ccff194d95142c1":7,"a468d5959ff93323":8},
- {"time":"2019-11-25T23:34:11.186Z","18bfdaa96cc77b24":7,"4ccff194d95142c1":6,"a468d5959ff93323":6}]
-[{"time":"2019-11-25T23:34:09.184Z","18bfdaa96cc77b24":5,"4ccff194d95142c1":7,"a468d5959ff93323":8},
- {"time":"2019-11-25T23:34:11.186Z","18bfdaa96cc77b24":7,"4ccff194d95142c1":6,"a468d5959ff93323":6},
- {"time":"2019-11-25T23:34:13.183Z","18bfdaa96cc77b24":4,"4ccff194d95142c1":8,"a468d5959ff93323":8}]
-[{"time":"2019-11-25T23:34:09.184Z","18bfdaa96cc77b24":5,"4ccff194d95142c1":7,"a468d5959ff93323":8},
- {"time":"2019-11-25T23:34:11.186Z","18bfdaa96cc77b24":7,"4ccff194d95142c1":6,"a468d5959ff93323":6},
- {"time":"2019-11-25T23:34:13.183Z","18bfdaa96cc77b24":4,"4ccff194d95142c1":8,"a468d5959ff93323":8},
- {"time":"2019-11-25T23:34:15.187Z","18bfdaa96cc77b24":7,"4ccff194d95142c1":8,"a468d5959ff93323":4}]
-[{"time":"2019-11-25T23:34:09.184Z","18bfdaa96cc77b24":5,"4ccff194d95142c1":7,"a468d5959ff93323":8},
- {"time":"2019-11-25T23:34:11.186Z","18bfdaa96cc77b24":7,"4ccff194d95142c1":6,"a468d5959ff93323":6},
- {"time":"2019-11-25T23:34:13.183Z","18bfdaa96cc77b24":4,"4ccff194d95142c1":8,"a468d5959ff93323":8},
- {"time":"2019-11-25T23:34:15.187Z","18bfdaa96cc77b24":7,"4ccff194d95142c1":8,"a468d5959ff93323":4},
- {"time":"2019-11-25T23:34:17.189Z","18bfdaa96cc77b24":7,"4ccff194d95142c1":7,"a468d5959ff93323":6}]
-[{"time":"2019-11-25T23:34:09.184Z","18bfdaa96cc77b24":5,"4ccff194d95142c1":7,"a468d5959ff93323":8},
- {"time":"2019-11-25T23:34:11.186Z","18bfdaa96cc77b24":7,"4ccff194d95142c1":6,"a468d5959ff93323":6},
- {"time":"2019-11-25T23:34:13.183Z","18bfdaa96cc77b24":4,"4ccff194d95142c1":8,"a468d5959ff93323":8},
- {"time":"2019-11-25T23:34:15.187Z","18bfdaa96cc77b24":7,"4ccff194d95142c1":8,"a468d5959ff93323":4},
- {"time":"2019-11-25T23:34:17.189Z","18bfdaa96cc77b24":7,"4ccff194d95142c1":7,"a468d5959ff93323":6},
- {"time":"2019-11-25T23:34:19.187Z","18bfdaa96cc77b24":6,"4ccff194d95142c1":9,"a468d5959ff93323":4}]
-[{"time":"2019-11-25T23:34:09.184Z","18bfdaa96cc77b24":5,"4ccff194d95142c1":7,"a468d5959ff93323":8},
- {"time":"2019-11-25T23:34:11.186Z","18bfdaa96cc77b24":7,"4ccff194d95142c1":6,"a468d5959ff93323":6},
- {"time":"2019-11-25T23:34:13.183Z","18bfdaa96cc77b24":4,"4ccff194d95142c1":8,"a468d5959ff93323":8},
- {"time":"2019-11-25T23:34:15.187Z","18bfdaa96cc77b24":7,"4ccff194d95142c1":8,"a468d5959ff93323":4},
- {"time":"2019-11-25T23:34:17.189Z","18bfdaa96cc77b24":7,"4ccff194d95142c1":7,"a468d5959ff93323":6},
- {"time":"2019-11-25T23:34:19.187Z","18bfdaa96cc77b24":6,"4ccff194d95142c1":9,"a468d5959ff93323":4},
- {"time":"2019-11-25T23:34:21.189Z","18bfdaa96cc77b24":6,"4ccff194d95142c1":7,"a468d5959ff93323":6}]
-*/
