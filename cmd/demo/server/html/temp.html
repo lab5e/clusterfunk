@@ -34,16 +34,14 @@
     }
 
     function updateFlowChart(data) {
-        console.log(dataKeys());
-        let series = d3.stack()
-            .keys(dataKeys())
-
-        let xScale = d3.scaleUtc()
-            .domain(d3.extent(data, d => d.time))
+        let stack = d3.stack().keys(dataKeys()).order(d3.stackOrderNone).offset(d3.stackOffsetWiggle);
+        let series = stack(data);
+        let xScale = d3.scaleLinear()
             .range([0, flowChartWidth]);
+        console.log(series);
 
         let yScale = d3.scaleLinear()
-            .domain([0, 50])
+            .domain([-30, 30])
             .range([flowChartHeight, 0]);
 
         let color = d3.scaleOrdinal()
@@ -51,20 +49,17 @@
             .range(d3.schemeCategory10);
 
         let area = d3.area()
-            .x(d => {
-                console.log(d);
-                return xScale(d.time)
-            })
-            .y0((d, k) => { console.log(d, k); return yScale(0); })
-            .y1((d, k) => yScale(d[k]));
+            .x((d, i) => xScale(i))
+            .y0((d) => yScale(d[0]))
+            .y1((d) => yScale(d[1]));
 
         const svg = d3.select('#proxyStream');
 
         svg.append("g")
             .selectAll("path")
-            .data(data)
+            .data(series)
             .join("path")
-            .attr("fill", ({ key }) => color(key))
+            .style("fill", (d, i) => color(i))
             .attr("d", area);
 
         console.log('Plotted');
@@ -72,13 +67,13 @@
         //    .call(xAxis);
     }
 
-    let data = [{ "time": "2019-11-25T23:34:09.184Z", "18bfdaa96cc77b24": 5, "4ccff194d95142c1": 7, "a468d5959ff93323": 8 },
-    { "time": "2019-11-25T23:34:11.186Z", "18bfdaa96cc77b24": 7, "4ccff194d95142c1": 6, "a468d5959ff93323": 6 },
-    { "time": "2019-11-25T23:34:13.183Z", "18bfdaa96cc77b24": 4, "4ccff194d95142c1": 8, "a468d5959ff93323": 8 },
-    { "time": "2019-11-25T23:34:15.187Z", "18bfdaa96cc77b24": 7, "4ccff194d95142c1": 8, "a468d5959ff93323": 4 },
-    { "time": "2019-11-25T23:34:17.189Z", "18bfdaa96cc77b24": 7, "4ccff194d95142c1": 7, "a468d5959ff93323": 6 },
-    { "time": "2019-11-25T23:34:19.187Z", "18bfdaa96cc77b24": 6, "4ccff194d95142c1": 9, "a468d5959ff93323": 4 },
-    { "time": "2019-11-25T23:34:21.189Z", "18bfdaa96cc77b24": 6, "4ccff194d95142c1": 7, "a468d5959ff93323": 6 }];
+    let data = [{ "time": Date.parse("2019-11-25T23:34:09.184Z"), "18bfdaa96cc77b24": 5, "4ccff194d95142c1": 7, "a468d5959ff93323": 8 },
+    { "time": Date.parse("2019-11-25T23:34:11.186Z"), "18bfdaa96cc77b24": 7, "4ccff194d95142c1": 6, "a468d5959ff93323": 6 },
+    { "time": Date.parse("2019-11-25T23:34:13.183Z"), "18bfdaa96cc77b24": 4, "4ccff194d95142c1": 8, "a468d5959ff93323": 8 },
+    { "time": Date.parse("2019-11-25T23:34:15.187Z"), "18bfdaa96cc77b24": 7, "4ccff194d95142c1": 8, "a468d5959ff93323": 4 },
+    { "time": Date.parse("2019-11-25T23:34:17.189Z"), "18bfdaa96cc77b24": 7, "4ccff194d95142c1": 7, "a468d5959ff93323": 6 },
+    { "time": Date.parse("2019-11-25T23:34:19.187Z"), "18bfdaa96cc77b24": 6, "4ccff194d95142c1": 9, "a468d5959ff93323": 4 },
+    { "time": Date.parse("2019-11-25T23:34:21.189Z"), "18bfdaa96cc77b24": 6, "4ccff194d95142c1": 7, "a468d5959ff93323": 6 }];
 
     updateFlowChart(data);
 </script>
