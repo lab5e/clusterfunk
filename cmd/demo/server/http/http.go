@@ -1,7 +1,9 @@
 package http
 
 import (
+	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/stalehd/clusterfunk/pkg/funk"
 	"github.com/stalehd/clusterfunk/pkg/funk/sharding"
@@ -72,7 +74,16 @@ func StartWebserver(endpoint string, cluster funk.Cluster, shards sharding.Shard
 	messageProducer.SetPresets(presets)
 
 	mux := http.NewServeMux()
-	mux.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir(uiPath))))
+	// Serve locally if the file system is found, otherwise use the
+	// included assets.
+	_, err := os.Lstat(fmt.Sprintf("%s/index.html", uiPath))
+	if err == nil {
+		log.Info("Using external HTML assets")
+		mux.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir(uiPath))))
+	} else {
+		log.WithError(err).Info("Using embedded HTML assets")
+		mux.Handle("/", http.StripPrefix("/", http.FileServer(Assets)))
+	}
 	mux.HandleFunc("/statusws", websocketHandler)
 	log.WithField("endpoint", endpoint).Info("HTTP server started")
 
