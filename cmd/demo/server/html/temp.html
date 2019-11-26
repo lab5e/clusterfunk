@@ -1,0 +1,86 @@
+<html>
+
+<head>
+    <title>Stream temp</title>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <style>
+        #proxyStream {
+            width: 600px;
+            height: 200px;
+            border: solid 1px black;
+        }
+    </style>
+</head>
+
+<body>
+    <svg id="proxyStream"></svg>
+</body>
+<script src="proxying_stream.js"></script>
+<script>
+    const flowChartWidth = 600;
+    const flowChartHeight = 200;
+
+    function dataKeys() {
+        ret = new Map()
+        data.forEach(d => {
+            for (var p in d) {
+                ret.set(p, 0);
+            }
+        });
+        ret.delete("time");
+        r = []
+        ret.forEach((v, k) => r.push(k));
+        return r;
+    }
+
+    function updateFlowChart(data) {
+        console.log(dataKeys());
+        let series = d3.stack()
+            .keys(dataKeys())
+
+        let xScale = d3.scaleUtc()
+            .domain(d3.extent(data, d => d.time))
+            .range([0, flowChartWidth]);
+
+        let yScale = d3.scaleLinear()
+            .domain([0, 50])
+            .range([flowChartHeight, 0]);
+
+        let color = d3.scaleOrdinal()
+            .domain(dataKeys())
+            .range(d3.schemeCategory10);
+
+        let area = d3.area()
+            .x(d => {
+                console.log(d);
+                return xScale(d.time)
+            })
+            .y0((d, k) => { console.log(d, k); return yScale(0); })
+            .y1((d, k) => yScale(d[k]));
+
+        const svg = d3.select('#proxyStream');
+
+        svg.append("g")
+            .selectAll("path")
+            .data(data)
+            .join("path")
+            .attr("fill", ({ key }) => color(key))
+            .attr("d", area);
+
+        console.log('Plotted');
+        //svg.append("g")
+        //    .call(xAxis);
+    }
+
+    let data = [{ "time": "2019-11-25T23:34:09.184Z", "18bfdaa96cc77b24": 5, "4ccff194d95142c1": 7, "a468d5959ff93323": 8 },
+    { "time": "2019-11-25T23:34:11.186Z", "18bfdaa96cc77b24": 7, "4ccff194d95142c1": 6, "a468d5959ff93323": 6 },
+    { "time": "2019-11-25T23:34:13.183Z", "18bfdaa96cc77b24": 4, "4ccff194d95142c1": 8, "a468d5959ff93323": 8 },
+    { "time": "2019-11-25T23:34:15.187Z", "18bfdaa96cc77b24": 7, "4ccff194d95142c1": 8, "a468d5959ff93323": 4 },
+    { "time": "2019-11-25T23:34:17.189Z", "18bfdaa96cc77b24": 7, "4ccff194d95142c1": 7, "a468d5959ff93323": 6 },
+    { "time": "2019-11-25T23:34:19.187Z", "18bfdaa96cc77b24": 6, "4ccff194d95142c1": 9, "a468d5959ff93323": 4 },
+    { "time": "2019-11-25T23:34:21.189Z", "18bfdaa96cc77b24": 6, "4ccff194d95142c1": 7, "a468d5959ff93323": 6 }];
+
+    updateFlowChart(data);
+</script>
+
+</html>
