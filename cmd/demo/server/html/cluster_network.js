@@ -1,6 +1,6 @@
-const clusterWidth = 600;
-const clusterHeight = 500;
-const rectWidth = 150;
+const clusterWidth = 400;
+const clusterHeight = 400;
+const rectWidth = 25;
 const rectHeight = 25;
 const nodeColors = d3.scaleOrdinal(d3.schemeCategory10)
 let colorMap = [];
@@ -34,27 +34,38 @@ function showCluster(members) {
 
     const simulation = d3.forceSimulation()
         .nodes(nodes)
-        .force("charge", d3.forceManyBody().strength(-1600))
+        .force("charge", d3.forceManyBody().strength(-800))
         .force("center", d3.forceCenter(clusterWidth / 2, clusterHeight / 2))
-        .force("link", d3.forceLink(links).id(d => d.id).distance(175))
+        .force("link", d3.forceLink(links).id(d => d.id).distance(75))
 
     const svg = d3.select('#clusterNetwork');
 
-    let rects = svg.select("#clusterNodes").selectAll("rect")
+    let rects = svg.select("#clusterNodes")
+        .selectAll("rect")
         .data(nodes)
-        .enter().append("g").attr("class", "box");
+        .enter().append("g").attr("class", "box")
+        .on("mouseover", (d) => setActive(d.id))
+        .on("mouseout", (d) => setActive(''));
 
     rects.append("rect")
         .transition().duration(100)
-        .attr("stroke", "black")
-        .attr("rx", 10)
+        .attr("rx", 5)
         .attr("width", rectWidth)
         .attr("height", rectHeight)
         .attr("fill", d => nodeIdToColor(d.id))
-    rects.append("text").text(d => d.id).attr("text-anchor", "middle");
 
-    svg.select("#clusterNodes").selectAll("rect").data(nodes).exit().remove();
-    svg.select("#clusterNodes").selectAll("text").data(nodes).exit().remove();
+
+    svg.select("#clusterNodes")
+        .selectAll("rect")
+        .data(nodes)
+        .exit()
+        .remove();
+
+    svg.select("#clusterNodes")
+        .selectAll("rect")
+        .data(nodes)
+        .attr("stroke", d => d.id == app.nodeId ? 'black' : 'silver')
+        .attr("stroke-width", d => d.id == app.nodeId ? '2px' : '1px')
 
     svg.select("#clusterLinks").selectAll("line.network")
         .data(links)
@@ -62,10 +73,14 @@ function showCluster(members) {
         .append("line")
         .transition().duration(100)
         .attr('class', 'network')
-        .attr("stroke", "black")
+        .attr("stroke", "silver")
         .attr("stroke-width", 1);
 
-    svg.select("#clusterLinks").selectAll("line").data(links).exit().remove();
+    svg.select("#clusterLinks")
+        .selectAll("line")
+        .data(links)
+        .exit()
+        .remove();
 
 
     simulation.on("tick", () => {
@@ -79,11 +94,6 @@ function showCluster(members) {
             .attr("x", d => d.x - (rectWidth / 2))
             .attr("y", d => d.y - (rectHeight / 2));
 
-        d3.selectAll("text")
-            .attr("x", d => d.x)
-            .attr("y", d => (d.y + 5));
-
     });
-
-    //invalidation.then(() => simulation.stop());
 }
+

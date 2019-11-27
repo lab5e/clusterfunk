@@ -1,3 +1,11 @@
+window.setInterval(updateChord, 5000);
+
+
+function updateChord() {
+    let urls = [];
+    app.members.forEach(d => urls.push(d.metricsEndpoint));
+    retrieveAllMetrics(urls).then(showProxying);
+}
 
 function retrieveAllMetrics(urls) {
     let promises = [];
@@ -77,15 +85,18 @@ function showProxying(proxyData) {
         })
     });
 
-    const innerRadius = 280;
-    const outerRadius = 290;
+    const chordMargins = { top: 10, bottom: 10, left: 10, right: 10 };
+    const chordSize = { width: 400, height: 400 };
+    const radiusSize = 10
+    const innerRadius = chordSize.width / 2 - radiusSize;
+    const outerRadius = chordSize.width / 2;
 
     d3.select('#proxyingChart').select('g.contents').remove();
 
     d3.select('#proxyingChart')
         .append('g')
         .attr('class', 'contents')
-        .attr('transform', 'translate(300,300)');
+        .attr('transform', `translate(${chordSize.width / 2},${chordSize.height / 2})`);
 
     let svg = d3.select('#proxyingChart').select('g.contents');
 
@@ -105,6 +116,7 @@ function showProxying(proxyData) {
 
     chordGroup.append("path")
         .style("fill", d => nodeIdToColor(chordData.indexToName.get(d.index)))
+        .attr('opacity', d => isActive(chordData.indexToName.get(d.index)) ? 1.0 : 0.2)
         .style("stroke", d => d3.rgb(nodeIdToColor(chordData.indexToName.get(d.index))).darker())
         .attr("d", arc)
 
@@ -119,5 +131,6 @@ function showProxying(proxyData) {
         .attr('class', 'links')
         .attr("d", ribbon)
         .style("fill", (d) => nodeIdToColor(chordData.indexToName.get(d.target.index)))
+        .attr('opacity', d => isActive(chordData.indexToName.get(d.target.index)) ? 1.0 : 0.2)
         .style("stroke", d => d3.rgb(nodeIdToColor(chordData.indexToName.get(d.target.index))).darker());
 }

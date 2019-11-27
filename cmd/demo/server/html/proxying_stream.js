@@ -1,4 +1,3 @@
-
 /* stream graph for proxying */
 function pollMetrics() {
     app.members.forEach(m => {
@@ -15,7 +14,7 @@ window.setInterval(pollMetrics, 1000);
 const flowChartWidth = 600;
 const flowChartHeight = 200;
 const maxSampleCount = 50;
-
+const flowMargins = { left: 35, top: 20, right: 0, bottom: 20 };
 
 // This array contains a list of changes since last time, ie the difference in count from the last array.
 let proxyData = [];
@@ -26,6 +25,9 @@ function updateProxyData(metrics) {
 
     // push the first element
     if (proxyData.length == 0) {
+        for (let i = 0; i < maxSampleCount; i++) {
+            proxyData.push({});
+        }
         for (var p in newItem) {
             currentCount[p] = newItem[p];
             newItem[p] = 0;
@@ -56,6 +58,8 @@ function updateProxyData(metrics) {
 
 }
 
+let streamKeys = [];
+
 function dataKeys(data) {
     let ret = new Map()
     data.forEach(d => {
@@ -69,7 +73,7 @@ function dataKeys(data) {
 }
 
 function domainY(data) {
-    let ret = [100, -100];
+    let ret = [200, -300];
     data.forEach(d => {
         d.forEach(i => {
             ret[0] = Math.min(ret[0], i[0])
@@ -82,20 +86,21 @@ function domainY(data) {
 }
 
 function updateFlowChart(data) {
-    let keys = dataKeys(data);
-    let stack = d3.stack().keys(keys).value((d, key) => {
+    streamKeys = dataKeys(data);
+
+    let stack = d3.stack().keys(streamKeys).value((d, key) => {
         if (isNaN(d[key])) { return 0; }
         return d[key];
-    }).order(d3.stackOrderDescending) // .offset(d3.stackOffsetWiggle);
+    }).order(d3.stackOrderNone).offset(d3.stackOffsetExpand);
     let series = stack(data);
 
     let xScale = d3.scaleLinear()
         .domain([0, maxSampleCount - 1])
-        .range([0, flowChartWidth]);
+        .range([flowMargins.left, (flowChartWidth - flowMargins.right)]);
 
     let yScale = d3.scaleLinear()
         .domain(domainY(series))
-        .range([flowChartHeight, 0]);
+        .range([(flowChartHeight - flowMargins.top), flowMargins.bottom]);
 
     let area = d3.area()
         //.curve(d3.curveNatural)
@@ -107,13 +112,17 @@ function updateFlowChart(data) {
     svg.selectAll("path")
         .data(series)
         .join("path")
-        .transition()
-        .style("fill", (d, i) => nodeIdToColor(keys[i]))
+        .style("fill", (d, i) => nodeIdToColor(streamKeys[i]))
         .attr("d", area);
 
-    //svg.append("g")
-    //    .call(xAxis);
+    d3.select('#proxyStream').select('g.yaxis').call(d3.axisLeft(yScale).ticks(4, "%"));
 }
 
+function setupFlowChart() {
+    d3.select('#proxyStream')
+        .append('g')
+        .attr('class', 'yaxis')
+        .attr('transform', `translate(${flowMargins.left},0)`);
+}
 
-
+setupFlowChart();

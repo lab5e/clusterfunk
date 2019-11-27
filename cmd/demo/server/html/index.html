@@ -5,6 +5,7 @@
 <head>
     <title>Cluster status</title>
     <link rel="icon" type="image/png" href="cf_icon.png">
+    <link rel="stylesheet" href="demo.css">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
@@ -13,39 +14,58 @@
 
     <style>
         #clusterNetwork {
-            border: solid 1px black;
-            width: 600px;
-            height: 500px;
+            width: 400px;
+            height: 400px;
         }
 
         #proxyingChart {
-            border: solid 1px black;
-            width: 600px;
-            height: 600px;
+            width: 400px;
+            height: 400px;
         }
 
         #proxyStream {
             width: 600px;
             height: 200px;
-            border: solid 1px black;
         }
     </style>
 </head>
 
 <body>
-    <svg id="clusterNetwork">
-        <g id="clusterLinks"></g>
-        <g id="clusterNodes"></g>
-    </svg>
-    <svg id="proxyingChart"></svg>
-    <svg id="proxyStream">
-        <g class="plot"></g>
-    </svg>
-
     <div id="demoApp">
-        <img src="clusterfunk_logo.png" /> {{ websocketStatus }}
-        <span :style="'display:block;width:40px;height:40px;background-color:'+toColor(nodeId)">&nbsp;</span>
-        <h1>Node {{ nodeId }}: {{ state }} {{ role }} </h1>
+        <div class="heading">
+            <div style="flex: 0 1 auto;">
+                <img src="clusterfunk_logo.png" />
+            </div>
+            <div style="flex: 2 1 auto;">
+                <span class=" node-rect" :style="'background-color:'+toColor(nodeId)">
+
+                </span><span class="node-title">Node {{ nodeId }}: {{ state }} {{ role }} </span>
+            </div>
+            <div>
+                <span>{{ websocketStatus }}</span>
+            </div>
+        </div>
+        <div class="chart">
+            <div>
+                <h1>Cluster</h1>
+                <svg id="clusterNetwork">
+                    <g id="clusterLinks"></g>
+                    <g id="clusterNodes"></g>
+                </svg>
+            </div>
+            <div>
+
+                <h1>Cluster proxying</h1>
+                <svg id="proxyingChart"></svg>
+            </div>
+            <div>
+                <h1>Proxying on local node</h1>
+                <svg id="proxyStream">
+                    <g class="plot"></g>
+                </svg>
+            </div>
+        </div>
+
         <h2>Cluster members</h2>
         <table border="1" cellspacing="0">
             <thead>
@@ -102,8 +122,8 @@
             </tbody>
         </table>
     </div>
-
-    <script src="vis.js"></script>
+    <script src="utils.js"></script>
+    <script src="cluster_network.js"></script>
     <script src="proxying_chord.js"></script>
     <script src="proxying_stream.js"></script>
     <script src="demo.js"></script>

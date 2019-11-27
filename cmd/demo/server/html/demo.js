@@ -50,6 +50,7 @@ var app = new Vue({
         ws.onclose = function (s, ev) {
             app.websocketStatus = 'disconnected';
         };
+
     },
     methods: {
         statusMessage: function (msg) {
@@ -64,6 +65,7 @@ var app = new Vue({
             if (app.statusHistory.length > 10) {
                 app.statusHistory.pop();
             }
+            showCluster(app.members);
         },
 
         memberMessage: function (msg) {
@@ -78,6 +80,8 @@ var app = new Vue({
                     app.members[index].metricsEndpoint = 'http://' + m.metrics + '/metrics';
                     app.members[index].remove = false;
                     app.members[index].leader = (m.id == msg.leaderId);
+                    app.members[index].requests = 0;
+                    app.members[index].percent = 0;
                     urls.push(app.members[index].metricsEndpoint);
                     return;
                 }
@@ -87,17 +91,19 @@ var app = new Vue({
                     metricsEndpoint: 'http://' + m.metrics + '/metrics',
                     remove: false,
                     shards: 0,
+                    requests: 0,
+                    percent: 0,
                     leader: (m.id == msg.leaderId)
                 };
                 app.members.push(newMember);
-                urls.push(newMember.metricsEndpoint);
             });
 
             app.members = app.members.filter(function (m, i) {
                 return !m.remove;
             });
             showCluster(app.members);
-            retrieveAllMetrics(urls).then(showProxying);
+            updateChord();
+
         },
         shardMessage: function (msg) {
             app.members.forEach(function (m, i) {
@@ -135,4 +141,3 @@ var app = new Vue({
         }
     }
 });
-

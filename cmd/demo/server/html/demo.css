@@ -1,0 +1,31 @@
+div.heading {
+    border: solid 1px silver;
+    display: flex;
+	flex-direction: row;
+	flex-wrap: nowrap;
+	justify-content: space-between;
+	align-items: stretch;
+	align-content: stretch;
+
+}
+div.chart {
+	display: flex;
+	flex-direction: row;
+	flex-wrap: nowrap;
+	justify-content: flex-start;
+	align-items: stretch;
+	align-content: stretch;
+}
+
+span.node-rect {
+    display:block;
+    width:40px;
+    height:40px;
+    border-radius: 4px;
+    border: solid 1px black;
+}
+
+span.node-title {
+    font-size: 24pt;
+    padding-left: 1em;
+}
