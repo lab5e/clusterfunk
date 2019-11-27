@@ -113,7 +113,9 @@ function updateFlowChart(data) {
         .data(series)
         .join("path")
         .style("fill", (d, i) => nodeIdToColor(streamKeys[i]))
-        .attr("d", area);
+        .attr("d", area)
+        .on("mouseover", (d, i) => setActive(streamKeys[i]))
+        .on("mouseout", (d) => setActive(''));
 
     d3.select('#proxyStream').select('g.yaxis').call(d3.axisLeft(yScale).ticks(4, "%"));
 }

@@ -119,6 +119,8 @@ function showProxying(proxyData) {
         .attr('opacity', d => isActive(chordData.indexToName.get(d.index)) ? 1.0 : 0.2)
         .style("stroke", d => d3.rgb(nodeIdToColor(chordData.indexToName.get(d.index))).darker())
         .attr("d", arc)
+        .on("mouseover", (d) => setActive(chordData.indexToName.get(d.index)))
+        .on("mouseout", (d) => setActive(''));
 
     // links between groups
     const ribbon = d3.ribbon().radius(innerRadius)
@@ -132,5 +134,7 @@ function showProxying(proxyData) {
         .attr("d", ribbon)
         .style("fill", (d) => nodeIdToColor(chordData.indexToName.get(d.target.index)))
         .attr('opacity', d => isActive(chordData.indexToName.get(d.target.index)) ? 1.0 : 0.2)
-        .style("stroke", d => d3.rgb(nodeIdToColor(chordData.indexToName.get(d.target.index))).darker());
+        .style("stroke", d => d3.rgb(nodeIdToColor(chordData.indexToName.get(d.target.index))).darker())
+        .on("mouseover", (d) => setActive(chordData.indexToName.get(d.target.index)))
+        .on("mouseout", (d) => setActive(''));
 }
