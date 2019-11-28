@@ -3,8 +3,10 @@ function pollMetrics() {
     app.members.forEach(m => {
         if (m.nodeId == app.nodeId) {
             axios.get(m.metricsEndpoint).then(resp => {
-                updateProxyData(metricsData(resp.data));
+                let metrics = metricsData(resp.data);
+                updateProxyData(metrics);
                 updateFlowChart(proxyData);
+                updateRequestCount(metrics);
             })
         }
     });
@@ -19,6 +21,7 @@ const flowMargins = { left: 35, top: 20, right: 0, bottom: 20 };
 // This array contains a list of changes since last time, ie the difference in count from the last array.
 let proxyData = [];
 let currentCount = {}
+
 function updateProxyData(metrics) {
 
     let newItem = metrics.reduce((a, d) => { a[d.destination] = d.count; return a }, {});

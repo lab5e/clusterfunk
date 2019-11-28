@@ -27,6 +27,11 @@
             width: 600px;
             height: 200px;
         }
+
+        #requestChart {
+            width: 600px;
+            height: 200px;
+        }
     </style>
 </head>
 
@@ -62,6 +67,12 @@
                 <h1>Proxying on local node</h1>
                 <svg id="proxyStream">
                     <g class="plot"></g>
+                </svg>
+                <h1>Requests on local node</h1>
+                <svg id="requestChart">
+                    <g class="xaxis"></g>
+                    <g class="plot"> </g>
+                    <g class="yaxis"></g>
                 </svg>
             </div>
         </div>
@@ -126,6 +137,7 @@
     <script src="cluster_network.js"></script>
     <script src="proxying_chord.js"></script>
     <script src="proxying_stream.js"></script>
+    <script src="local_requests.js"></script>
     <script src="demo.js"></script>
 
 </html>
