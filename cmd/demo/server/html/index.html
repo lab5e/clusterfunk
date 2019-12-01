@@ -11,28 +11,6 @@
     <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
     <script src="https://d3js.org/d3.v5.min.js"></script>
-
-    <style>
-        #clusterNetwork {
-            width: 400px;
-            height: 400px;
-        }
-
-        #proxyingChart {
-            width: 400px;
-            height: 400px;
-        }
-
-        #proxyStream {
-            width: 600px;
-            height: 200px;
-        }
-
-        #requestChart {
-            width: 600px;
-            height: 200px;
-        }
-    </style>
 </head>
 
 <body>
@@ -50,7 +28,8 @@
                 <span>{{ websocketStatus }}</span>
             </div>
         </div>
-        <div class="chart">
+
+        <div class="cluster">
             <div>
                 <h1>Cluster</h1>
                 <svg id="clusterNetwork">
@@ -63,11 +42,74 @@
                 <h1>Cluster proxying</h1>
                 <svg id="proxyingChart"></svg>
             </div>
+
+            <h2>Cluster members</h2>
+            <table border="1" cellspacing="0">
+                <thead>
+                    <tr>
+                        <th>&nbsp;</th>
+                        <th>Node ID</th>
+                        <th>Role</th>
+                        <th>Shards</th>
+                        <th>Status page</th>
+                        <th>Metrics</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="member in members">
+                        <td :bgcolor="toColor(member.nodeId)">&nbsp;&nbsp;</td>
+                        <td>{{ member.nodeId }} </td>
+                        <td v-if="member.leader">Leader</td>
+                        <td v-if="!member.leader">Follower</td>
+                        <td> {{ member.shards }}</td>
+                        <td><a :href="member.httpEndpoint">{{ member.httpEndpoint }}</a></td>
+                        <td><a v-on:click="showMetrics(member.metricsEndpoint)"
+                                href="#">{{ member.metricsEndpoint }}</a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <h2>State history</h2>
+            <table border="1" cellspacing="0">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>State</th>
+                        <th>Role</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="status in statusHistory">
+                        <td>{{status.time.toISOString().substr(11,12)}}</td>
+                        <td>{{status.state}}</td>
+                        <td>{{status.role}}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>Metrics</h2>
+            <table border="1" cellspacing="0">
+                <thead>
+                    <th>Name</th>
+                    <th>Value</th>
+                </thead>
+                <tbody>
+                    <tr v-for="metric in metrics">
+                        <td>{{metric.name}}</td>
+                        <td>{{metric.value}}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+        </div>
+
+        <div class="node">
             <div>
                 <h1>Proxying on local node</h1>
                 <svg id="proxyStream">
                     <g class="plot"></g>
                 </svg>
+
                 <h1>Requests on local node</h1>
                 <svg id="requestChart">
                     <g class="xaxis"></g>
@@ -76,62 +118,6 @@
                 </svg>
             </div>
         </div>
-
-        <h2>Cluster members</h2>
-        <table border="1" cellspacing="0">
-            <thead>
-                <tr>
-                    <th>&nbsp;</th>
-                    <th>Node ID</th>
-                    <th>Role</th>
-                    <th>Shards</th>
-                    <th>Status page</th>
-                    <th>Metrics</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr v-for="member in members">
-                    <td :bgcolor="toColor(member.nodeId)">&nbsp;&nbsp;</td>
-                    <td>{{ member.nodeId }} </td>
-                    <td v-if="member.leader">Leader</td>
-                    <td v-if="!member.leader">Follower</td>
-                    <td> {{ member.shards }}</td>
-                    <td><a :href="member.httpEndpoint">{{ member.httpEndpoint }}</a></td>
-                    <td><a v-on:click="showMetrics(member.metricsEndpoint)" href="#">{{ member.metricsEndpoint }}</a>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-        <h2>State history</h2>
-        <table border="1" cellspacing="0">
-            <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>State</th>
-                    <th>Role</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr v-for="status in statusHistory">
-                    <td>{{status.time.toISOString().substr(11,12)}}</td>
-                    <td>{{status.state}}</td>
-                    <td>{{status.role}}</td>
-                </tr>
-            </tbody>
-        </table>
-        <h2>Metrics</h2>
-        <table border="1" cellspacing="0">
-            <thead>
-                <th>Name</th>
-                <th>Value</th>
-            </thead>
-            <tbody>
-                <tr v-for="metric in metrics">
-                    <td>{{metric.name}}</td>
-                    <td>{{metric.value}}</td>
-                </tr>
-            </tbody>
-        </table>
     </div>
     <script src="utils.js"></script>
     <script src="cluster_network.js"></script>

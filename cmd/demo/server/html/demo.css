@@ -1,31 +1,146 @@
+/* body style */
+body {
+    font-family: sans-serif;
+    font-size: 14pt;
+    background-color: #eeeeee;
+}
+
+/* generic (svg) chart style */
+svg.chart {
+    background-color: #fefefe;
+}
+
+/* square charts */
+svg.square {
+    position: relative;
+    width: 100%;
+    padding-top: 100%;
+    height: 0;
+}
+
+/* rectangular charts */
+svg.rect {
+    position: relative;
+    width: 100%;
+    padding-top: 30%;
+    height: 0;
+}
+
+/* Top heading */
 div.heading {
-    border: solid 1px silver;
-    display: flex;
-	flex-direction: row;
-	flex-wrap: nowrap;
-	justify-content: space-between;
-	align-items: stretch;
-	align-content: stretch;
-
-}
-div.chart {
-	display: flex;
-	flex-direction: row;
-	flex-wrap: nowrap;
-	justify-content: flex-start;
-	align-items: stretch;
-	align-content: stretch;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3em;
+    padding: 1em;
 }
 
-span.node-rect {
-    display:block;
-    width:40px;
-    height:40px;
+div.websocket-status {
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    width: 200px;
+    background-color: darkgreen;
+    color: white;
+    border-radius: 8px;
+    text-align: center;
+    padding-top: 0.5em;
+    padding-bottom: 0.5em;
+}
+
+/* image inside heading */
+div.heading img {
+    padding-right: 1em;
+    width: 352px;
+    height: 62px;
+}
+
+/* fields inside the heading */
+div.heading span {
+    border: solid 1px black;
+    padding: 1em;
+}
+
+/* content block - ie area under heading */
+div.content {
+    background-color: orange;
+    margin: 5em 1em 1em 1em;
+    padding: 1em;
+    border-radius: 1em;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+
+}
+
+/* boxes in content */
+div.section {
+    border: solid 1px black;
+    margin: 0.5em;
+    padding: 1em;
+    background-color: #eeeeee;
+    border-radius: 0.5em;
+}
+
+/* headings inside blocks */
+div.section h2 {
+    margin: 0;
+    font-size: 16pt;
+}
+
+/* extra tall grid element */
+div.tall {
+    grid-row: span 2
+}
+
+/* extra wide content */
+div.wide {
+    grid-column: span 2
+}
+
+table {
+    width: 100%;
+    border-spacing: 0;
+    border-collapse: collapse;
+}
+
+th {
+    background-color: silver;
+    padding: .5em;
+}
+tr:nth-child(2) {
+    background-color: silver;
+}
+
+
+/* node info pane - it's a cell grid of its own */
+div.node-info {
+    display: grid;
+    align-items: stretch;
+/*    justify-items: center; */
+    height: 100%;
+    grid-template-columns: repeat(6, 1fr);
+    grid-template-rows: 1fr 1fr;
+}
+div.node-info-id {
+    font-size: 18pt;
+    font-weight: bold;
+    text-align: center;
+    grid-column: span 5;
+    margin-top: auto;
+    margin-bottom: auto;
+}
+
+div.node-info-state,div.node-info-role {
+    grid-column: span 3;
+    text-align: center;
+    margin-top: auto;
+    margin-bottom: auto;
+    font-weight: bold;
+}
+
+div.node-info-label {
     border-radius: 4px;
     border: solid 1px black;
-}
-
-span.node-title {
-    font-size: 24pt;
-    padding-left: 1em;
+    background-color: salmon;
 }
