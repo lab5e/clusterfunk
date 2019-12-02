@@ -1,14 +1,16 @@
+/*jslint es6 */
+"use strict";
+
 let requestData = [];
 let lastRequestCount = 0;
 const maxRequests = 50;
 const requestMargins = { top: 5, left: 30, right: 5, bottom: 30 };
-const requestSize = { width: 600, height: 200 };
 
 function updateRequestCount(metrics) {
     let sum = 0;
-    metrics.forEach(d => {
+    metrics.forEach((d) => {
         sum += d.count;
-    })
+    });
     if (requestData.length == 0) {
         for (let i = 0; i < maxRequests; i++) {
             requestData.push({ value: i % 2 });
@@ -23,7 +25,9 @@ function updateRequestCount(metrics) {
 }
 
 function updateRequestChart(data) {
-    const svg = d3.select('#requestChart');
+    const container = d3.select('#node-request-container').node().getBoundingClientRect();
+    const requestSize = { width: container.width, height: container.height };
+    const svg = d3.select('#node-request');
 
     const xScale = d3.scaleTime()
         .domain(d3.extent(data, d => d.time))
@@ -36,7 +40,7 @@ function updateRequestChart(data) {
         .range([requestSize.height - requestMargins.bottom, requestMargins.top]);
 
 
-    const yAxis = d3.axisLeft(yScale);
+    const yAxis = d3.axisLeft(yScale).ticks(5);
 
     const line = d3.line()
         .defined(d => !isNaN(d.time))
@@ -48,7 +52,7 @@ function updateRequestChart(data) {
         .data([data])
         .join('path')
         .attr('fill', 'none')
-        .attr('stroke', nodeIdToColor(app.nodeId))
+        .attr('stroke', nodeIdToColor(status.nodeId))
         .attr('stroke-width', 2)
         .attr('d', line);
 

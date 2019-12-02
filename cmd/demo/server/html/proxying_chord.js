@@ -1,10 +1,17 @@
-window.setInterval(updateChord, 5000);
+/*jslint es6 */
+"use strict";
+const clusterRefreshRate = 5000;
+
+window.setInterval(updateChord, clusterRefreshRate);
 
 
 function updateChord() {
     let urls = [];
-    app.members.forEach(d => urls.push(d.metricsEndpoint));
-    retrieveAllMetrics(urls).then(showProxying);
+    status.members.forEach(d => urls.push(d.metricsEndpoint));
+    retrieveAllMetrics(urls).then((data) => {
+        showProxying(data);
+        updateClusterRequestCount(data);
+    });
 }
 
 function retrieveAllMetrics(urls) {
@@ -65,6 +72,12 @@ function addNodeToMatrix(nodeId) {
 }
 // Visualize proxy information
 function showProxying(proxyData) {
+    const container = d3.select('#chord-container').node().getBoundingClientRect()
+    const chordSize = { width: container.width, height: container.height };
+    const radiusSize = 10
+    const innerRadius = chordSize.width / 2 - radiusSize;
+    const outerRadius = chordSize.width / 2;
+
     // We have a list of metrics for all nodes. Build the matrix.
     // build the list of names and mappings
     proxyData.forEach(line => {
@@ -84,21 +97,16 @@ function showProxying(proxyData) {
             chordData.matrix[i1][i2] = d.count;
         })
     });
+    d3.select('#cluster-chord').attr('viewBox', `0 0 ${chordSize.width} ${chordSize.height}`);
 
-    const chordMargins = { top: 10, bottom: 10, left: 10, right: 10 };
-    const chordSize = { width: 400, height: 400 };
-    const radiusSize = 10
-    const innerRadius = chordSize.width / 2 - radiusSize;
-    const outerRadius = chordSize.width / 2;
+    d3.select('#cluster-chord').select('g.contents').remove();
 
-    d3.select('#proxyingChart').select('g.contents').remove();
-
-    d3.select('#proxyingChart')
+    d3.select('#cluster-chord')
         .append('g')
         .attr('class', 'contents')
         .attr('transform', `translate(${chordSize.width / 2},${chordSize.height / 2})`);
 
-    let svg = d3.select('#proxyingChart').select('g.contents');
+    let svg = d3.select('#cluster-chord').select('g.contents');
 
     const arc = d3.arc()
         .innerRadius(innerRadius)

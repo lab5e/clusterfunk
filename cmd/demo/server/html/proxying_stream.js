@@ -1,7 +1,7 @@
 /* stream graph for proxying */
 function pollMetrics() {
-    app.members.forEach(m => {
-        if (m.nodeId == app.nodeId) {
+    status.members.forEach(m => {
+        if (m.nodeId == status.nodeId) {
             axios.get(m.metricsEndpoint).then(resp => {
                 let metrics = metricsData(resp.data);
                 updateProxyData(metrics);
@@ -13,8 +13,6 @@ function pollMetrics() {
 }
 
 window.setInterval(pollMetrics, 1000);
-const flowChartWidth = 600;
-const flowChartHeight = 200;
 const maxSampleCount = 50;
 const flowMargins = { left: 35, top: 20, right: 0, bottom: 20 };
 
@@ -40,7 +38,6 @@ function updateProxyData(metrics) {
     }
 
     // Calculate difference, if none -- skip it.
-    let changes = 0;
     let newElement = {};
 
     for (var prop in currentCount) {
@@ -51,7 +48,6 @@ function updateProxyData(metrics) {
             currentCount[prop] = 0;
         }
         newElement[prop] = newItem[prop] - currentCount[prop]
-        changes += newElement[prop]
     }
     proxyData.push(newElement);
     currentCount = newItem;
@@ -89,6 +85,10 @@ function domainY(data) {
 }
 
 function updateFlowChart(data) {
+    const container = d3.select('#node-proxy-container').node().getBoundingClientRect();
+    const flowChartWidth = container.width;
+    const flowChartHeight = container.height;
+
     streamKeys = dataKeys(data);
 
     let stack = d3.stack().keys(streamKeys).value((d, key) => {
@@ -111,7 +111,7 @@ function updateFlowChart(data) {
         .y0((d) => yScale(d[0]))
         .y1((d) => yScale(d[1]));
 
-    const svg = d3.select('#proxyStream').select('g.plot');
+    const svg = d3.select('#node-proxy').select('g.plot');
     svg.selectAll("path")
         .data(series)
         .join("path")
@@ -120,11 +120,11 @@ function updateFlowChart(data) {
         .on("mouseover", (d, i) => setActive(streamKeys[i]))
         .on("mouseout", (d) => setActive(''));
 
-    d3.select('#proxyStream').select('g.yaxis').call(d3.axisLeft(yScale).ticks(4, "%"));
+    d3.select('#node-proxy').select('g.yaxis').call(d3.axisLeft(yScale).ticks(4, "%"));
 }
 
 function setupFlowChart() {
-    d3.select('#proxyStream')
+    d3.select('#node-proxy')
         .append('g')
         .attr('class', 'yaxis')
         .attr('transform', `translate(${flowMargins.left},0)`);

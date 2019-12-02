@@ -7,11 +7,13 @@ body {
 
 /* generic (svg) chart style */
 svg.chart {
-    background-color: #fefefe;
+    position: absolute;
+    top: 0;
+    width: 100%;
 }
 
 /* square charts */
-svg.square {
+.square {
     position: relative;
     width: 100%;
     padding-top: 100%;
@@ -19,7 +21,7 @@ svg.square {
 }
 
 /* rectangular charts */
-svg.rect {
+.rect {
     position: relative;
     width: 100%;
     padding-top: 30%;
@@ -41,12 +43,19 @@ div.websocket-status {
     top: 10px;
     right: 20px;
     width: 200px;
-    background-color: darkgreen;
-    color: white;
     border-radius: 8px;
     text-align: center;
     padding-top: 0.5em;
     padding-bottom: 0.5em;
+    background-color: darkgrey;
+    color: white;
+}
+
+div.active {
+    background-color: darkgreen;
+}
+div.inactive {
+    background-color: red;
 }
 
 /* image inside heading */
@@ -105,13 +114,15 @@ table {
 }
 
 th {
-    background-color: silver;
+    background-color:#dddddd;
     padding: .5em;
 }
-tr:nth-child(2) {
+td {
+    padding: 0.5em;
+}
+tr:hover {
     background-color: silver;
 }
-
 
 /* node info pane - it's a cell grid of its own */
 div.node-info {

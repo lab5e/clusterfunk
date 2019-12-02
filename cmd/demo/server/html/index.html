@@ -1,50 +1,69 @@
 <!doctype html>
-<!-- this is a template for the web server -->
 <html>
 
 <head>
     <title>Cluster status</title>
     <link rel="icon" type="image/png" href="cf_icon.png">
     <link rel="stylesheet" href="demo.css">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-
-    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
     <script src="https://d3js.org/d3.v5.min.js"></script>
 </head>
 
 <body>
-    <div id="demoApp">
-        <div class="heading">
-            <div style="flex: 0 1 auto;">
-                <img src="clusterfunk_logo.png" />
-            </div>
-            <div style="flex: 2 1 auto;">
-                <span class=" node-rect" :style="'background-color:'+toColor(nodeId)">
+    <div class="heading">
+        <img src="clusterfunk_logo.png" />
+    </div>
+    <div class="websocket-status" id="websocket-container">
+        <span id="websocket">unknown</span>
+    </div>
 
-                </span><span class="node-title">Node {{ nodeId }}: {{ state }} {{ role }} </span>
-            </div>
-            <div>
-                <span>{{ websocketStatus }}</span>
-            </div>
-        </div>
-
-        <div class="cluster">
-            <div>
-                <h1>Cluster</h1>
-                <svg id="clusterNetwork">
-                    <g id="clusterLinks"></g>
-                    <g id="clusterNodes"></g>
+    <div class="content">
+        <div class="section tall">
+            <h2>Network</h2>
+            <div class="square" id="network-container">
+                <svg id="cluster-network" class="chart">
+                    <g id="cluster-links"></g>
+                    <g id="cluster-nodes"></g>
                 </svg>
             </div>
-            <div>
+            <p>This is the cluster layout.</p>
+        </div>
 
-                <h1>Cluster proxying</h1>
-                <svg id="proxyingChart"></svg>
+        <div class="section tall">
+            <h2>Proxying</h2>
+            <div class="square" id="chord-container">
+                <svg id="cluster-chord" class="chart">
+
+                </svg>
             </div>
+            <p>This shows the number of request proxied between each node in
+                the cluster. The size of the link from the node is proportional
+                to the number of requests handled by that node.</p>
+        </div>
 
-            <h2>Cluster members</h2>
-            <table border="1" cellspacing="0">
+        <div class="section">
+            <h2>Cluster requests</h2>
+            <div id="cluster-request-container" class="rect">
+                <svg id="cluster-request" class="chart">
+                    <g class="xaxis"></g>
+                    <g class="plot"> </g>
+                    <g class="yaxis"></g>
+                </svg>
+            </div>
+            <p>
+                This shows the number of requests handled by the entire cluster.
+            </p>
+        </div>
+        <div class="section">
+            <div class="node-info">
+                <div class="node-info-label" id="node-color"></div>
+                <div class="node-info-id" id="node-id">ID: fabacada0102</div>
+                <div class="node-info-state" id="node-state">Operational</div>
+                <div class="node-info-role" id="node-role">Leader</div>
+            </div>
+        </div>
+        <div class="section tall wide">
+            <table>
                 <thead>
                     <tr>
                         <th>&nbsp;</th>
@@ -55,75 +74,58 @@
                         <th>Metrics</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <tr v-for="member in members">
-                        <td :bgcolor="toColor(member.nodeId)">&nbsp;&nbsp;</td>
-                        <td>{{ member.nodeId }} </td>
-                        <td v-if="member.leader">Leader</td>
-                        <td v-if="!member.leader">Follower</td>
-                        <td> {{ member.shards }}</td>
-                        <td><a :href="member.httpEndpoint">{{ member.httpEndpoint }}</a></td>
-                        <td><a v-on:click="showMetrics(member.metricsEndpoint)"
-                                href="#">{{ member.metricsEndpoint }}</a>
-                        </td>
-                    </tr>
+                <tbody id="member-table">
+                    <!--                    <tr>
+                        <td>&nbsp;&nbsp;</td>
+                        <td>Node 1 </td>
+                        <td>Leader</td>
+                        <td>10000</td>
+                        <td><a href="#">Status page</a></td>
+                        <td><a href="#">Metrics</a></td>
+                    </tr>-->
                 </tbody>
             </table>
-            <h2>State history</h2>
-            <table border="1" cellspacing="0">
-                <thead>
-                    <tr>
-                        <th>Time</th>
-                        <th>State</th>
-                        <th>Role</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="status in statusHistory">
-                        <td>{{status.time.toISOString().substr(11,12)}}</td>
-                        <td>{{status.state}}</td>
-                        <td>{{status.role}}</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <h2>Metrics</h2>
-            <table border="1" cellspacing="0">
-                <thead>
-                    <th>Name</th>
-                    <th>Value</th>
-                </thead>
-                <tbody>
-                    <tr v-for="metric in metrics">
-                        <td>{{metric.name}}</td>
-                        <td>{{metric.value}}</td>
-                    </tr>
-                </tbody>
-            </table>
-
+            <p>This list shows all members in the cluster</p>
         </div>
 
-        <div class="node">
-            <div>
-                <h1>Proxying on local node</h1>
-                <svg id="proxyStream">
+        <div class="section">
+            <h2>Proxying on local node</h2>
+            <div id="node-proxy-container" class="rect">
+                <svg id="node-proxy" class="chart">
                     <g class="plot"></g>
                 </svg>
-
-                <h1>Requests on local node</h1>
-                <svg id="requestChart">
+            </div>
+            <p>
+                This shows the number of proxied requests on the local node.
+            </p>
+        </div>
+        <div class="section">
+            <h2>Requests on local node</h2>
+            <div id="node-request-container" class="rect">
+                <svg id="node-request" class="chart">
                     <g class="xaxis"></g>
                     <g class="plot"> </g>
                     <g class="yaxis"></g>
                 </svg>
             </div>
+            <p>This shows the number of requests handled by the local node.</p>
         </div>
     </div>
-    <script src="utils.js"></script>
-    <script src="cluster_network.js"></script>
-    <script src="proxying_chord.js"></script>
     <script src="proxying_stream.js"></script>
     <script src="local_requests.js"></script>
+    <script src="cluster_requests.js"></script>
+    <script src="utils.js"></script>
+    <script src="proxying_chord.js"></script>
+    <script src="cluster_network.js"></script>
     <script src="demo.js"></script>
+</body>
+<script>
+
+    window.addEventListener('load', (e) => {
+        // Document loaded
+        start();
+    });
+
+</script>
 
 </html>
