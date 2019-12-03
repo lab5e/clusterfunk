@@ -2,7 +2,7 @@
 body {
     font-family: sans-serif;
     font-size: 14pt;
-    background-color: #eeeeee;
+    background-color: #6AC5F4;
 }
 
 /* generic (svg) chart style */
@@ -73,21 +73,36 @@ div.heading span {
 
 /* content block - ie area under heading */
 div.content {
-    background-color: orange;
+    background-color: #FC510B;
+    border: solid 3px #36425C;
     margin: 5em 1em 1em 1em;
     padding: 1em;
     border-radius: 1em;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+}
 
+@media (min-width: 800px) {
+    div.content {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+@media (min-width: 1200px) {
+    div.content {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+@media (min-width: 1400px) {
+    div.content {
+        grid-template-columns: repeat(4, 1fr);
+    }
 }
 
 /* boxes in content */
 div.section {
-    border: solid 1px black;
+    border: solid 1px #36425C;
     margin: 0.5em;
     padding: 1em;
-    background-color: #eeeeee;
+    background-color: #F7F7F7;
     border-radius: 0.5em;
 }
 
@@ -128,7 +143,6 @@ tr:hover {
 div.node-info {
     display: grid;
     align-items: stretch;
-/*    justify-items: center; */
     height: 100%;
     grid-template-columns: repeat(6, 1fr);
     grid-template-rows: 1fr 1fr;

@@ -1,5 +1,6 @@
 /*jslint es6 */
 "use strict";
+
 const clusterRefreshRate = 5000;
 
 window.setInterval(updateChord, clusterRefreshRate);

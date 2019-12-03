@@ -4,7 +4,7 @@
 let requestData = [];
 let lastRequestCount = 0;
 const maxRequests = 50;
-const requestMargins = { top: 5, left: 30, right: 5, bottom: 30 };
+const requestMargins = { top: 5, left: 35, right: 5, bottom: 35 };
 
 function updateRequestCount(metrics) {
     let sum = 0;

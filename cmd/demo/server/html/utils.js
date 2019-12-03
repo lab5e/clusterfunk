@@ -1,8 +1,18 @@
-function recolorNetwork() {
-    d3.select('#clusterNetwork')
-        .select('#clusterNodes')
-        .selectAll('rect')
-        .attr("opacity", d => isActive(d.id) ? 1.0 : 0.2);
+/*jslint es6 */
+"use strict";
+
+const nodeColors = d3.scaleOrdinal(d3.schemeCategory10);
+
+let colorMap = [];
+let nodeCounter = 0;
+
+function nodeIdToColor(nodeId) {
+    let col = colorMap[nodeId];
+    if (!col) {
+        nodeCounter++;
+        colorMap[nodeId] = nodeCounter;
+    }
+    return nodeColors(colorMap[nodeId]);
 }
 
 let activeNodeId = '';

@@ -1,6 +1,8 @@
 /*jslint es6 */
 "use strict";
 
+
+
 const rectWidth = 25;
 const rectHeight = 25;
 function showCluster(members) {
@@ -8,8 +10,9 @@ function showCluster(members) {
     const clusterWidth = container.node().getBoundingClientRect().width;
     const clusterHeight = container.node().getBoundingClientRect().height;
 
-    let leaderId = "";
+    let leaderId = '';
     let nodes = [];
+
     members.forEach((d) => {
         if (d.leader) {
             leaderId = d.nodeId;
