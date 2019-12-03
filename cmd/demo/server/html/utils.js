@@ -1,7 +1,7 @@
 /*jslint es6 */
 "use strict";
 
-const nodeColors = d3.scaleOrdinal(d3.schemeCategory10);
+const nodeColors = d3.scaleOrdinal(d3.schemePaired);
 
 let colorMap = [];
 let nodeCounter = 0;
