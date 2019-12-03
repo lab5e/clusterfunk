@@ -1,3 +1,3 @@
 package http
 
-// go:generate go run assets_gen.go
+//go:generate go run -tags vfsgen assets_gen.go

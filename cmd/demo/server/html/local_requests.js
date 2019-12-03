@@ -4,7 +4,7 @@
 let requestData = [];
 let lastRequestCount = 0;
 const maxRequests = 50;
-const requestMargins = { top: 5, left: 35, right: 5, bottom: 35 };
+const requestMargins = { top: 5, left: 40, right: 5, bottom: 35 };
 
 function updateRequestCount(metrics) {
     let sum = 0;
@@ -18,7 +18,8 @@ function updateRequestCount(metrics) {
         lastRequestCount = sum;
         return;
     }
-    requestData.push({ time: new Date(), value: (sum - lastRequestCount) });
+    let rps = (sum - lastRequestCount) / (nodeSampleInterval / 1000);
+    requestData.push({ time: new Date(), value: Math.max(0, rps) });
     requestData.shift();
     lastRequestCount = sum;
     updateRequestChart(requestData);
@@ -35,8 +36,11 @@ function updateRequestChart(data) {
 
     const xAxis = d3.axisBottom(xScale).ticks(5, d3.timeFormat("%H:%M:%S"));
 
+    let dom = d3.extent(data, d => d.value)
+    dom[0] = 0;
+    dom[1] = Math.max(dom[1], 10);
     const yScale = d3.scaleLinear()
-        .domain(d3.extent(data, d => d.value))
+        .domain(dom)
         .range([requestSize.height - requestMargins.bottom, requestMargins.top]);
 
 

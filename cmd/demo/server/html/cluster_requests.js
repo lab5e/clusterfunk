@@ -5,7 +5,7 @@ let clusterRequestState = {
     requestData: [],
     lastRequestCount: 0,
     maxRequests: 50,
-    margins: { top: 5, left: 35, bottom: 35, right: 5 }
+    margins: { top: 5, left: 40, bottom: 35, right: 5 }
 };
 
 function updateClusterRequestCount(metrics) {
@@ -17,7 +17,7 @@ function updateClusterRequestCount(metrics) {
             sum += d.count;
         }
     }));
-    let count = (sum - clusterRequestState.lastRequestCount) / (clusterRefreshRate / 1000);
+    let count = Math.max(0, (sum - clusterRequestState.lastRequestCount) / (clusterRefreshRate / 1000));
     clusterRequestState.lastRequestCount = sum;
 
 
@@ -44,8 +44,12 @@ function updateClusterRequestChart(data) {
 
     const xAxis = d3.axisBottom(xScale).ticks(5, d3.timeFormat("%H:%M:%S"));
 
+    let dom = d3.extent(data, d => d.value)
+    dom[0] = 0;
+    dom[1] = Math.max(dom[1], 10);
+
     const yScale = d3.scaleLinear()
-        .domain(d3.extent(data, d => d.value))
+        .domain(dom)
         .range([requestSize.height - clusterRequestState.margins.bottom, clusterRequestState.margins.top]);
 
 

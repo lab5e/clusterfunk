@@ -64,8 +64,8 @@ func main() {
 	setupLogging()
 
 	demoServerEndpoint := toolbox.RandomPublicEndpoint()
-	webserverEndpoint = toolbox.RandomLocalEndpoint()
-	metricsEndpoint = toolbox.RandomLocalEndpoint()
+	webserverEndpoint = toolbox.RandomPublicEndpoint()
+	metricsEndpoint = toolbox.RandomPublicEndpoint()
 
 	gohttp.Handle("/metrics", rest.AddCORSHeaders(promhttp.Handler().ServeHTTP))
 	go func() {

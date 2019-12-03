@@ -11,8 +11,8 @@ function pollMetrics() {
         }
     });
 }
-
-window.setInterval(pollMetrics, 1000);
+const nodeSampleInterval = 1000;
+window.setInterval(pollMetrics, nodeSampleInterval);
 const maxSampleCount = 50;
 const flowMargins = { left: 35, top: 20, right: 0, bottom: 20 };
 

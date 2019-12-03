@@ -28,5 +28,7 @@ lint:
 # Make sure you have the latest version locally. If you have an older version it will give you complation errors.
 linux:
 	docker run --rm -it -v ${GOPATH}:/go -v $(CURDIR):/clusterfunk -w /clusterfunk/cmd dockercore/golang-cross:latest sh -c '\
-	   cd demo/server && echo Demo server...     && GOOS=linux GOARCH=amd64 go build -installsuffix cgo -o ../../../bin/demo.linux'
+	   cd demo/server && echo Demo server...     && GOOS=linux GOARCH=amd64 go build -installsuffix cgo -o ../../../bin/demo.linux  \
+	&& cd ../client && echo Demo client...       && GOOS=linux GOARCH=amd64 go build -installsuffix cgo -o ../../../bin/client.linux \
+	&& cd ../../ctrlc && echo Ctrlc...           && GOOS=linux GOARCH=amd64 go build -installsuffix cgo -o ../../bin/ctrl.linux'
 
