@@ -20,10 +20,10 @@ import (
 	"math/rand"
 	"net"
 
-	"github.com/stalehd/clusterfunk/cmd/demo"
-	"github.com/stalehd/clusterfunk/pkg/funk"
-	"github.com/stalehd/clusterfunk/pkg/funk/sharding"
-	"github.com/stalehd/clusterfunk/pkg/serverfunk"
+	"github.com/ExploratoryEngineering/clusterfunk/cmd/demo"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/sharding"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/serverfunk"
 
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"

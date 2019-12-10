@@ -17,8 +17,8 @@ package clientfunk
 import (
 	"time"
 
-	"github.com/stalehd/clusterfunk/pkg/funk"
-	"github.com/stalehd/clusterfunk/pkg/toolbox"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
 )
 
 // ZeroconfManagementLookup does a lookup in Zeroconf to find endpoints. The cluster

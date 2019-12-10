@@ -24,8 +24,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/stalehd/clusterfunk/pkg/funk/clustermgmt"
-	"github.com/stalehd/clusterfunk/pkg/toolbox"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/clustermgmt"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"

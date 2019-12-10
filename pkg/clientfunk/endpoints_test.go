@@ -20,8 +20,8 @@ import (
 	"net"
 	"testing"
 
-	"github.com/stalehd/clusterfunk/pkg/funk/clustermgmt"
-	"github.com/stalehd/clusterfunk/pkg/toolbox"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/clustermgmt"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 )

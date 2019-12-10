@@ -18,7 +18,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/stalehd/clusterfunk/pkg/toolbox"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
 )
 
 // ackCollection handles acknowledgement and timeouts on acknowledgements

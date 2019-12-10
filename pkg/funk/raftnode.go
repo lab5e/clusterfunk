@@ -20,7 +20,7 @@ import (
 	"io"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/stalehd/clusterfunk/pkg/toolbox"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
 
 	"net"
 	"os"

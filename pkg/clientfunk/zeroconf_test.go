@@ -17,8 +17,8 @@ package clientfunk
 import (
 	"testing"
 
-	"github.com/stalehd/clusterfunk/pkg/funk"
-	"github.com/stalehd/clusterfunk/pkg/toolbox"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
 	"github.com/stretchr/testify/require"
 )
 

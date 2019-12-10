@@ -26,10 +26,10 @@ import (
 	"github.com/ExploratoryEngineering/params"
 
 	"github.com/aclements/go-moremath/stats"
-	"github.com/stalehd/clusterfunk/cmd/demo"
-	"github.com/stalehd/clusterfunk/pkg/clientfunk"
-	"github.com/stalehd/clusterfunk/pkg/funk"
-	"github.com/stalehd/clusterfunk/pkg/toolbox"
+	"github.com/ExploratoryEngineering/clusterfunk/cmd/demo"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/clientfunk"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
 )
 
 type parameters struct {

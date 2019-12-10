@@ -23,9 +23,9 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/stalehd/clusterfunk/pkg/funk"
-	"github.com/stalehd/clusterfunk/pkg/funk/sharding"
-	"github.com/stalehd/clusterfunk/pkg/toolbox"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/sharding"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
 )
 
 const numShards = 10000

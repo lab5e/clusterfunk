@@ -11,13 +11,20 @@ A silver bullet.
 
 ## Requirements
 
-clusterfunk requires Go version 1.12 or later.
+clusterfunk requires Go version 1.12 or later. You'll need a few linters to
+run the lint target but you can build a version with `make nolint` which will
+just run the tests and build the binaries.
 
 ## Building
 
-This library requires a fairly recent version of Go, at least 1.12. If you are modifying the protobuffer files you'll need the protoc compiler. The generated files are included in the source tree so you won't need it unless you use `make generate` (or `go generate ./...`).
+This library requires a fairly recent version of Go, at least 1.12. If you are
+modifying the protobuffer files you'll need the protoc compiler. The generated
+files are included in the source tree so you won't need it unless you use
+`make generate` (or `go generate ./...`).
 
-Run `make` to build the demo service. The build uses a host of checkers (golint, go vet, staticcheck, revive and golangci-lint) so you might get some errors if you miss one or more of those.
+Run `make` to build the demo service. The build uses a host of checkers (golint,
+go vet, staticcheck, revive and golangci-lint) so you might get some errors if
+you miss one or more of those.
 
 Get them the usual way:
 

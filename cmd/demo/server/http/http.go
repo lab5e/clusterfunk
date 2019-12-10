@@ -19,8 +19,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/stalehd/clusterfunk/pkg/funk"
-	"github.com/stalehd/clusterfunk/pkg/funk/sharding"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/sharding"
 
 	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"

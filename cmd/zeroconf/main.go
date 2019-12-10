@@ -21,7 +21,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/stalehd/clusterfunk/pkg/toolbox"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
 )
 
 func registerService(name string) {

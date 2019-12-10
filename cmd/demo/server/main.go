@@ -21,17 +21,17 @@ import (
 	"runtime/pprof"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/stalehd/clusterfunk/cmd/demo/server/grpcserver"
+	"github.com/ExploratoryEngineering/clusterfunk/cmd/demo/server/grpcserver"
 
 	golog "log"
 
 	"github.com/ExploratoryEngineering/params"
 	"github.com/ExploratoryEngineering/rest"
 	log "github.com/sirupsen/logrus"
-	"github.com/stalehd/clusterfunk/cmd/demo/server/http"
-	"github.com/stalehd/clusterfunk/pkg/funk"
-	"github.com/stalehd/clusterfunk/pkg/funk/sharding"
-	"github.com/stalehd/clusterfunk/pkg/toolbox"
+	"github.com/ExploratoryEngineering/clusterfunk/cmd/demo/server/http"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/sharding"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
 )
 
 const numShards = 10000

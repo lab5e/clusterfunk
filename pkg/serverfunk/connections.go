@@ -18,10 +18,10 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/stalehd/clusterfunk/pkg/funk"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
 
 	"github.com/sirupsen/logrus"
-	"github.com/stalehd/clusterfunk/pkg/funk/sharding"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/sharding"
 	"google.golang.org/grpc"
 )
 

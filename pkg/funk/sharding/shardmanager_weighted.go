@@ -20,7 +20,7 @@ import (
 	"sync"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/stalehd/clusterfunk/pkg/funk/sharding/shardpb"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/sharding/shardpb"
 )
 
 type nodeData struct {

@@ -21,15 +21,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stalehd/clusterfunk/pkg/funk/metrics"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/metrics"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/stalehd/clusterfunk/pkg/funk/clusterproto"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/clusterproto"
 
-	"github.com/stalehd/clusterfunk/pkg/funk/sharding"
-	"github.com/stalehd/clusterfunk/pkg/toolbox"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/sharding"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
 	"google.golang.org/grpc"
 )
 

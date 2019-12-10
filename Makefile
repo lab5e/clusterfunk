@@ -1,4 +1,6 @@
-all: test bins lint
+all: nolint lint
+
+nolint: test bins
 
 clean:
 	go clean

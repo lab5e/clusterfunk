@@ -17,8 +17,8 @@ package serverfunk
 import (
 	"context"
 
-	"github.com/stalehd/clusterfunk/pkg/funk"
-	"github.com/stalehd/clusterfunk/pkg/funk/metrics"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/metrics"
 
 	"google.golang.org/grpc"
 )

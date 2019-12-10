@@ -1,4 +1,4 @@
-module github.com/stalehd/clusterfunk
+module github.com/ExploratoryEngineering/clusterfunk
 
 go 1.12
 
@@ -29,6 +29,3 @@ require (
 	google.golang.org/grpc v1.24.0
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 )
-
-// Using a non-pushed version of Raft here.
-//replace github.com/hashicorp/raft v1.1.1 => github.com/stalehd/raft v1.1.2-0.20190926134415-e3913cefd917

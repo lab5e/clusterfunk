@@ -19,9 +19,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/stalehd/clusterfunk/pkg/toolbox"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
 
-	"github.com/stalehd/clusterfunk/pkg/funk"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
 )
 
 var eps = []string{
