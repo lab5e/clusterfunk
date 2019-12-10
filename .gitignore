@@ -4,3 +4,4 @@ tests/
 *.csv
 
 docker/demo/demo.linux
+.DS_Store
