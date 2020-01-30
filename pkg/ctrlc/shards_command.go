@@ -13,8 +13,8 @@ type ShardsCommand struct {
 }
 
 // Run shows the current shard distribution in the cluster
-func (c *ShardsCommand) Run(param *Command) error {
-	client := connectToManagement(param)
+func (c *ShardsCommand) Run(args RunContext) error {
+	client := connectToManagement(args.ServerParameters())
 	if client == nil {
 		return errStd
 	}

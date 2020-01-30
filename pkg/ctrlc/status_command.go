@@ -13,8 +13,8 @@ type StatusCommand struct {
 }
 
 // Run executes the status operation
-func (c *StatusCommand) Run(param *Command) error {
-	client := connectToManagement(param)
+func (c *StatusCommand) Run(args RunContext) error {
+	client := connectToManagement(args.ServerParameters())
 	if client == nil {
 		return errStd
 	}

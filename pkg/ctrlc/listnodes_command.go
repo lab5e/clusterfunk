@@ -13,8 +13,8 @@ type ListNodesCommand struct {
 }
 
 // Run executes the list nodes command
-func (c *ListNodesCommand) Run(params *Command) error {
-	client := connectToManagement(params)
+func (c *ListNodesCommand) Run(args RunContext) error {
+	client := connectToManagement(args.ServerParameters())
 	if client == nil {
 		return errStd
 	}

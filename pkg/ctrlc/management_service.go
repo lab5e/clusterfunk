@@ -13,7 +13,7 @@ import (
 
 const gRPCTimeout = 10 * time.Second
 
-func connectToManagement(params *Command) clustermgmt.ClusterManagementClient {
+func connectToManagement(params ManagementServerParameters) clustermgmt.ClusterManagementClient {
 	if params.Endpoint == "" && params.Zeroconf {
 		if params.ClusterName == "" {
 			fmt.Fprintf(os.Stderr, "Needs a cluster name if zeroconf is to be used for discovery")

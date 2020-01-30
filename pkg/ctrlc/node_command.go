@@ -18,15 +18,15 @@ type NodeCommand struct {
 type addNodeCommand struct {
 }
 
-func (c *addNodeCommand) Run(param *Command) error {
-	client := connectToManagement(param)
+func (c *addNodeCommand) Run(args RunContext) error {
+	client := connectToManagement(args.ServerParameters())
 	if client == nil {
 		return errStd
 	}
 	ctx, done := context.WithTimeout(context.Background(), gRPCTimeout)
 	defer done()
 	res, err := client.AddNode(ctx, &clustermgmt.AddNodeRequest{
-		NodeId: param.Node.ID,
+		NodeId: args.Commands().Node.ID,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error adding node: %v\n", err)
@@ -36,15 +36,15 @@ func (c *addNodeCommand) Run(param *Command) error {
 		fmt.Fprintf(os.Stderr, "Leader could not add node: %v\n", res.Error.Message)
 		return errStd
 	}
-	fmt.Printf("Node %s added to cluster\n", param.Node.ID)
+	fmt.Printf("Node %s added to cluster\n", args.Commands().Node.ID)
 	return nil
 }
 
 type removeNodeCommand struct {
 }
 
-func (c *removeNodeCommand) Run(param *Command) error {
-	client := connectToManagement(param)
+func (c *removeNodeCommand) Run(args RunContext) error {
+	client := connectToManagement(args.ServerParameters())
 	if client == nil {
 		return errStd
 	}
@@ -52,7 +52,7 @@ func (c *removeNodeCommand) Run(param *Command) error {
 	ctx, done := context.WithTimeout(context.Background(), gRPCTimeout)
 	defer done()
 	res, err := client.RemoveNode(ctx, &clustermgmt.RemoveNodeRequest{
-		NodeId: param.Node.ID,
+		NodeId: args.Commands().Node.ID,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error removing node: %v\n", err)
@@ -62,7 +62,7 @@ func (c *removeNodeCommand) Run(param *Command) error {
 		fmt.Fprintf(os.Stderr, "Leader could not remove node: %v\n", res.Error.Message)
 		return errStd
 	}
-	fmt.Printf("Node %s removed from cluster\n", param.Node.ID)
+	fmt.Printf("Node %s removed from cluster\n", args.Commands().Node.ID)
 
 	return nil
 }

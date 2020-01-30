@@ -33,7 +33,7 @@ func main() {
 		}
 	}()
 
-	var param ctrlc.Command
+	var param ctrlc.Parameters
 	ctx := kong.Parse(&param,
 		kong.Name("ctrlc"),
 		kong.Description("Clusterfunk management CLI"),
@@ -42,8 +42,10 @@ func main() {
 			Compact: true,
 			Summary: true,
 		}))
-
-	if err := ctx.Run(&param); err != nil {
+	// This binds the interface ctrlc.RunContext to the implementation we're
+	// using.
+	ctx.BindTo(ctrlc.NewRunContext(param), (*ctrlc.RunContext)(nil))
+	if err := ctx.Run(); err != nil {
 		// Won't print the error since the commands will do it
 		os.Exit(1)
 	}
