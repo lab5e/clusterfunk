@@ -4,24 +4,28 @@ This tool is used to manage the cluster nodes via gRPC.
 
 ## Usage
 
-```ctrlc [args] [command] [command args]```
+```text
+Usage: ctrlc <command>
 
-...where `args` is zero or more of:
+Clusterfunk management CLI
 
-* `--cluster-name [string]` - name of cluster. Default is `demo`
-* `--zeroconf [bool]`  -- use zeroconf to locate nodes. Default is `true`
-* `--endpoint [string]` -- management endpoint to use. This will not use zeroconf and ignore the cluster name parameter.
+Flags:
+      --help                          Show context-sensitive help.
+  -n, --cluster-name="clusterfunk"    Cluster name
+  -z, --zeroconf                      Use zeroconf discovery for Serf
+  -e, --endpoint=STRING               gRPC management endpoint
+  -T, --tls                           TLS enabled for gRPC
+  -C, --cert-file=STRING              Client certificate for management service
+  -H, --hostname-override=STRING      Host name override for certificate
 
-...and `command` is one of:
+Commands:
+  status       Show the node status
+  nodes        List the nodes in the cluster
+  endpoints    List endpoints known by the node
+  node add     Add node to cluster
+  node rm      Remove node from cluster
+  shards       Show the shards in the cluster
+  step-down    Step down as the current leader
 
-* `status` -- show status of cluster.
-* `nodes` -- list nodes in cluster. The cluster must be operational.
-* `endpoints [name]` -- list endpoints. If name is omitted all known endpoints will be listed.
-* `add-node [id]` - add a Raft node to the cluster. Node ID is required and the node must have joined the Serf cluster. The node will be added immediately and the cluster will start resharding. The cluster must be operational.
-* `remove-node [id]` -- remove a Raft node from the cluster. Node ID is required. The node will be drained and removed immediately and the cluster will start resharding. The cluster must be operational.
-* `shards` -- list shard distribution per node in the cluster. The cluster must be operational.
-* `step-down` -- force a re-election in the cluster. The cluster must be operational.
-
-The default is to use Zeroconf to locate the first management endpoint. Note that the node might be unavailable.
-
-Care should be taken when using this tool. It might make the cluster unavailable (particularly `remove-node` and `step-down`)
+Run "ctrlc <command> --help" for more information on a command.
+```
