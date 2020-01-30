@@ -24,7 +24,7 @@ type ManagementServerParameters struct {
 	Zeroconf         bool   `kong:"help='Use zeroconf discovery for Serf',default='true',short='z'"`
 	Endpoint         string `kong:"help='gRPC management endpoint',short='e'"`
 	TLS              bool   `kong:"help='TLS enabled for gRPC',short='T'"`
-	CertFile         string `kong:"help='Client certificate for management service',type='path',short='C'"`
+	CertFile         string `kong:"help='Client certificate for management service',type='existingfile',short='C'"`
 	HostnameOverride string `kong:"help='Host name override for certificate',short='H'"`
 }
 
