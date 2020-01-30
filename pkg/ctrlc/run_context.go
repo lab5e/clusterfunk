@@ -3,8 +3,8 @@ package ctrlc
 // RunContext is the context passed on to the subcommands. Override this when
 // reusing the commands in other projects.
 type RunContext interface {
-	ServerParameters() ManagementServerParameters
-	Commands() CommandList
+	ClusterServer() ManagementServerParameters
+	ClusterCommands() CommandList
 }
 
 // NewRunContext creates a new RunContext from the command
@@ -16,10 +16,10 @@ type internalRunContext struct {
 	params Parameters
 }
 
-func (i *internalRunContext) ServerParameters() ManagementServerParameters {
+func (i *internalRunContext) ClusterServer() ManagementServerParameters {
 	return i.params.Server
 }
 
-func (i *internalRunContext) Commands() CommandList {
+func (i *internalRunContext) ClusterCommands() CommandList {
 	return i.params.Commands
 }

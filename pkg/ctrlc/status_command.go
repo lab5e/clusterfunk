@@ -14,7 +14,7 @@ type StatusCommand struct {
 
 // Run executes the status operation
 func (c *StatusCommand) Run(args RunContext) error {
-	client := connectToManagement(args.ServerParameters())
+	client := connectToManagement(args.ClusterServer())
 	if client == nil {
 		return errStd
 	}

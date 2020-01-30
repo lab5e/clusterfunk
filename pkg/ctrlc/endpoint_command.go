@@ -16,7 +16,7 @@ type EndpointsCommand struct {
 
 // Run executes the endpoint command
 func (c *EndpointsCommand) Run(args RunContext) error {
-	client := connectToManagement(args.ServerParameters())
+	client := connectToManagement(args.ClusterServer())
 	if client == nil {
 		return errStd
 	}
@@ -24,7 +24,7 @@ func (c *EndpointsCommand) Run(args RunContext) error {
 	ctx, done := context.WithTimeout(context.Background(), gRPCTimeout)
 	defer done()
 
-	res, err := client.FindEndpoint(ctx, &clustermgmt.EndpointRequest{EndpointName: args.Commands().Endpoints.Filter})
+	res, err := client.FindEndpoint(ctx, &clustermgmt.EndpointRequest{EndpointName: args.ClusterCommands().Endpoints.Filter})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error searching for endpoint: %v\n", err)
 		return errStd

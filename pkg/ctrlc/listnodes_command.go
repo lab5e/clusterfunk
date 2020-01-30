@@ -14,7 +14,7 @@ type ListNodesCommand struct {
 
 // Run executes the list nodes command
 func (c *ListNodesCommand) Run(args RunContext) error {
-	client := connectToManagement(args.ServerParameters())
+	client := connectToManagement(args.ClusterServer())
 	if client == nil {
 		return errStd
 	}

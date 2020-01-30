@@ -14,7 +14,7 @@ type ShardsCommand struct {
 
 // Run shows the current shard distribution in the cluster
 func (c *ShardsCommand) Run(args RunContext) error {
-	client := connectToManagement(args.ServerParameters())
+	client := connectToManagement(args.ClusterServer())
 	if client == nil {
 		return errStd
 	}
