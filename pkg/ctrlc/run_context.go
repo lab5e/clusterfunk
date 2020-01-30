@@ -7,19 +7,3 @@ type RunContext interface {
 	ClusterCommands() CommandList
 }
 
-// NewRunContext creates a new RunContext from the command
-func NewRunContext(cmd Parameters) RunContext {
-	return &internalRunContext{params: cmd}
-}
-
-type internalRunContext struct {
-	params Parameters
-}
-
-func (i *internalRunContext) ClusterServer() ManagementServerParameters {
-	return i.params.Server
-}
-
-func (i *internalRunContext) ClusterCommands() CommandList {
-	return i.params.Commands
-}

@@ -44,7 +44,7 @@ func main() {
 		}))
 	// This binds the interface ctrlc.RunContext to the implementation we're
 	// using.
-	ctx.BindTo(ctrlc.NewRunContext(param), (*ctrlc.RunContext)(nil))
+	ctx.BindTo(&param, (*ctrlc.RunContext)(nil))
 	if err := ctx.Run(); err != nil {
 		// Won't print the error since the commands will do it
 		os.Exit(1)

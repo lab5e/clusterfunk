@@ -2,11 +2,6 @@ package ctrlc
 
 import "errors"
 
-// Parameters is the main parameter struct for the ctrlc utility
-type Parameters struct {
-	Server        ManagementServerParameters `kong:"embed"`
-	Commands CommandList `kong:"embed"`
-}
 
 // CommandList contains all of the commands for the ctrlc utility
 type CommandList struct {
@@ -26,6 +21,22 @@ type ManagementServerParameters struct {
 	TLS              bool   `kong:"help='TLS enabled for gRPC',short='T'"`
 	CertFile         string `kong:"help='Client certificate for management service',type='existingfile',short='C'"`
 	HostnameOverride string `kong:"help='Host name override for certificate',short='H'"`
+}
+
+// Parameters is the main parameter struct for the ctrlc utility
+type Parameters struct {
+	Server        ManagementServerParameters `kong:"embed"`
+	Commands CommandList `kong:"embed"`
+}
+
+// ClusterServer returns the management server parameters
+func (p *Parameters) ClusterServer() ManagementServerParameters {
+	return p.Server
+}
+
+// ClusterCommands returns the list of commands for the management utility
+func (p *Parameters) ClusterCommands() CommandList {
+	return p.Commands
 }
 
 // We won't be using the errors returned from the commands in Kong so this is
