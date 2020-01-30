@@ -1,4 +1,5 @@
 package funk
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -19,8 +20,8 @@ import (
 	"fmt"
 	"io"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
+	log "github.com/sirupsen/logrus"
 
 	"net"
 	"os"
@@ -108,11 +109,11 @@ func NewRaftNode() *RaftNode {
 
 // RaftParameters is the configuration for the Raft cluster
 type RaftParameters struct {
-	RaftEndpoint string `param:"desc=Endpoint for Raft;default="`
-	DiskStore    bool   `param:"desc=Disk-based store;default=false"`
-	Bootstrap    bool   `param:"desc=Bootstrap a new Raft cluster;default=false"`
-	Verbose      bool   `param:"desc=Verbose Raft logging;default=false"`
-	DebugLog     bool   `param:"desc=Show debug log messages for Raft;default=false"`
+	RaftEndpoint string `kong:"help='Endpoint for Raft',default=''"`
+	DiskStore    bool   `kong:"help='Disk-based store',default='false'"`
+	Bootstrap    bool   `kong:"help='Bootstrap a new Raft cluster',default='false'"`
+	Verbose      bool   `kong:"help='Verbose Raft logging',default='false'"`
+	DebugLog     bool   `kong:"help='Show debug log messages for Raft',default='false'"`
 }
 
 // Start launches the node

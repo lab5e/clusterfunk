@@ -4,7 +4,6 @@ go 1.12
 
 require (
 	github.com/ExploratoryEngineering/logging v0.0.0-20181106085733-dcb8702a004e // indirect
-	github.com/ExploratoryEngineering/params v1.0.0
 	github.com/ExploratoryEngineering/rest v0.0.0-20181001125504-5b79b712352a
 	github.com/aclements/go-moremath v0.0.0-20190830160640-d16893ddf098
 	github.com/alecthomas/kong v0.2.1

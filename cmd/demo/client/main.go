@@ -1,4 +1,5 @@
 package main
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -23,32 +24,40 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/ExploratoryEngineering/params"
-
-	"github.com/aclements/go-moremath/stats"
 	"github.com/ExploratoryEngineering/clusterfunk/cmd/demo"
 	"github.com/ExploratoryEngineering/clusterfunk/pkg/clientfunk"
 	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
 	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
+	"github.com/aclements/go-moremath/stats"
+	"github.com/alecthomas/kong"
 )
 
 type parameters struct {
-	Endpoints    string        `param:"desc=Comma-separated list of endpoints to use. Will use zeroconf to find the parameters"`
-	ClusterName  string        `param:"desc=Cluster name;default=clusterfunk"`
-	Repeats      int           `param:"desc=Number of times to repeat rpc call;default=50"`
-	Sleep        time.Duration `param:"desc=Sleep between invocations;default=100ms"`
-	PrintSummary bool          `param:"desc=Print summary when finished;default=true"`
-	ZeroConf     bool          `param:"desc=ZeroConf lookups for cluster;default=true"`
-	Retry        bool          `param:"desc=Do a single retry for failed requests;default=true"`
-	Serf         funk.SerfParameters
+	Endpoints    string              `kong:"help='Comma-separated list of endpoints to use. Will use zeroconf to find the parameters'"`
+	ClusterName  string              `kong:"help='Cluster name',default='clusterfunk'"`
+	Repeats      int                 `kong:"help='Number of times to repeat rpc call',default='50'"`
+	Sleep        time.Duration       `kong:"help='Sleep between invocations',default='100ms'"`
+	PrintSummary bool                `kong:"help='Print summary when finished',default='true'"`
+	ZeroConf     bool                `kong:"help='ZeroConf lookups for cluster',default='true'"`
+	Retry        bool                `kong:"help='Do a single retry for failed requests',default='true'"`
+	Serf         funk.SerfParameters `kong:"embed,prefix='serf-'"`
 }
 
 var config parameters
 
 func main() {
-	// Get the configuration. The defaults will run 50 calls, one call every 100 ms.
-	if err := params.NewEnvFlag(&config, os.Args[1:]); err != nil {
-		fmt.Println(err)
+	k, err := kong.New(&config, kong.Name("client"),
+		kong.Description("Demo client"),
+		kong.UsageOnError(),
+		kong.ConfigureHelp(kong.HelpOptions{
+			Compact: true,
+			Summary: false,
+		}))
+	if err != nil {
+		panic(err)
+	}
+	if _, err := k.Parse(os.Args[1:]); err != nil {
+		k.FatalIfErrorf(err)
 		return
 	}
 

@@ -1,4 +1,5 @@
 package toolbox
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -15,17 +16,17 @@ package toolbox
 //limitations under the License.
 //
 import (
-	"google.golang.org/grpc/credentials"
 	"errors"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 // GRPCClientParam is a parameter struct for gRPC clients.
 type GRPCClientParam struct {
-	ServerEndpoint     string `param:"desc=Server endpoint;default=localhost:10000"` // Host:port address of the server
-	TLS                bool   `param:"desc=Enable TLS;default=false"`                // TLS enabled
-	CAFile             string `param:"desc=CA certificate file;file"`                // CA cert file
-	ServerHostOverride string `param:"desc=Host name override for certificate"`      // Server name returned from the TLS handshake (for debugging)
+	ServerEndpoint     string `kong:"help='Server endpoint',default='localhost:10000'"` // Host:port address of the server
+	TLS                bool   `kong:"help='Enable TLS',default='false'"`                // TLS enabled
+	CAFile             string `kong:"help='CA certificate file',type='existingfile'"`   // CA cert file
+	ServerHostOverride string `kong:"help='Host name override for certificate'"`        // Server name returned from the TLS handshake (for debugging)
 }
 
 // GetGRPCDialOpts returns dial options for a gRPC client based on the client parameters

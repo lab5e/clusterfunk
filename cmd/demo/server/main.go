@@ -1,4 +1,5 @@
 package main
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -20,18 +21,18 @@ import (
 	"os"
 	"runtime/pprof"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/ExploratoryEngineering/clusterfunk/cmd/demo/server/grpcserver"
+	"github.com/alecthomas/kong"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	golog "log"
 
-	"github.com/ExploratoryEngineering/params"
-	"github.com/ExploratoryEngineering/rest"
-	log "github.com/sirupsen/logrus"
 	"github.com/ExploratoryEngineering/clusterfunk/cmd/demo/server/http"
 	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
 	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/sharding"
 	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
+	"github.com/ExploratoryEngineering/rest"
+	log "github.com/sirupsen/logrus"
 )
 
 const numShards = 10000
@@ -47,13 +48,23 @@ var webserverEndpoint string
 var metricsEndpoint string
 
 type parameters struct {
-	CPUProfilerFile string `param:"desc=Turn on profiling and store the profile data in a file"`
-	Cluster         funk.Parameters
+	CPUProfilerFile string          `kong:"help='Turn on profiling and store the profile data in a file'"`
+	Cluster         funk.Parameters `kong:"embed,prefix='cluster-'"`
 }
 
 func main() {
-	if err := params.NewEnvFlag(&config, os.Args[1:]); err != nil {
-		fmt.Println(err.Error())
+	k, err := kong.New(&config, kong.Name("server"),
+		kong.Description("Demo server"),
+		kong.UsageOnError(),
+		kong.ConfigureHelp(kong.HelpOptions{
+			Compact: true,
+			Summary: false,
+		}))
+	if err != nil {
+		panic(err)
+	}
+	if _, err := k.Parse(os.Args[1:]); err != nil {
+		k.FatalIfErrorf(err)
 		return
 	}
 

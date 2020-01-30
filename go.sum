@@ -4,8 +4,6 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/DataDog/datadog-go v2.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
 github.com/ExploratoryEngineering/logging v0.0.0-20181106085733-dcb8702a004e h1:O7OjyupeGg0n3dfiSMUrp1P76DmtdrJHk+g/EMuijMI=
 github.com/ExploratoryEngineering/logging v0.0.0-20181106085733-dcb8702a004e/go.mod h1:kT1WQ+ilTCL84XXFGxG4QGnGgiimexLTFRtnn+zuND0=
-github.com/ExploratoryEngineering/params v1.0.0 h1:/lNqaxMpSyGIEcn7Inc2p81L+koS758JoA+hUYhUU08=
-github.com/ExploratoryEngineering/params v1.0.0/go.mod h1:i9N5FxvOO/qOVtsRRBUmYLYvetGGhmuGOC+HJdunaT4=
 github.com/ExploratoryEngineering/rest v0.0.0-20181001125504-5b79b712352a h1:mtWtIalHqphQ86p0XWJcJkZtCz10NdCijY3Gee0BkoE=
 github.com/ExploratoryEngineering/rest v0.0.0-20181001125504-5b79b712352a/go.mod h1:SU4Tz3KydjbbJURuS7m9hlS8TdynrewPUfq3P7qH3rg=
 github.com/aclements/go-moremath v0.0.0-20190830160640-d16893ddf098 h1:a7+Y8VlXRC2VX5ue6tpCutr4PsrkRkWWVZv4zqfaHuc=

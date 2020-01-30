@@ -1,4 +1,5 @@
 package funk
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -24,8 +25,8 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/hashicorp/serf/serf"
 )
@@ -98,9 +99,9 @@ func NewSerfNode() *SerfNode {
 
 // SerfParameters holds parameters for the Serf client
 type SerfParameters struct {
-	Endpoint    string `param:"desc=Endpoint for Serf;default="`
-	JoinAddress string `param:"desc=Join address and port for Serf cluster"`
-	Verbose     bool   `param:"desc=Verbose logging for Serf"`
+	Endpoint    string `kong:"help='Endpoint for Serf',default=''"`
+	JoinAddress string `kong:"help='Join address and port for Serf cluster'"`
+	Verbose     bool   `kong:"help='Verbose logging for Serf'"`
 }
 
 // Final populates empty fields with default values
