@@ -7,6 +7,7 @@ require (
 	github.com/ExploratoryEngineering/params v1.0.0
 	github.com/ExploratoryEngineering/rest v0.0.0-20181001125504-5b79b712352a
 	github.com/aclements/go-moremath v0.0.0-20190830160640-d16893ddf098
+	github.com/alecthomas/kong v0.2.1
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/golang/protobuf v1.3.2
 	github.com/gorilla/websocket v1.4.1
