@@ -25,6 +25,12 @@ type Sink interface {
 	LogRequest(nodeid, destination, method string)
 }
 
+// The list of supported metrics
+const (
+	PrometheusSink = "prometheus"
+	NoSink         = "none"
+)
+
 // NewSinkFromString returns a named sink
 func NewSinkFromString(name string) Sink {
 	switch name {
