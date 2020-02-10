@@ -26,11 +26,11 @@ A typical cluster of Raft nodes should not exceed 10-15 nodes. This is a limitat
 * A load balancer. If you just need a load balancer in front of your service do use one. It's much easier to install, manage and use.
 * A performance enhancing library. If your service is slow it won't make it go faster. You might get better throughput if you do all the required steps (see [Little's Law](https://en.wikipedia.org/wiki/Little%27s_law)) but if your backend storage is a limiting factor it might end up being slower than before since it introduces network hops.
 
-[Introduction](introduction.md)
-[CtrlC tool](ctrlc.md)
-[Demo service](demo.md)
-[Implementing a server](servers.md)
-[Implementing a client](clients.md)
-[Sharding](sharding.md)
-[Production services](production.md)
-[Notes on networking](networking.md)
+* [Introduction](introduction.md)
+* [CtrlC tool](ctrlc.md)
+* [Demo service](demo.md)
+* [Implementing a server](servers.md)
+* [Implementing a client](clients.md)
+* [Sharding](sharding.md)
+* [Production services](production.md)
+* [Notes on networking](networking.md)
