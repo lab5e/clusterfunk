@@ -67,7 +67,7 @@ func StartDemoServer(endpoint string, endpointName string, cluster funk.Cluster,
 
 // The shard conversion function is used by the interceptor and returns two parameters:
 // The computed shard (id) for the request and the expected return type. The return type
-// must be returned by the internal interceptors so that the type is
+// must be returned by the internal interceptors.
 func createShardConversionFunc(shardMap sharding.ShardMap) serverfunk.ShardConversionFunc {
 	shardFunc := sharding.NewIntSharder(int64(len(shardMap.Shards())))
 
@@ -75,6 +75,8 @@ func createShardConversionFunc(shardMap sharding.ShardMap) serverfunk.ShardConve
 		switch v := request.(type) {
 		case *demo.LiffRequest:
 			return shardFunc(v.ID), &demo.LiffResponse{}
+		case *demo.Hello:
+			return shardFunc(v.Id), &demo.There{}
 		}
 		panic(fmt.Sprintf("Unknown request type %T", request))
 	}
@@ -97,48 +99,50 @@ func (l *liffServer) Liff(ctx context.Context, req *demo.LiffRequest) (*demo.Lif
 }
 
 func (l *liffServer) ClientStreams(req demo.DemoService_ClientStreamsServer) error {
-	finished := false
+	log.Info("Starting stream request")
 	count := 0
-	for !finished {
+	id := int64(0)
+	for {
 		in, err := req.Recv()
 		if err != nil {
+			log.WithError(err).Error("Got receive error")
 			return err
 		}
-		fmt.Printf("Got message: %+v\n", in)
+		id = in.Id
 		count++
 		if count >= 10 {
-			return req.SendAndClose(&demo.There{Id: 1, Message: "There!"})
+			log.WithField("count", count).WithField("Client ID", id).Info("Completed")
+			return req.SendAndClose(&demo.There{Id: 1, Message: fmt.Sprintf("There! I'm %s", l.nodeID)})
 		}
 	}
-	return nil
 }
 
 func (l *liffServer) ServerStreams(req *demo.Hello, res demo.DemoService_ServerStreamsServer) error {
-	fmt.Printf("Got request: %+v. Sending 10 responses\n", req)
+	log.WithField("request", req).Info("Got request. Sending 10 responses")
 	for i := 0; i < 10; i++ {
-		if err := res.Send(&demo.There{Id: int64(i), Message: "There!"}); err != nil {
-			fmt.Printf("Error sending: %v\n", err)
+		if err := res.Send(&demo.There{Id: int64(i + 1), Message: fmt.Sprintf("There! I'm %s", l.nodeID)}); err != nil {
+			log.WithError(err).Error("Error sending")
 			return err
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(100 * time.Millisecond)
 	}
 	return nil
 }
 
 func (l *liffServer) BothStreams(s demo.DemoService_BothStreamsServer) error {
-	fmt.Printf("Bidirectional stream\n")
+	log.Info("Bidirectional stream")
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
 		for i := 0; i < 10; i++ {
 			if err := s.Send(&demo.There{
-				Id:      int64(i),
-				Message: "There!",
+				Id:      int64(i + 1),
+				Message: fmt.Sprintf("There! I'm %s", l.nodeID),
 			}); err != nil {
 				return
 			}
-			time.Sleep(1 * time.Second)
+			time.Sleep(100 * time.Millisecond)
 		}
 	}()
 	go func() {
@@ -148,9 +152,11 @@ func (l *liffServer) BothStreams(s demo.DemoService_BothStreamsServer) error {
 			if err != nil {
 				return
 			}
-			fmt.Printf("Received %+v\n", in)
+			log.WithField("msg", in).Info("Received message")
 		}
 	}()
+	wg.Wait()
+	log.Info("Done streams")
 	return nil
 }
 

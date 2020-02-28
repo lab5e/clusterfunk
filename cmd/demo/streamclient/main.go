@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"os"
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/ExploratoryEngineering/clusterfunk/cmd/demo"
 	"github.com/ExploratoryEngineering/clusterfunk/pkg/clientfunk"
@@ -23,6 +25,37 @@ type parameters struct {
 }
 
 var config parameters
+
+func doClientStreaming(lc demo.DemoServiceClient) {
+	ctx, done := context.WithTimeout(context.Background(), 20*time.Second)
+	defer done()
+
+	ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"One": "Thing"}))
+
+	cs, err := lc.ClientStreams(ctx)
+	if err != nil {
+		panic(err.Error())
+	}
+	id := rand.Int63()
+	fmt.Print("Sending")
+	for i := 0; i < 10; i++ {
+		fmt.Print(" ", i+1)
+		if err := cs.Send(&demo.Hello{
+			Id:      id,
+			Message: "Hello",
+		}); err != nil {
+			panic(err.Error())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	fmt.Println()
+	fmt.Println("Waiting for response")
+	response, err := cs.CloseAndRecv()
+	if err != nil {
+		panic(err.Error())
+	}
+	fmt.Printf("Got response: %+v\n", response)
+}
 
 func main() {
 	k, err := kong.New(&config, kong.Name("client"),
@@ -60,78 +93,67 @@ func main() {
 	defer grpcConnection.Close()
 
 	lc := demo.NewDemoServiceClient(grpcConnection)
-	ctx, done := context.WithTimeout(context.Background(), 20*time.Second)
-	defer done()
 
-	fmt.Println("Client stream")
-	cs, err := lc.ClientStreams(ctx)
-	if err != nil {
-		panic(err.Error())
-	}
 	for i := 0; i < 10; i++ {
-		if err := cs.Send(&demo.Hello{
-			Id:      int64(i),
-			Message: "Hello",
-		}); err != nil {
+		doClientStreaming(lc)
+	}
+	fmt.Println("Shutting down")
+	/*
+
+
+		ctx2, done2 := context.WithTimeout(context.Background(), 20*time.Second)
+		defer done2()
+		ctx2 = metadata.NewOutgoingContext(ctx2, metadata.New(map[string]string{"Two": "Thing"}))
+		fmt.Println("Server streaming")
+		ss, err := lc.ServerStreams(ctx2, &demo.Hello{Id: 99, Message: "Hello hello"})
+		if err != nil {
 			panic(err.Error())
 		}
-		time.Sleep(1000 * time.Millisecond)
-	}
-	cs.CloseSend()
-
-	fmt.Println("Wait...")
-	time.Sleep(5 * time.Second)
-
-	ctx2, done2 := context.WithTimeout(context.Background(), 20*time.Second)
-	defer done2()
-	fmt.Println("Server streaming")
-	ss, err := lc.ServerStreams(ctx2, &demo.Hello{Id: 99, Message: "Hello hello"})
-	if err != nil {
-		panic(err.Error())
-	}
-	finished := false
-	for !finished {
-		m, err := ss.Recv()
-		if err != nil {
-			finished = true
-			continue
+		finished := false
+		for !finished {
+			m, err := ss.Recv()
+			if err != nil {
+				finished = true
+				continue
+			}
+			fmt.Printf("Got message from server: %v\n", m)
 		}
-		fmt.Printf("Got message from server: %v\n", m)
-	}
 
-	fmt.Println("Wait...")
-	time.Sleep(5 * time.Second)
+		fmt.Println("Both streaming")
 
-	fmt.Println("Both streaming")
+		ctx3, done3 := context.WithTimeout(context.Background(), 20*time.Second)
+		defer done3()
+		ctx3 = metadata.NewOutgoingContext(ctx3, metadata.New(map[string]string{"Three": "Thing"}))
 
-	ctx3, done3 := context.WithTimeout(context.Background(), 20*time.Second)
-	defer done3()
+		bs, err := lc.BothStreams(ctx3)
+		if err != nil {
+			panic(err.Error())
+		}
 
-	bs, err := lc.BothStreams(ctx3)
-	if err != nil {
-		panic(err.Error())
-	}
-	go func() {
+		wg := &sync.WaitGroup{}
+		wg.Add(1)
+		go func() {
+			for {
+				msg, err := bs.Recv()
+				if err != nil {
+					wg.Done()
+					return
+				}
+				fmt.Printf("Got message %+v\n", msg)
+			}
+		}()
 		for i := 0; i < 10; i++ {
 			if err := bs.Send(&demo.Hello{
-				Id:      int64(i),
+				Id:      rand.Int63(),
 				Message: "Hello",
 			}); err != nil {
 				panic(err.Error())
 			}
-			time.Sleep(1000 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 		}
 		bs.CloseSend()
-	}()
-	for !finished {
-		m, err := bs.Recv()
-		if err != nil {
-			finished = true
-			continue
-		}
-		fmt.Printf("Got message from server: %v\n", m)
-	}
 
-	time.Sleep(2 * time.Second)
-	fmt.Println("Done")
+		wg.Wait()
+		fmt.Println("Done")
+	*/
 }

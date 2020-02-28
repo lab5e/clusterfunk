@@ -1,4 +1,4 @@
-all: nolint lint
+all: nolint
 
 nolint: test bins
 
@@ -9,6 +9,7 @@ bins:
 	cd cmd/ctrlc && go build -o ../../bin/ctrlc
 	cd cmd/demo/server && go build -o ../../../bin/demo
 	cd cmd/demo/client && go build -o ../../../bin/client
+	cd cmd/demo/streamclient && go build -o ../../../bin/streamclient
 	cd cmd/raft && go build -o ../../bin/raft
 
 test:
