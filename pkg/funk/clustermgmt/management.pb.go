@@ -2,26 +2,14 @@
 // source: management.proto
 
 package clustermgmt
-//
-//Copyright 2019 Telenor Digital AS
-//
-//Licensed under the Apache License, Version 2.0 (the "License");
-//you may not use this file except in compliance with the License.
-//You may obtain a copy of the License at
-//
-//http://www.apache.org/licenses/LICENSE-2.0
-//
-//Unless required by applicable law or agreed to in writing, software
-//distributed under the License is distributed on an "AS IS" BASIS,
-//WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//See the License for the specific language governing permissions and
-//limitations under the License.
-//
+
 import (
 	context "context"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -1303,6 +1291,35 @@ type ClusterManagementServer interface {
 	// ListShards dumps the current shard map as seen by the node handling the
 	// request.
 	ListShards(context.Context, *ListShardsRequest) (*ListShardsResponse, error)
+}
+
+// UnimplementedClusterManagementServer can be embedded to have forward compatible implementations.
+type UnimplementedClusterManagementServer struct {
+}
+
+func (*UnimplementedClusterManagementServer) GetStatus(ctx context.Context, req *GetStatusRequest) (*GetStatusResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetStatus not implemented")
+}
+func (*UnimplementedClusterManagementServer) ListNodes(ctx context.Context, req *ListNodesRequest) (*ListNodesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListNodes not implemented")
+}
+func (*UnimplementedClusterManagementServer) FindEndpoint(ctx context.Context, req *EndpointRequest) (*EndpointResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FindEndpoint not implemented")
+}
+func (*UnimplementedClusterManagementServer) ListEndpoints(ctx context.Context, req *ListEndpointRequest) (*ListEndpointResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListEndpoints not implemented")
+}
+func (*UnimplementedClusterManagementServer) AddNode(ctx context.Context, req *AddNodeRequest) (*AddNodeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddNode not implemented")
+}
+func (*UnimplementedClusterManagementServer) RemoveNode(ctx context.Context, req *RemoveNodeRequest) (*RemoveNodeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveNode not implemented")
+}
+func (*UnimplementedClusterManagementServer) StepDown(ctx context.Context, req *StepDownRequest) (*StepDownResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StepDown not implemented")
+}
+func (*UnimplementedClusterManagementServer) ListShards(ctx context.Context, req *ListShardsRequest) (*ListShardsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListShards not implemented")
 }
 
 func RegisterClusterManagementServer(s *grpc.Server, srv ClusterManagementServer) {

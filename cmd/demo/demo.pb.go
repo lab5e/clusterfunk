@@ -2,26 +2,14 @@
 // source: demo.proto
 
 package demo
-//
-//Copyright 2019 Telenor Digital AS
-//
-//Licensed under the Apache License, Version 2.0 (the "License");
-//you may not use this file except in compliance with the License.
-//You may obtain a copy of the License at
-//
-//http://www.apache.org/licenses/LICENSE-2.0
-//
-//Unless required by applicable law or agreed to in writing, software
-//distributed under the License is distributed on an "AS IS" BASIS,
-//WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//See the License for the specific language governing permissions and
-//limitations under the License.
-//
+
 import (
 	context "context"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -130,26 +118,127 @@ func (m *LiffResponse) GetNodeID() string {
 	return ""
 }
 
+type Hello struct {
+	Id                   int64    `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Message              string   `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *Hello) Reset()         { *m = Hello{} }
+func (m *Hello) String() string { return proto.CompactTextString(m) }
+func (*Hello) ProtoMessage()    {}
+func (*Hello) Descriptor() ([]byte, []int) {
+	return fileDescriptor_ca53982754088a9d, []int{2}
+}
+
+func (m *Hello) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Hello.Unmarshal(m, b)
+}
+func (m *Hello) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Hello.Marshal(b, m, deterministic)
+}
+func (m *Hello) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Hello.Merge(m, src)
+}
+func (m *Hello) XXX_Size() int {
+	return xxx_messageInfo_Hello.Size(m)
+}
+func (m *Hello) XXX_DiscardUnknown() {
+	xxx_messageInfo_Hello.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Hello proto.InternalMessageInfo
+
+func (m *Hello) GetId() int64 {
+	if m != nil {
+		return m.Id
+	}
+	return 0
+}
+
+func (m *Hello) GetMessage() string {
+	if m != nil {
+		return m.Message
+	}
+	return ""
+}
+
+type There struct {
+	Id                   int64    `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Message              string   `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *There) Reset()         { *m = There{} }
+func (m *There) String() string { return proto.CompactTextString(m) }
+func (*There) ProtoMessage()    {}
+func (*There) Descriptor() ([]byte, []int) {
+	return fileDescriptor_ca53982754088a9d, []int{3}
+}
+
+func (m *There) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_There.Unmarshal(m, b)
+}
+func (m *There) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_There.Marshal(b, m, deterministic)
+}
+func (m *There) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_There.Merge(m, src)
+}
+func (m *There) XXX_Size() int {
+	return xxx_messageInfo_There.Size(m)
+}
+func (m *There) XXX_DiscardUnknown() {
+	xxx_messageInfo_There.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_There proto.InternalMessageInfo
+
+func (m *There) GetId() int64 {
+	if m != nil {
+		return m.Id
+	}
+	return 0
+}
+
+func (m *There) GetMessage() string {
+	if m != nil {
+		return m.Message
+	}
+	return ""
+}
+
 func init() {
 	proto.RegisterType((*LiffRequest)(nil), "demo.LiffRequest")
 	proto.RegisterType((*LiffResponse)(nil), "demo.LiffResponse")
+	proto.RegisterType((*Hello)(nil), "demo.Hello")
+	proto.RegisterType((*There)(nil), "demo.There")
 }
 
 func init() { proto.RegisterFile("demo.proto", fileDescriptor_ca53982754088a9d) }
 
 var fileDescriptor_ca53982754088a9d = []byte{
-	// 164 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0x4a, 0x49, 0xcd, 0xcd,
-	0xd7, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x01, 0xb1, 0x95, 0x64, 0xb9, 0xb8, 0x7d, 0x32,
-	0xd3, 0xd2, 0x82, 0x52, 0x0b, 0x4b, 0x53, 0x8b, 0x4b, 0x84, 0xf8, 0xb8, 0x98, 0x3c, 0x5d, 0x24,
-	0x18, 0x15, 0x18, 0x35, 0x98, 0x83, 0x98, 0x3c, 0x5d, 0x94, 0xc2, 0xb8, 0x78, 0x20, 0xd2, 0xc5,
-	0x05, 0xf9, 0x79, 0xc5, 0xa9, 0xe8, 0xf2, 0x42, 0x72, 0x5c, 0x5c, 0x2e, 0xa9, 0x69, 0x99, 0x79,
-	0x99, 0x25, 0x99, 0xf9, 0x79, 0x12, 0x4c, 0x0a, 0x8c, 0x1a, 0x9c, 0x41, 0x48, 0x22, 0x42, 0x62,
-	0x5c, 0x6c, 0x7e, 0xf9, 0x29, 0xa9, 0x9e, 0x2e, 0x12, 0xcc, 0x60, 0x39, 0x28, 0xcf, 0xc8, 0x86,
-	0x8b, 0xdb, 0x25, 0x35, 0x37, 0x3f, 0x38, 0xb5, 0xa8, 0x2c, 0x33, 0x39, 0x55, 0x48, 0x97, 0x8b,
-	0x05, 0x64, 0x8d, 0x90, 0xa0, 0x1e, 0xd8, 0x81, 0x48, 0x2e, 0x92, 0x12, 0x42, 0x16, 0x82, 0xb8,
-	0x22, 0x89, 0x0d, 0xec, 0x03, 0x63, 0x40, 0x00, 0x00, 0x00, 0xff, 0xff, 0x08, 0xa7, 0xd8, 0x9e,
-	0xcf, 0x00, 0x00, 0x00,
+	// 250 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x51, 0xc1, 0x4a, 0xc3, 0x40,
+	0x14, 0x64, 0xd3, 0x5a, 0xf1, 0x45, 0x05, 0xdf, 0x41, 0x42, 0x41, 0x29, 0x39, 0x05, 0xc4, 0x52,
+	0xf5, 0x0f, 0x34, 0x07, 0x03, 0xe2, 0x21, 0x15, 0xef, 0xd5, 0x4c, 0xec, 0x42, 0x92, 0x57, 0x77,
+	0x57, 0x7f, 0xd0, 0x1f, 0x93, 0xdd, 0xa6, 0x10, 0xbc, 0xd8, 0xdb, 0xce, 0x9b, 0x79, 0xb3, 0x33,
+	0xbb, 0x44, 0x15, 0x5a, 0x99, 0x6f, 0x8c, 0x38, 0xe1, 0xb1, 0x3f, 0xa7, 0x17, 0x14, 0x3f, 0xe9,
+	0xba, 0x2e, 0xf1, 0xf9, 0x05, 0xeb, 0xf8, 0x94, 0xa2, 0x22, 0x4f, 0xd4, 0x4c, 0x65, 0xa3, 0x32,
+	0x2a, 0xf2, 0xf4, 0x95, 0x8e, 0xb7, 0xb4, 0xdd, 0x48, 0x67, 0xf1, 0x97, 0xe7, 0x4b, 0xa2, 0x1c,
+	0xb5, 0xee, 0xb4, 0xd3, 0xd2, 0x25, 0xd1, 0x4c, 0x65, 0x47, 0xe5, 0x60, 0xc2, 0xe7, 0x34, 0x79,
+	0x96, 0x0a, 0x45, 0x9e, 0x8c, 0x02, 0xd7, 0xa3, 0xf4, 0x86, 0x0e, 0x1e, 0xd1, 0x34, 0xe2, 0x0d,
+	0x75, 0xb5, 0x33, 0xd4, 0x15, 0x27, 0x74, 0xd8, 0xc2, 0xda, 0xd5, 0x07, 0x7a, 0xb7, 0x1d, 0xf4,
+	0x2b, 0x2f, 0x6b, 0x18, 0xec, 0xbf, 0x72, 0xfb, 0xa3, 0x28, 0xce, 0xd1, 0xca, 0x12, 0xe6, 0x5b,
+	0xbf, 0x83, 0xaf, 0x69, 0xec, 0xdb, 0xf0, 0xd9, 0x3c, 0xbc, 0xc3, 0xa0, 0xf8, 0x94, 0x87, 0xa3,
+	0xbe, 0xec, 0x15, 0x9d, 0x3c, 0x34, 0x1a, 0x9d, 0x5b, 0x3a, 0x83, 0x55, 0x6b, 0x39, 0xde, 0x8a,
+	0x42, 0xf2, 0x69, 0x0f, 0x42, 0xa6, 0x4c, 0x79, 0xb1, 0xbf, 0x06, 0xe6, 0x5f, 0xf1, 0xc2, 0x8b,
+	0xe3, 0x7b, 0x71, 0xeb, 0x3d, 0x7c, 0x17, 0xea, 0x6d, 0x12, 0xfe, 0xeb, 0xee, 0x37, 0x00, 0x00,
+	0xff, 0xff, 0x06, 0x12, 0x0b, 0x02, 0xbd, 0x01, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -166,6 +255,9 @@ const _ = grpc.SupportPackageIsVersion4
 type DemoServiceClient interface {
 	// This method returns a line from one of the Liff books.
 	Liff(ctx context.Context, in *LiffRequest, opts ...grpc.CallOption) (*LiffResponse, error)
+	ClientStreams(ctx context.Context, opts ...grpc.CallOption) (DemoService_ClientStreamsClient, error)
+	ServerStreams(ctx context.Context, in *Hello, opts ...grpc.CallOption) (DemoService_ServerStreamsClient, error)
+	BothStreams(ctx context.Context, opts ...grpc.CallOption) (DemoService_BothStreamsClient, error)
 }
 
 type demoServiceClient struct {
@@ -185,10 +277,127 @@ func (c *demoServiceClient) Liff(ctx context.Context, in *LiffRequest, opts ...g
 	return out, nil
 }
 
+func (c *demoServiceClient) ClientStreams(ctx context.Context, opts ...grpc.CallOption) (DemoService_ClientStreamsClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_DemoService_serviceDesc.Streams[0], "/demo.DemoService/ClientStreams", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &demoServiceClientStreamsClient{stream}
+	return x, nil
+}
+
+type DemoService_ClientStreamsClient interface {
+	Send(*Hello) error
+	CloseAndRecv() (*There, error)
+	grpc.ClientStream
+}
+
+type demoServiceClientStreamsClient struct {
+	grpc.ClientStream
+}
+
+func (x *demoServiceClientStreamsClient) Send(m *Hello) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *demoServiceClientStreamsClient) CloseAndRecv() (*There, error) {
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	m := new(There)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *demoServiceClient) ServerStreams(ctx context.Context, in *Hello, opts ...grpc.CallOption) (DemoService_ServerStreamsClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_DemoService_serviceDesc.Streams[1], "/demo.DemoService/ServerStreams", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &demoServiceServerStreamsClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type DemoService_ServerStreamsClient interface {
+	Recv() (*There, error)
+	grpc.ClientStream
+}
+
+type demoServiceServerStreamsClient struct {
+	grpc.ClientStream
+}
+
+func (x *demoServiceServerStreamsClient) Recv() (*There, error) {
+	m := new(There)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *demoServiceClient) BothStreams(ctx context.Context, opts ...grpc.CallOption) (DemoService_BothStreamsClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_DemoService_serviceDesc.Streams[2], "/demo.DemoService/BothStreams", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &demoServiceBothStreamsClient{stream}
+	return x, nil
+}
+
+type DemoService_BothStreamsClient interface {
+	Send(*Hello) error
+	Recv() (*There, error)
+	grpc.ClientStream
+}
+
+type demoServiceBothStreamsClient struct {
+	grpc.ClientStream
+}
+
+func (x *demoServiceBothStreamsClient) Send(m *Hello) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *demoServiceBothStreamsClient) Recv() (*There, error) {
+	m := new(There)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // DemoServiceServer is the server API for DemoService service.
 type DemoServiceServer interface {
 	// This method returns a line from one of the Liff books.
 	Liff(context.Context, *LiffRequest) (*LiffResponse, error)
+	ClientStreams(DemoService_ClientStreamsServer) error
+	ServerStreams(*Hello, DemoService_ServerStreamsServer) error
+	BothStreams(DemoService_BothStreamsServer) error
+}
+
+// UnimplementedDemoServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedDemoServiceServer struct {
+}
+
+func (*UnimplementedDemoServiceServer) Liff(ctx context.Context, req *LiffRequest) (*LiffResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Liff not implemented")
+}
+func (*UnimplementedDemoServiceServer) ClientStreams(srv DemoService_ClientStreamsServer) error {
+	return status.Errorf(codes.Unimplemented, "method ClientStreams not implemented")
+}
+func (*UnimplementedDemoServiceServer) ServerStreams(req *Hello, srv DemoService_ServerStreamsServer) error {
+	return status.Errorf(codes.Unimplemented, "method ServerStreams not implemented")
+}
+func (*UnimplementedDemoServiceServer) BothStreams(srv DemoService_BothStreamsServer) error {
+	return status.Errorf(codes.Unimplemented, "method BothStreams not implemented")
 }
 
 func RegisterDemoServiceServer(s *grpc.Server, srv DemoServiceServer) {
@@ -213,6 +422,79 @@ func _DemoService_Liff_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DemoService_ClientStreams_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(DemoServiceServer).ClientStreams(&demoServiceClientStreamsServer{stream})
+}
+
+type DemoService_ClientStreamsServer interface {
+	SendAndClose(*There) error
+	Recv() (*Hello, error)
+	grpc.ServerStream
+}
+
+type demoServiceClientStreamsServer struct {
+	grpc.ServerStream
+}
+
+func (x *demoServiceClientStreamsServer) SendAndClose(m *There) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *demoServiceClientStreamsServer) Recv() (*Hello, error) {
+	m := new(Hello)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func _DemoService_ServerStreams_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(Hello)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(DemoServiceServer).ServerStreams(m, &demoServiceServerStreamsServer{stream})
+}
+
+type DemoService_ServerStreamsServer interface {
+	Send(*There) error
+	grpc.ServerStream
+}
+
+type demoServiceServerStreamsServer struct {
+	grpc.ServerStream
+}
+
+func (x *demoServiceServerStreamsServer) Send(m *There) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func _DemoService_BothStreams_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(DemoServiceServer).BothStreams(&demoServiceBothStreamsServer{stream})
+}
+
+type DemoService_BothStreamsServer interface {
+	Send(*There) error
+	Recv() (*Hello, error)
+	grpc.ServerStream
+}
+
+type demoServiceBothStreamsServer struct {
+	grpc.ServerStream
+}
+
+func (x *demoServiceBothStreamsServer) Send(m *There) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *demoServiceBothStreamsServer) Recv() (*Hello, error) {
+	m := new(Hello)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 var _DemoService_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "demo.DemoService",
 	HandlerType: (*DemoServiceServer)(nil),
@@ -222,6 +504,23 @@ var _DemoService_serviceDesc = grpc.ServiceDesc{
 			Handler:    _DemoService_Liff_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "ClientStreams",
+			Handler:       _DemoService_ClientStreams_Handler,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "ServerStreams",
+			Handler:       _DemoService_ServerStreams_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "BothStreams",
+			Handler:       _DemoService_BothStreams_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "demo.proto",
 }

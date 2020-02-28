@@ -1,4 +1,5 @@
 package grpcserver
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -19,6 +20,8 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"sync"
+	"time"
 
 	"github.com/ExploratoryEngineering/clusterfunk/cmd/demo"
 	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
@@ -91,6 +94,64 @@ func (l *liffServer) Liff(ctx context.Context, req *demo.LiffRequest) (*demo.Lif
 		Definition: liffs[rand.Intn(len(liffs))],
 		NodeID:     l.nodeID,
 	}, nil
+}
+
+func (l *liffServer) ClientStreams(req demo.DemoService_ClientStreamsServer) error {
+	finished := false
+	count := 0
+	for !finished {
+		in, err := req.Recv()
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Got message: %+v\n", in)
+		count++
+		if count >= 10 {
+			return req.SendAndClose(&demo.There{Id: 1, Message: "There!"})
+		}
+	}
+	return nil
+}
+
+func (l *liffServer) ServerStreams(req *demo.Hello, res demo.DemoService_ServerStreamsServer) error {
+	fmt.Printf("Got request: %+v. Sending 10 responses\n", req)
+	for i := 0; i < 10; i++ {
+		if err := res.Send(&demo.There{Id: int64(i), Message: "There!"}); err != nil {
+			fmt.Printf("Error sending: %v\n", err)
+			return err
+		}
+		time.Sleep(1 * time.Second)
+	}
+	return nil
+}
+
+func (l *liffServer) BothStreams(s demo.DemoService_BothStreamsServer) error {
+	fmt.Printf("Bidirectional stream\n")
+	wg := &sync.WaitGroup{}
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 10; i++ {
+			if err := s.Send(&demo.There{
+				Id:      int64(i),
+				Message: "There!",
+			}); err != nil {
+				return
+			}
+			time.Sleep(1 * time.Second)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for {
+			in, err := s.Recv()
+			if err != nil {
+				return
+			}
+			fmt.Printf("Received %+v\n", in)
+		}
+	}()
+	return nil
 }
 
 // Copied from http://liff.hivemind.net/ which again have copied them from

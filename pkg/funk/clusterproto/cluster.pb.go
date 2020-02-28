@@ -2,26 +2,14 @@
 // source: cluster.proto
 
 package clusterproto
-//
-//Copyright 2019 Telenor Digital AS
-//
-//Licensed under the Apache License, Version 2.0 (the "License");
-//you may not use this file except in compliance with the License.
-//You may obtain a copy of the License at
-//
-//http://www.apache.org/licenses/LICENSE-2.0
-//
-//Unless required by applicable law or agreed to in writing, software
-//distributed under the License is distributed on an "AS IS" BASIS,
-//WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//See the License for the specific language governing permissions and
-//limitations under the License.
-//
+
 import (
 	context "context"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -247,6 +235,14 @@ func (c *clusterLeaderServiceClient) ConfirmShardMap(ctx context.Context, in *Co
 // ClusterLeaderServiceServer is the server API for ClusterLeaderService service.
 type ClusterLeaderServiceServer interface {
 	ConfirmShardMap(context.Context, *ConfirmShardMapRequest) (*ConfirmShardMapResponse, error)
+}
+
+// UnimplementedClusterLeaderServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedClusterLeaderServiceServer struct {
+}
+
+func (*UnimplementedClusterLeaderServiceServer) ConfirmShardMap(ctx context.Context, req *ConfirmShardMapRequest) (*ConfirmShardMapResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ConfirmShardMap not implemented")
 }
 
 func RegisterClusterLeaderServiceServer(s *grpc.Server, srv ClusterLeaderServiceServer) {

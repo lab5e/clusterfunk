@@ -10,9 +10,21 @@ message LiffResponse {
   string NodeID = 3;     // This is the node running the service
 };
 
+message Hello {
+  int64 id = 1;
+  string message = 2;
+}
+
+message There {
+  int64 id = 1;
+  string message = 2;
+}
+
 // DemoService is the service used by the demo client.
 service DemoService {
   // This method returns a line from one of the Liff books.
   rpc Liff(LiffRequest) returns (LiffResponse);
-
+  rpc ClientStreams(stream Hello) returns (There);
+  rpc ServerStreams(Hello) returns (stream There);
+  rpc BothStreams(stream Hello) returns (stream There);
 }

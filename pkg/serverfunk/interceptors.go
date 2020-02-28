@@ -1,4 +1,5 @@
 package serverfunk
+
 //
 //Copyright 2019 Telenor Digital AS
 //

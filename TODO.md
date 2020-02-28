@@ -12,3 +12,8 @@
 
 * Docker stack for demo server
 
+* Verify client/server/bidirectional gRPC streaming calls.
+Streams from the server to the client is relatively simple - shard on the
+request, let the server stream. Client-side streaming means we have to wait for
+and figure out which shard the first message maps to, then stick to that node
+for the rest of the stream.
