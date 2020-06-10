@@ -1,4 +1,5 @@
 package clientfunk
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -48,7 +49,7 @@ var cfEndpoints = make(map[string][]resolver.Address)
 type clusterResolverBuilder struct {
 }
 
-func (b *clusterResolverBuilder) Build(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOption) (resolver.Resolver, error) {
+func (b *clusterResolverBuilder) Build(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOptions) (resolver.Resolver, error) {
 	if target.Scheme != ClusterfunkSchemaName {
 		return nil, fmt.Errorf("unsupported scheme: %s", target.Scheme)
 	}
@@ -83,7 +84,7 @@ func (c *clusterResolver) updateState() error {
 	return nil
 }
 
-func (c *clusterResolver) ResolveNow(resolver.ResolveNowOption) {
+func (c *clusterResolver) ResolveNow(resolver.ResolveNowOptions) {
 	if err := c.updateState(); err != nil {
 		log.WithError(err).Error("couldn't re-resolve endpoint")
 	}

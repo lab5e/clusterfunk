@@ -1,4 +1,5 @@
 package sharding
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -19,8 +20,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/sharding/shardpb"
+	"google.golang.org/protobuf/proto"
 )
 
 type nodeData struct {

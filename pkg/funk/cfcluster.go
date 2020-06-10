@@ -1,4 +1,5 @@
 package funk
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -25,8 +26,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/clusterproto"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/sharding"
 	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"

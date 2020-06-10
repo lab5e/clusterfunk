@@ -2,28 +2,33 @@ syntax = "proto3";
 
 package clusterproto;
 
+option go_package = ".;clusterproto";
+
 // ConfirmShardMapRequest is sent by followers to the leader to signal readyness
 // with the new shard map
 message ConfirmShardMapRequest {
-    int64 LogIndex = 1; // LogIndex is the index of the shard map used
-    string NodeID = 2;  // NodeID is the follower's cluster ID.
+  int64 LogIndex = 1; // LogIndex is the index of the shard map used
+  string NodeID = 2;  // NodeID is the follower's cluster ID.
 };
 
 // ConfirmShardMapResponse is sent as a response from the leader to the
 // followers.
 message ConfirmShardMapResponse {
-    bool Success = 1;        // Success is set to true if the confirmation is acknowledged by the leader.
-    int64 CurrentIndex = 2; // CurrentIndex is the currently active shard map. Any lower numbered shard maps can be ignored by the follower.
+  bool Success = 1; // Success is set to true if the confirmation is
+                    // acknowledged by the leader.
+  int64 CurrentIndex =
+      2; // CurrentIndex is the currently active shard map. Any lower numbered
+         // shard maps can be ignored by the follower.
 };
 
 // CommitShardMapMessage is sent when the shard map is committed by the leader
 // and all nodes have acknowledged the new shard map. The message contains the
 // nodes in the cluster for the commited map.
 message CommitShardMapMessage {
-    int64 ShardMapLogIndex = 1;
-    repeated string Nodes = 2;
+  int64 ShardMapLogIndex = 1;
+  repeated string Nodes = 2;
 }
 
 service ClusterLeaderService {
-    rpc ConfirmShardMap(ConfirmShardMapRequest) returns (ConfirmShardMapResponse);
+  rpc ConfirmShardMap(ConfirmShardMapRequest) returns (ConfirmShardMapResponse);
 }

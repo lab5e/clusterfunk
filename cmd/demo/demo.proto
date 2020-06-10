@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package demo;
 
+option go_package = ".;demo";
+
 message LiffRequest { int64 ID = 1; };
 
 message LiffResponse {
@@ -14,5 +16,4 @@ message LiffResponse {
 service DemoService {
   // This method returns a line from one of the Liff books.
   rpc Liff(LiffRequest) returns (LiffResponse);
-
 }

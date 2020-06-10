@@ -2,18 +2,20 @@ syntax = "proto3";
 
 package shardpb;
 
+option go_package = ".;shardpb";
+
 message WireNodes {
-    int32 NodeId = 1;
-    string NodeName = 2;
+  int32 NodeId = 1;
+  string NodeName = 2;
 }
 
 message WireShard {
-    int32 Id=1;
-    int32 Weight = 2;
-    int32 NodeId = 3;
+  int32 Id = 1;
+  int32 Weight = 2;
+  int32 NodeId = 3;
 }
 
 message ShardDistribution {
-    repeated WireNodes Nodes = 1;
-    repeated WireShard Shards = 2;
+  repeated WireNodes Nodes = 1;
+  repeated WireShard Shards = 2;
 }
