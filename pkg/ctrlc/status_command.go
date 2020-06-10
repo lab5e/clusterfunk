@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/clustermgmt"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/managepb"
 )
 
 // StatusCommand is a subcommand for the ctrlc CLI.
@@ -21,7 +21,7 @@ func (c *StatusCommand) Run(args RunContext) error {
 
 	ctx, done := context.WithTimeout(context.Background(), gRPCTimeout)
 	defer done()
-	res, err := client.GetStatus(ctx, &clustermgmt.GetStatusRequest{})
+	res, err := client.GetStatus(ctx, &managepb.GetStatusRequest{})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error retrieving status: %v\n", err)
 		return errStd

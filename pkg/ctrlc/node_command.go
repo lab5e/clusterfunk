@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/clustermgmt"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/managepb"
 )
 
 // NodeCommand is the subcommand to add and remove nodes
@@ -25,7 +25,7 @@ func (c *addNodeCommand) Run(args RunContext) error {
 	}
 	ctx, done := context.WithTimeout(context.Background(), gRPCTimeout)
 	defer done()
-	res, err := client.AddNode(ctx, &clustermgmt.AddNodeRequest{
+	res, err := client.AddNode(ctx, &managepb.AddNodeRequest{
 		NodeId: args.ClusterCommands().Node.ID,
 	})
 	if err != nil {
@@ -51,7 +51,7 @@ func (c *removeNodeCommand) Run(args RunContext) error {
 
 	ctx, done := context.WithTimeout(context.Background(), gRPCTimeout)
 	defer done()
-	res, err := client.RemoveNode(ctx, &clustermgmt.RemoveNodeRequest{
+	res, err := client.RemoveNode(ctx, &managepb.RemoveNodeRequest{
 		NodeId: args.ClusterCommands().Node.ID,
 	})
 	if err != nil {

@@ -1,4 +1,5 @@
 package funk
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -24,7 +25,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/clustermgmt"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/managepb"
 	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
 
 	"google.golang.org/grpc"
@@ -55,7 +56,7 @@ func (c *clusterfunkCluster) startManagementServices() error {
 	}
 	c.mgmtServer = grpc.NewServer(opts...)
 
-	clustermgmt.RegisterClusterManagementServer(c.mgmtServer, c)
+	managepb.RegisterClusterManagementServer(c.mgmtServer, c)
 
 	listener, err := net.Listen("tcp", c.config.Management.Endpoint)
 	if err != nil {
@@ -82,7 +83,7 @@ func (c *clusterfunkCluster) startManagementServices() error {
 
 // Node management implementation
 // -----------------------------------------------------------------------------
-func (c *clusterfunkCluster) leaderManagementClient() (clustermgmt.ClusterManagementClient, error) {
+func (c *clusterfunkCluster) leaderManagementClient() (managepb.ClusterManagementClient, error) {
 	ep := c.GetEndpoint(c.raftNode.LeaderNodeID(), ManagementEndpoint)
 
 	// TODO: Custom gRPC parameters goes here. Set cert if required
@@ -94,26 +95,26 @@ func (c *clusterfunkCluster) leaderManagementClient() (clustermgmt.ClusterManage
 	if err != nil {
 		return nil, err
 	}
-	return clustermgmt.NewClusterManagementClient(conn), nil
+	return managepb.NewClusterManagementClient(conn), nil
 }
 
-func (c *clusterfunkCluster) GetStatus(ctx context.Context, req *clustermgmt.GetStatusRequest) (*clustermgmt.GetStatusResponse, error) {
-	var ret *clustermgmt.GetStatusResponse
+func (c *clusterfunkCluster) GetStatus(ctx context.Context, req *managepb.GetStatusRequest) (*managepb.GetStatusResponse, error) {
+	var ret *managepb.GetStatusResponse
 
 	switch c.State() {
 	case Invalid, Stopping, Starting, Joining:
-		ret = &clustermgmt.GetStatusResponse{
+		ret = &managepb.GetStatusResponse{
 			ClusterName: c.Name(),
 			LocalState:  c.State().String(),
 			LocalRole:   c.Role().String(),
-			Error: &clustermgmt.Error{
-				ErrorCode: clustermgmt.Error_INVALID,
+			Error: &managepb.Error{
+				ErrorCode: managepb.Error_INVALID,
 				Message:   fmt.Sprintf("Not in a cluster. State is %s", c.State().String()),
 			},
 		}
 
 	case Operational, Voting, Resharding:
-		ret = &clustermgmt.GetStatusResponse{
+		ret = &managepb.GetStatusResponse{
 			ClusterName:   c.Name(),
 			LocalNodeId:   c.NodeID(),
 			LocalState:    c.State().String(),
@@ -150,11 +151,11 @@ func (c *clusterfunkCluster) GetStatus(ctx context.Context, req *clustermgmt.Get
 	return ret, nil
 }
 
-func (c *clusterfunkCluster) ListNodes(ctx context.Context, req *clustermgmt.ListNodesRequest) (*clustermgmt.ListNodesResponse, error) {
+func (c *clusterfunkCluster) ListNodes(ctx context.Context, req *managepb.ListNodesRequest) (*managepb.ListNodesResponse, error) {
 	if c.State() != Operational {
-		return &clustermgmt.ListNodesResponse{
-			Error: &clustermgmt.Error{
-				ErrorCode: clustermgmt.Error_NO_LEADER,
+		return &managepb.ListNodesResponse{
+			Error: &managepb.Error{
+				ErrorCode: managepb.Error_NO_LEADER,
 				Message:   "Cluster is not in operational state",
 			},
 		}, nil
@@ -172,11 +173,11 @@ func (c *clusterfunkCluster) ListNodes(ctx context.Context, req *clustermgmt.Lis
 		return ret, nil
 	}
 
-	nodes := make(map[string]*clustermgmt.NodeInfo)
-	ret := &clustermgmt.ListNodesResponse{
+	nodes := make(map[string]*managepb.NodeInfo)
+	ret := &managepb.ListNodesResponse{
 		LeaderId: c.NodeID(),
 		NodeId:   c.NodeID(),
-		Nodes:    make([]*clustermgmt.NodeInfo, 0),
+		Nodes:    make([]*managepb.NodeInfo, 0),
 	}
 
 	list, err := c.raftNode.memberList()
@@ -184,7 +185,7 @@ func (c *clusterfunkCluster) ListNodes(ctx context.Context, req *clustermgmt.Lis
 		return nil, err
 	}
 	for _, v := range list {
-		nodes[v.ID] = &clustermgmt.NodeInfo{
+		nodes[v.ID] = &managepb.NodeInfo{
 			NodeId:    v.ID,
 			RaftState: v.State,
 			Leader:    v.Leader,
@@ -194,7 +195,7 @@ func (c *clusterfunkCluster) ListNodes(ctx context.Context, req *clustermgmt.Lis
 	for _, v := range c.serfNode.memberList() {
 		n, ok := nodes[v.ID]
 		if !ok {
-			n = &clustermgmt.NodeInfo{
+			n = &managepb.NodeInfo{
 				NodeId:    v.ID,
 				RaftState: "",
 				Leader:    false,
@@ -210,16 +211,16 @@ func (c *clusterfunkCluster) ListNodes(ctx context.Context, req *clustermgmt.Lis
 	return ret, nil
 }
 
-func (c *clusterfunkCluster) FindEndpoint(ctx context.Context, req *clustermgmt.EndpointRequest) (*clustermgmt.EndpointResponse, error) {
-	ret := &clustermgmt.EndpointResponse{
+func (c *clusterfunkCluster) FindEndpoint(ctx context.Context, req *managepb.EndpointRequest) (*managepb.EndpointResponse, error) {
+	ret := &managepb.EndpointResponse{
 		NodeId:    c.NodeID(),
-		Endpoints: make([]*clustermgmt.EndpointInfo, 0),
+		Endpoints: make([]*managepb.EndpointInfo, 0),
 	}
 	for _, v := range c.serfNode.Nodes() {
 		for k, val := range v.Tags {
 			if strings.HasPrefix(k, EndpointPrefix) {
 				if strings.Contains(k, req.EndpointName) {
-					ret.Endpoints = append(ret.Endpoints, &clustermgmt.EndpointInfo{
+					ret.Endpoints = append(ret.Endpoints, &managepb.EndpointInfo{
 						NodeId:   v.NodeID,
 						Name:     k,
 						HostPort: val,
@@ -231,15 +232,15 @@ func (c *clusterfunkCluster) FindEndpoint(ctx context.Context, req *clustermgmt.
 	return ret, nil
 }
 
-func (c *clusterfunkCluster) ListEndpoints(ctx context.Context, req *clustermgmt.ListEndpointRequest) (*clustermgmt.ListEndpointResponse, error) {
-	ret := &clustermgmt.ListEndpointResponse{
+func (c *clusterfunkCluster) ListEndpoints(ctx context.Context, req *managepb.ListEndpointRequest) (*managepb.ListEndpointResponse, error) {
+	ret := &managepb.ListEndpointResponse{
 		NodeId:    c.NodeID(),
-		Endpoints: make([]*clustermgmt.EndpointInfo, 0),
+		Endpoints: make([]*managepb.EndpointInfo, 0),
 	}
 	for _, v := range c.serfNode.Nodes() {
 		for k, val := range v.Tags {
 			if strings.HasPrefix(k, EndpointPrefix) {
-				ret.Endpoints = append(ret.Endpoints, &clustermgmt.EndpointInfo{
+				ret.Endpoints = append(ret.Endpoints, &managepb.EndpointInfo{
 					NodeId:   v.NodeID,
 					Name:     k,
 					HostPort: val,
@@ -250,37 +251,37 @@ func (c *clusterfunkCluster) ListEndpoints(ctx context.Context, req *clustermgmt
 	return ret, nil
 }
 
-func (c *clusterfunkCluster) AddNode(ctx context.Context, req *clustermgmt.AddNodeRequest) (*clustermgmt.AddNodeResponse, error) {
+func (c *clusterfunkCluster) AddNode(ctx context.Context, req *managepb.AddNodeRequest) (*managepb.AddNodeResponse, error) {
 	if c.State() != Operational {
-		return &clustermgmt.AddNodeResponse{
-			Error: &clustermgmt.Error{
-				ErrorCode: clustermgmt.Error_NO_LEADER,
+		return &managepb.AddNodeResponse{
+			Error: &managepb.Error{
+				ErrorCode: managepb.Error_NO_LEADER,
 				Message:   "Cluster is not in operational state",
 			},
 		}, nil
 	}
 	if c.Role() == Leader {
-		ret := &clustermgmt.AddNodeResponse{
+		ret := &managepb.AddNodeResponse{
 			NodeId: c.NodeID(),
 		}
 		if c.raftNode.Nodes.Contains(req.NodeId) {
-			ret.Error = &clustermgmt.Error{
-				ErrorCode: clustermgmt.Error_INVALID,
+			ret.Error = &managepb.Error{
+				ErrorCode: managepb.Error_INVALID,
 				Message:   "Node is already a member of the cluster",
 			}
 			return ret, nil
 		}
 		ep := c.GetEndpoint(req.NodeId, RaftEndpoint)
 		if ep == "" {
-			ret.Error = &clustermgmt.Error{
-				ErrorCode: clustermgmt.Error_UNKNOWN_ID,
+			ret.Error = &managepb.Error{
+				ErrorCode: managepb.Error_UNKNOWN_ID,
 				Message:   "Unknown node",
 			}
 			return ret, nil
 		}
 		if err := c.raftNode.AddClusterNode(req.NodeId, ep); err != nil {
-			ret.Error = &clustermgmt.Error{
-				ErrorCode: clustermgmt.Error_GENERIC,
+			ret.Error = &managepb.Error{
+				ErrorCode: managepb.Error_GENERIC,
 				Message:   err.Error(),
 			}
 		}
@@ -294,30 +295,30 @@ func (c *clusterfunkCluster) AddNode(ctx context.Context, req *clustermgmt.AddNo
 	return leader.AddNode(ctx, req)
 }
 
-func (c *clusterfunkCluster) RemoveNode(ctx context.Context, req *clustermgmt.RemoveNodeRequest) (*clustermgmt.RemoveNodeResponse, error) {
+func (c *clusterfunkCluster) RemoveNode(ctx context.Context, req *managepb.RemoveNodeRequest) (*managepb.RemoveNodeResponse, error) {
 	if c.State() != Operational {
-		return &clustermgmt.RemoveNodeResponse{
-			Error: &clustermgmt.Error{
-				ErrorCode: clustermgmt.Error_NO_LEADER,
+		return &managepb.RemoveNodeResponse{
+			Error: &managepb.Error{
+				ErrorCode: managepb.Error_NO_LEADER,
 				Message:   "Cluster is not in operational state",
 			},
 		}, nil
 	}
 	if c.Role() == Leader {
-		ret := &clustermgmt.RemoveNodeResponse{
+		ret := &managepb.RemoveNodeResponse{
 			NodeId: c.NodeID(),
 		}
 		ep := c.GetEndpoint(req.NodeId, RaftEndpoint)
 		if ep == "" || !c.raftNode.Nodes.Contains(req.NodeId) {
-			ret.Error = &clustermgmt.Error{
-				ErrorCode: clustermgmt.Error_UNKNOWN_ID,
+			ret.Error = &managepb.Error{
+				ErrorCode: managepb.Error_UNKNOWN_ID,
 				Message:   "Node is not a member of the Serf cluster",
 			}
 			return ret, nil
 		}
 		if err := c.raftNode.RemoveClusterNode(req.NodeId, ep); err != nil {
-			ret.Error = &clustermgmt.Error{
-				ErrorCode: clustermgmt.Error_GENERIC,
+			ret.Error = &managepb.Error{
+				ErrorCode: managepb.Error_GENERIC,
 				Message:   err.Error(),
 			}
 		}
@@ -331,20 +332,20 @@ func (c *clusterfunkCluster) RemoveNode(ctx context.Context, req *clustermgmt.Re
 	return leader.RemoveNode(ctx, req)
 }
 
-func (c *clusterfunkCluster) ListShards(ctx context.Context, req *clustermgmt.ListShardsRequest) (*clustermgmt.ListShardsResponse, error) {
+func (c *clusterfunkCluster) ListShards(ctx context.Context, req *managepb.ListShardsRequest) (*managepb.ListShardsResponse, error) {
 	if c.State() != Operational {
-		return &clustermgmt.ListShardsResponse{
-			Error: &clustermgmt.Error{
-				ErrorCode: clustermgmt.Error_NO_LEADER,
+		return &managepb.ListShardsResponse{
+			Error: &managepb.Error{
+				ErrorCode: managepb.Error_NO_LEADER,
 				Message:   "Cluster is not in operational state",
 			},
 		}, nil
 	}
-	items := make(map[string]*clustermgmt.ShardInfo)
+	items := make(map[string]*managepb.ShardInfo)
 
-	ret := &clustermgmt.ListShardsResponse{
+	ret := &managepb.ListShardsResponse{
 		NodeId: c.NodeID(),
-		Shards: make([]*clustermgmt.ShardInfo, 0),
+		Shards: make([]*managepb.ShardInfo, 0),
 	}
 	shards := c.shardManager.Shards()
 	ret.TotalShards = int32(len(shards))
@@ -352,7 +353,7 @@ func (c *clusterfunkCluster) ListShards(ctx context.Context, req *clustermgmt.Li
 	for _, v := range shards {
 		i := items[v.NodeID()]
 		if i == nil {
-			i = &clustermgmt.ShardInfo{
+			i = &managepb.ShardInfo{
 				NodeId:      v.NodeID(),
 				ShardCount:  0,
 				ShardWeight: 0,
@@ -369,25 +370,25 @@ func (c *clusterfunkCluster) ListShards(ctx context.Context, req *clustermgmt.Li
 	return ret, nil
 }
 
-func (c *clusterfunkCluster) StepDown(ctx context.Context, req *clustermgmt.StepDownRequest) (*clustermgmt.StepDownResponse, error) {
+func (c *clusterfunkCluster) StepDown(ctx context.Context, req *managepb.StepDownRequest) (*managepb.StepDownResponse, error) {
 	if c.State() != Operational {
-		return &clustermgmt.StepDownResponse{
-			Error: &clustermgmt.Error{
-				ErrorCode: clustermgmt.Error_NO_LEADER,
+		return &managepb.StepDownResponse{
+			Error: &managepb.Error{
+				ErrorCode: managepb.Error_NO_LEADER,
 				Message:   "Cluster is not in operational state",
 			},
 		}, nil
 	}
 	if c.raftNode.Leader() {
 		if err := c.raftNode.StepDown(); err != nil {
-			return &clustermgmt.StepDownResponse{
-				Error: &clustermgmt.Error{
-					ErrorCode: clustermgmt.Error_GENERIC,
+			return &managepb.StepDownResponse{
+				Error: &managepb.Error{
+					ErrorCode: managepb.Error_GENERIC,
 					Message:   err.Error(),
 				},
 			}, nil
 		}
-		return &clustermgmt.StepDownResponse{
+		return &managepb.StepDownResponse{
 			NodeId: c.NodeID(),
 		}, nil
 	}

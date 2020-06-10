@@ -6,7 +6,7 @@ import (
 	"os"
 	"sort"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/clustermgmt"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/managepb"
 )
 
 // EndpointsCommand is the subcommand to list endpoints
@@ -24,7 +24,7 @@ func (c *EndpointsCommand) Run(args RunContext) error {
 	ctx, done := context.WithTimeout(context.Background(), gRPCTimeout)
 	defer done()
 
-	res, err := client.FindEndpoint(ctx, &clustermgmt.EndpointRequest{EndpointName: args.ClusterCommands().Endpoints.Filter})
+	res, err := client.FindEndpoint(ctx, &managepb.EndpointRequest{EndpointName: args.ClusterCommands().Endpoints.Filter})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error searching for endpoint: %v\n", err)
 		return errStd

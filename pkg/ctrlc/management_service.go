@@ -6,14 +6,14 @@ import (
 	"time"
 
 	"github.com/ExploratoryEngineering/clusterfunk/pkg/clientfunk"
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/clustermgmt"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/managepb"
 	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
 	"google.golang.org/grpc"
 )
 
 const gRPCTimeout = 10 * time.Second
 
-func connectToManagement(params ManagementServerParameters) clustermgmt.ClusterManagementClient {
+func connectToManagement(params ManagementServerParameters) managepb.ClusterManagementClient {
 	if params.Endpoint == "" && params.Zeroconf {
 		if params.ClusterName == "" {
 			fmt.Fprintf(os.Stderr, "Needs a cluster name if zeroconf is to be used for discovery")
@@ -48,6 +48,6 @@ func connectToManagement(params ManagementServerParameters) clustermgmt.ClusterM
 		fmt.Fprintf(os.Stderr, "Could not dial management endpoint: %v\n", err)
 		return nil
 	}
-	return clustermgmt.NewClusterManagementClient(conn)
+	return managepb.NewClusterManagementClient(conn)
 
 }

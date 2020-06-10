@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package clusterproto;
+package clusterpb;
 
-option go_package = ".;clusterproto";
+option go_package = ".;clusterpb";
 
 // ConfirmShardMapRequest is sent by followers to the leader to signal readyness
 // with the new shard map

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/clustermgmt"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/managepb"
 )
 
 // ShardsCommand is the subcommand that shows the shards in the cluster
@@ -22,7 +22,7 @@ func (c *ShardsCommand) Run(args RunContext) error {
 	ctx, done := context.WithTimeout(context.Background(), gRPCTimeout)
 	defer done()
 
-	res, err := client.ListShards(ctx, &clustermgmt.ListShardsRequest{})
+	res, err := client.ListShards(ctx, &managepb.ListShardsRequest{})
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error listing shards: %v\n", err)

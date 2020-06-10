@@ -26,7 +26,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/clusterproto"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/clusterpb"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/sharding"
@@ -456,7 +456,7 @@ func (c *clusterfunkCluster) processShardMapCommitMessage(msg *LogMessage) {
 	if c.raftNode.Leader() {
 		return
 	}
-	commitMsg := &clusterproto.CommitShardMapMessage{}
+	commitMsg := &clusterpb.CommitShardMapMessage{}
 	if err := proto.Unmarshal(msg.Data, commitMsg); err != nil {
 		panic(fmt.Sprintf("Unable to unmarshal commit message: %v", err))
 	}
@@ -492,10 +492,10 @@ func (c *clusterfunkCluster) ackShardMap(index uint64, endpoint string) {
 		return
 	}
 	defer conn.Close()
-	client := clusterproto.NewClusterLeaderServiceClient(conn)
+	client := clusterpb.NewClusterLeaderServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
-	resp, err := client.ConfirmShardMap(ctx, &clusterproto.ConfirmShardMapRequest{
+	resp, err := client.ConfirmShardMap(ctx, &clusterpb.ConfirmShardMapRequest{
 		NodeID:   c.raftNode.LocalNodeID(),
 		LogIndex: int64(index),
 	})
@@ -519,7 +519,7 @@ func (c *clusterfunkCluster) ackShardMap(index uint64, endpoint string) {
 }
 
 func (c *clusterfunkCluster) sendCommitMessage(index uint64) {
-	commitMsg := clusterproto.CommitShardMapMessage{
+	commitMsg := clusterpb.CommitShardMapMessage{
 		ShardMapLogIndex: int64(index),
 	}
 	commitMsg.Nodes = append(commitMsg.Nodes, c.raftNode.Nodes.List()...)

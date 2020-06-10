@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package clustermgmt;
+package managepb;
 
-option go_package = ".;clustermgmt";
+option go_package = ".;managepb";
 
 // LeaderManagement service is responsible for node management. Management
 // operations must happen on the leader in the cluster.

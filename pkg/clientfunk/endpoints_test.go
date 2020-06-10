@@ -1,4 +1,5 @@
 package clientfunk
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -20,7 +21,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/clustermgmt"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/managepb"
 	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -30,7 +31,7 @@ func TestEndpointLookup(t *testing.T) {
 	assert := require.New(t)
 	server := grpc.NewServer()
 
-	clustermgmt.RegisterClusterManagementServer(server, &dummyManagement{})
+	managepb.RegisterClusterManagementServer(server, &dummyManagement{})
 	ep := toolbox.RandomLocalEndpoint()
 
 	go func() {
@@ -57,52 +58,52 @@ func TestEndpointLookup(t *testing.T) {
 type dummyManagement struct {
 }
 
-func (d *dummyManagement) GetStatus(context.Context, *clustermgmt.GetStatusRequest) (*clustermgmt.GetStatusResponse, error) {
+func (d *dummyManagement) GetStatus(context.Context, *managepb.GetStatusRequest) (*managepb.GetStatusResponse, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (d *dummyManagement) ListNodes(context.Context, *clustermgmt.ListNodesRequest) (*clustermgmt.ListNodesResponse, error) {
+func (d *dummyManagement) ListNodes(context.Context, *managepb.ListNodesRequest) (*managepb.ListNodesResponse, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (d *dummyManagement) FindEndpoint(ctx context.Context, req *clustermgmt.EndpointRequest) (*clustermgmt.EndpointResponse, error) {
+func (d *dummyManagement) FindEndpoint(ctx context.Context, req *managepb.EndpointRequest) (*managepb.EndpointResponse, error) {
 	if req.EndpointName == "ep.err" {
-		return &clustermgmt.EndpointResponse{
-			Error: &clustermgmt.Error{
-				ErrorCode: clustermgmt.Error_GENERIC,
+		return &managepb.EndpointResponse{
+			Error: &managepb.Error{
+				ErrorCode: managepb.Error_GENERIC,
 				Message:   "Something went wrong",
 			},
 		}, nil
 	}
-	return &clustermgmt.EndpointResponse{
-		Endpoints: []*clustermgmt.EndpointInfo{
-			&clustermgmt.EndpointInfo{Name: "ep.test", HostPort: "127.1.2.3:1234"},
-			&clustermgmt.EndpointInfo{Name: "ep.test", HostPort: "127.4.3.2:4321"},
+	return &managepb.EndpointResponse{
+		Endpoints: []*managepb.EndpointInfo{
+			&managepb.EndpointInfo{Name: "ep.test", HostPort: "127.1.2.3:1234"},
+			&managepb.EndpointInfo{Name: "ep.test", HostPort: "127.4.3.2:4321"},
 		},
 	}, nil
 }
 
-func (d *dummyManagement) ListEndpoints(ctx context.Context, req *clustermgmt.ListEndpointRequest) (*clustermgmt.ListEndpointResponse, error) {
-	return &clustermgmt.ListEndpointResponse{
-		Endpoints: []*clustermgmt.EndpointInfo{
-			&clustermgmt.EndpointInfo{Name: "ep.a", HostPort: "127.1.2.3:1234"},
-			&clustermgmt.EndpointInfo{Name: "ep.b", HostPort: "127.4.3.2:4321"},
+func (d *dummyManagement) ListEndpoints(ctx context.Context, req *managepb.ListEndpointRequest) (*managepb.ListEndpointResponse, error) {
+	return &managepb.ListEndpointResponse{
+		Endpoints: []*managepb.EndpointInfo{
+			&managepb.EndpointInfo{Name: "ep.a", HostPort: "127.1.2.3:1234"},
+			&managepb.EndpointInfo{Name: "ep.b", HostPort: "127.4.3.2:4321"},
 		},
 	}, nil
 }
 
-func (d *dummyManagement) AddNode(context.Context, *clustermgmt.AddNodeRequest) (*clustermgmt.AddNodeResponse, error) {
+func (d *dummyManagement) AddNode(context.Context, *managepb.AddNodeRequest) (*managepb.AddNodeResponse, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (d *dummyManagement) RemoveNode(context.Context, *clustermgmt.RemoveNodeRequest) (*clustermgmt.RemoveNodeResponse, error) {
+func (d *dummyManagement) RemoveNode(context.Context, *managepb.RemoveNodeRequest) (*managepb.RemoveNodeResponse, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (d *dummyManagement) StepDown(context.Context, *clustermgmt.StepDownRequest) (*clustermgmt.StepDownResponse, error) {
+func (d *dummyManagement) StepDown(context.Context, *managepb.StepDownRequest) (*managepb.StepDownResponse, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (d *dummyManagement) ListShards(context.Context, *clustermgmt.ListShardsRequest) (*clustermgmt.ListShardsResponse, error) {
+func (d *dummyManagement) ListShards(context.Context, *managepb.ListShardsRequest) (*managepb.ListShardsResponse, error) {
 	return nil, errors.New("not implemented")
 }

@@ -1,4 +1,5 @@
 package clientfunk
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -19,7 +20,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/clustermgmt"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/managepb"
 	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
 	"google.golang.org/grpc"
 )
@@ -36,12 +37,12 @@ func GetEndpoints(name string, managementClientParam toolbox.GRPCClientParam) ([
 		return nil, err
 	}
 
-	client := clustermgmt.NewClusterManagementClient(conn)
+	client := managepb.NewClusterManagementClient(conn)
 
 	// TODO: use parameter for timeout. Maybe include in grpc client params. Defaults 1s
 	ctx, done := context.WithTimeout(context.Background(), 1*time.Second)
 	defer done()
-	res, err := client.FindEndpoint(ctx, &clustermgmt.EndpointRequest{
+	res, err := client.FindEndpoint(ctx, &managepb.EndpointRequest{
 		EndpointName: name,
 	})
 	if err != nil {

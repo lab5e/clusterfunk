@@ -1,5 +1,5 @@
-// Package clusterproto contains the generate gRPC code
-package clusterproto
+package managepb
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -15,3 +15,4 @@ package clusterproto
 //See the License for the specific language governing permissions and
 //limitations under the License.
 //
+//go:generate protoc -I=../../../protobuf --go_out=plugins=grpc:. ../../../protobuf/management.proto

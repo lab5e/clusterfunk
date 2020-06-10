@@ -1,6 +1,6 @@
-// Package clustermgmt contains the protobuf-generate code for the
-// cluster management interface
-package clustermgmt
+// Package clusterpb contains the generate gRPC code
+package clusterpb
+
 //
 //Copyright 2019 Telenor Digital AS
 //

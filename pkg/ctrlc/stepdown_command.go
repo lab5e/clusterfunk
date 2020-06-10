@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/clustermgmt"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/managepb"
 )
 
 // StepDownCommand is the step-down subcommand. The current leader will step
@@ -23,7 +23,7 @@ func (c *StepDownCommand) Run(args RunContext) error {
 	ctx, done := context.WithTimeout(context.Background(), gRPCTimeout)
 	defer done()
 
-	res, err := client.StepDown(ctx, &clustermgmt.StepDownRequest{})
+	res, err := client.StepDown(ctx, &managepb.StepDownRequest{})
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error asking leader to step down: %v\n", err)

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/clustermgmt"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/managepb"
 )
 
 // ListNodesCommand is the subcommand to list nodes in the cluster
@@ -22,7 +22,7 @@ func (c *ListNodesCommand) Run(args RunContext) error {
 	ctx, done := context.WithTimeout(context.Background(), gRPCTimeout)
 	defer done()
 
-	res, err := client.ListNodes(ctx, &clustermgmt.ListNodesRequest{})
+	res, err := client.ListNodes(ctx, &managepb.ListNodesRequest{})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error listing nodes: %v\n", err)
 		return errStd

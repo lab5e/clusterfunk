@@ -1,4 +1,5 @@
 package funk
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -22,7 +23,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/clusterproto"
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/clusterpb"
 	"google.golang.org/grpc"
 )
 
@@ -40,7 +41,7 @@ func (c *clusterfunkCluster) startLeaderService() error {
 		return err
 	}
 	c.leaderServer = grpc.NewServer(opts...)
-	clusterproto.RegisterClusterLeaderServiceServer(c.leaderServer, c)
+	clusterpb.RegisterClusterLeaderServiceServer(c.leaderServer, c)
 
 	listener, err := net.Listen("tcp", leaderConfig.Endpoint)
 	if err != nil {
@@ -64,7 +65,7 @@ func (c *clusterfunkCluster) startLeaderService() error {
 	return nil
 }
 
-func (c *clusterfunkCluster) ConfirmShardMap(ctx context.Context, req *clusterproto.ConfirmShardMapRequest) (*clusterproto.ConfirmShardMapResponse, error) {
+func (c *clusterfunkCluster) ConfirmShardMap(ctx context.Context, req *clusterpb.ConfirmShardMapRequest) (*clusterpb.ConfirmShardMapResponse, error) {
 	// Ensure we're the leader and we're resharding the cluster
 	if c.Role() != Leader {
 		return nil, errors.New("not a leader")
@@ -80,20 +81,20 @@ func (c *clusterfunkCluster) ConfirmShardMap(ctx context.Context, req *clusterpr
 
 	if uint64(req.LogIndex) != c.unacknowledged.ShardIndex() {
 		// This is not the ack we're looking for
-		return &clusterproto.ConfirmShardMapResponse{
+		return &clusterpb.ConfirmShardMapResponse{
 			Success:      false,
 			CurrentIndex: int64(c.unacknowledged.ShardIndex()),
 		}, nil
 	}
 
 	if c.handleAckReceived(req.NodeID, uint64(req.LogIndex)) {
-		return &clusterproto.ConfirmShardMapResponse{
+		return &clusterpb.ConfirmShardMapResponse{
 			Success:      true,
 			CurrentIndex: req.LogIndex,
 		}, nil
 	}
 
-	return &clusterproto.ConfirmShardMapResponse{
+	return &clusterpb.ConfirmShardMapResponse{
 		Success:      false,
 		CurrentIndex: int64(c.unacknowledged.ShardIndex()),
 	}, nil
