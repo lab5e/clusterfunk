@@ -1,6 +1,6 @@
 module github.com/ExploratoryEngineering/clusterfunk
 
-go 1.12
+go 1.14
 
 require (
 	github.com/ExploratoryEngineering/logging v0.0.0-20181106085733-dcb8702a004e // indirect
