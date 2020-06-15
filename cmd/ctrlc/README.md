@@ -1,6 +1,7 @@
 # ctrlc - cluster control tool
 
-This tool is used to manage the cluster nodes via gRPC.
+This tool is used to manage the cluster nodes via gRPC. This is mostly a sample
+implementation of a command line utility.
 
 ## Usage
 
