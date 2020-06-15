@@ -1,5 +1,7 @@
 # Clusterfunk
 
+[GoDoc documentation @ pkg.go.dev](https://pkg.go.dev/github.com/ExploratoryEngineering/clusterfunk)
+
 ## What it is
 
 This is a cluster library for Go. At its core it uses Raft and Serf to manage
