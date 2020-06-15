@@ -15,4 +15,4 @@ package managepb
 //See the License for the specific language governing permissions and
 //limitations under the License.
 //
-//go:generate protoc -I=../../../protobuf --go_out=plugins=grpc:. ../../../protobuf/management.proto
+//go:generate protoc -I=../../../protobuf --go_out=plugins=grpc:. ../../../protobuf/clusterfunk_management.proto
