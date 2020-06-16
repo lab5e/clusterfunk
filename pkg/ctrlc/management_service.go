@@ -15,13 +15,13 @@ const gRPCTimeout = 10 * time.Second
 
 func connectToManagement(params ManagementServerParameters) managepb.ClusterManagementClient {
 	if params.Endpoint == "" && params.Zeroconf {
-		if params.ClusterName == "" {
+		if params.Name == "" {
 			fmt.Fprintf(os.Stderr, "Needs a cluster name if zeroconf is to be used for discovery")
 			return nil
 		}
-		ep, err := clientfunk.ZeroconfManagementLookup(params.ClusterName)
+		ep, err := clientfunk.ZeroconfManagementLookup(params.Name)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Unable to do zeroconf lookup: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Zeroconf lookup error when searching for cluster %s: %v\n", params.Name, err)
 			return nil
 		}
 		params.Endpoint = ep
@@ -45,7 +45,7 @@ func connectToManagement(params ManagementServerParameters) managepb.ClusterMana
 	}
 	conn, err := grpc.Dial(grpcParams.ServerEndpoint, opts...)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Could not dial management endpoint: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Could not dial management endpoint for cluster %s. Is is it available? : %v\n", params.Name, err)
 		return nil
 	}
 	return managepb.NewClusterManagementClient(conn)

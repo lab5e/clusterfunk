@@ -1,4 +1,5 @@
 package funk
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -154,10 +155,8 @@ const (
 // The following is a list of well-known endpoints on nodes
 const (
 	//These are
-	//MetricsEndpoint    = "ep.metrics"    // MetricsEndpoint is the metrics endpoint
-	//HTTPEndpoint       = "ep.http"       // HTTPEndpoint is the HTTP endpoint
 	SerfEndpoint       = "ep.serf"
 	RaftEndpoint       = "ep.raft"
-	ManagementEndpoint = "ep.management" //  gRPC endpoint for management
+	ManagementEndpoint = "ep.clusterfunk.management" //  gRPC endpoint for management
 	LivenessEndpoint   = "ep.liveness"
 )
