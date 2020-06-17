@@ -4,12 +4,13 @@ import "errors"
 
 // CommandList contains all of the commands for the ctrlc utility
 type CommandList struct {
-	Status    StatusCommand    `kong:"cmd,help='Show the node status'"`
-	Nodes     ListNodesCommand `kong:"cmd,help='List the nodes in the cluster'"`
-	Endpoints EndpointsCommand `kong:"cmd,help='List endpoints known by the node'"`
-	Node      NodeCommand      `kong:"cmd,help='Add and remove nodes in cluster'"`
-	Shards    ShardsCommand    `kong:"cmd,help='Show the shards in the cluster'"`
-	StepDown  StepDownCommand  `kong:"cmd,help='Step down as the current leader'"`
+	Status    StatusCommand      `kong:"cmd,help='Show the node status'"`
+	Nodes     ListNodesCommand   `kong:"cmd,help='List the nodes in the cluster'"`
+	Endpoints EndpointsCommand   `kong:"cmd,help='List endpoints known by the node'"`
+	Node      NodeCommand        `kong:"cmd,help='Add and remove nodes in cluster'"`
+	Shards    ShardsCommand      `kong:"cmd,help='Show the shards in the cluster'"`
+	StepDown  StepDownCommand    `kong:"cmd,help='Step down as the current leader'"`
+	Diag      DiagnosticsCommand `kong:"cmd,help='Show diagnostic information for zeroconf, serf and raft'"`
 }
 
 // ManagementServerParameters holds the gRPC and utility configuration
