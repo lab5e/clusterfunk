@@ -8,9 +8,11 @@ import (
 	"github.com/grandcat/zeroconf"
 )
 
+// DiagnosticsCommand is a command to show cluster diagnostics
 type DiagnosticsCommand struct {
 }
 
+// Run executes the diagnostic command
 func (c *DiagnosticsCommand) Run(args RunContext) error {
 	if args.ClusterServer().Zeroconf {
 		// Dump zeroconf lookups. Listen for 5 seconds
