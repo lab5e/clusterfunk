@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/managepb"
 	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/metrics"
 
 	log "github.com/sirupsen/logrus"
@@ -55,6 +56,9 @@ type clusterfunkCluster struct {
 	livenessChecker      LivenessChecker           // Check for node liveness. The built-in heartbeats in Raft isn't exposed
 	livenessClient       LocalLivenessEndpoint
 	cfmetrics            metrics.Sink
+	leaderClientMutex    *sync.Mutex // Mutex for the gRPC client pointing to the leader node
+	leaderClientConn     *grpc.ClientConn
+	leaderClient         managepb.ClusterManagementClient
 }
 
 // NewCluster returns a new cluster (client)
@@ -74,6 +78,7 @@ func NewCluster(params Parameters, shardManager sharding.ShardMap) Cluster {
 		unacknowledged:       newAckCollection(),
 		livenessChecker:      NewLivenessChecker(params.LivenessInterval, params.LivenessRetries),
 		cfmetrics:            metrics.NewSinkFromString(params.Metrics),
+		leaderClientMutex:    &sync.Mutex{},
 	}
 	return ret
 }
@@ -237,11 +242,13 @@ func (c *clusterfunkCluster) raftEventLoop(ch <-chan RaftEventType) {
 	for e := range ch {
 		switch e {
 		case RaftClusterSizeChanged:
+			c.clearLeaderManagementClient()
 			toolbox.TimeCall(func() { c.handleClusterSizeChanged(c.raftNode.Nodes.List()) }, "ClusterSizeChanged")
 			c.cfmetrics.SetClusterSize(c.raftNode.LocalNodeID(), c.raftNode.Nodes.Size())
 
 		case RaftLeaderLost:
 			c.livenessChecker.Clear()
+			c.clearLeaderManagementClient()
 			toolbox.TimeCall(func() { c.handleLeaderLost() }, "LeaderLost")
 
 		case RaftBecameLeader:

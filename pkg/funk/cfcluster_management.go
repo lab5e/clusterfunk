@@ -81,21 +81,36 @@ func (c *clusterfunkCluster) startManagementServices() error {
 	return nil
 }
 
+func (c *clusterfunkCluster) clearLeaderManagementClient() {
+	c.leaderClientMutex.Lock()
+	defer c.leaderClientMutex.Unlock()
+	if c.leaderClientConn != nil {
+		c.leaderClientConn.Close()
+		c.leaderClientConn = nil
+	}
+	c.leaderClient = nil
+}
+
 // Node management implementation
 // -----------------------------------------------------------------------------
 func (c *clusterfunkCluster) leaderManagementClient() (managepb.ClusterManagementClient, error) {
-	ep := c.GetEndpoint(c.raftNode.LeaderNodeID(), ManagementEndpoint)
+	if c.leaderClient == nil {
+		ep := c.GetEndpoint(c.raftNode.LeaderNodeID(), ManagementEndpoint)
 
-	// TODO: Custom gRPC parameters goes here. Set cert if required
-	opts, err := toolbox.GetGRPCDialOpts(toolbox.GRPCClientParam{})
-	if err != nil {
-		return nil, err
+		// TODO: Custom gRPC parameters goes here. Set cert if required
+		opts, err := toolbox.GetGRPCDialOpts(toolbox.GRPCClientParam{})
+		if err != nil {
+			return nil, err
+		}
+		c.leaderClientMutex.Lock()
+		defer c.leaderClientMutex.Unlock()
+		c.leaderClientConn, err = grpc.Dial(ep, opts...)
+		if err != nil {
+			return nil, err
+		}
+		c.leaderClient = managepb.NewClusterManagementClient(c.leaderClientConn)
 	}
-	conn, err := grpc.Dial(ep, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return managepb.NewClusterManagementClient(conn), nil
+	return c.leaderClient, nil
 }
 
 func (c *clusterfunkCluster) GetStatus(ctx context.Context, req *managepb.GetStatusRequest) (*managepb.GetStatusResponse, error) {
