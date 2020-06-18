@@ -1,4 +1,5 @@
 package sharding
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -67,6 +68,16 @@ func verifyShards(t *testing.T, manager ShardMap, maxShards int) {
 	}
 }
 
+func verifyWorkerIDs(t *testing.T, manager ShardMap) {
+	assert := require.New(t)
+	workers := make([]int, 0)
+	for _, v := range manager.NodeList() {
+		workerID := manager.WorkerID(v)
+		assert.NotContains(workers, workerID)
+		workers = append(workers, workerID)
+	}
+}
+
 func testShardManager(t *testing.T, manager ShardMap, maxShards int, weights []int) {
 	assert := require.New(t)
 	assert.Error(manager.Init(0, nil), "Expected error when maxShards = 0")
@@ -79,24 +90,29 @@ func testShardManager(t *testing.T, manager ShardMap, maxShards int, weights []i
 	assert.Len(manager.NodeList(), 1)
 	verifyDistribution(t, manager)
 	verifyShards(t, manager, maxShards)
+	verifyWorkerIDs(t, manager)
 
 	manager.UpdateNodes("B", "A")
 	assert.Len(manager.NodeList(), 2)
 	verifyDistribution(t, manager)
 	verifyShards(t, manager, maxShards)
+	verifyWorkerIDs(t, manager)
 
 	manager.UpdateNodes("C", "B", "A")
 	assert.Len(manager.NodeList(), 3)
 	verifyDistribution(t, manager)
 	verifyShards(t, manager, maxShards)
+	verifyWorkerIDs(t, manager)
 
 	manager.UpdateNodes("B", "A", "C", "D", "E")
 	assert.Len(manager.NodeList(), 5, "Manager should contain 5 nodes")
 	verifyShards(t, manager, maxShards)
+	verifyWorkerIDs(t, manager)
 
 	manager.UpdateNodes("B", "C", "D")
 	assert.Len(manager.NodeList(), 3, "Manager should contain 3 nodes")
 	verifyShards(t, manager, maxShards)
+	verifyWorkerIDs(t, manager)
 
 	for i := 0; i < maxShards; i++ {
 		assert.NotEqual("", manager.MapToNode(i).NodeID(), "Shard %d is not mapped to a node", i)
@@ -105,13 +121,16 @@ func testShardManager(t *testing.T, manager ShardMap, maxShards int, weights []i
 	manager.UpdateNodes("A", "C")
 	verifyDistribution(t, manager)
 	verifyShards(t, manager, maxShards)
+	verifyWorkerIDs(t, manager)
 
 	manager.UpdateNodes("C")
 	verifyDistribution(t, manager)
 	verifyShards(t, manager, maxShards)
+	verifyWorkerIDs(t, manager)
 
 	manager.UpdateNodes([]string{}...)
 	verifyDistribution(t, manager)
+	verifyWorkerIDs(t, manager)
 
 	require.Panics(t, func() { manager.MapToNode(-1) }, "Panics on invalid shard ID")
 }

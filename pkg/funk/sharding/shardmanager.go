@@ -1,4 +1,5 @@
 package sharding
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -76,6 +77,9 @@ type ShardMap interface {
 
 	// ShardCountForNode returns the number of shards allocated to a particular node.
 	ShardCountForNode(nodeid string) int
+
+	// WorkerID returns the worker ID for the node
+	WorkerID(nodeID string) int
 
 	// The marshaling methods are used to save and restore the shard manager
 	// from the Raft log.

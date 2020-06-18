@@ -28,6 +28,7 @@ type nodeData struct {
 	NodeID       string
 	TotalWeights int
 	Shards       []Shard
+	WorkerID     int
 }
 
 func newNodeData(nodeID string) *nodeData {
@@ -71,19 +72,23 @@ func (nd *nodeData) RemoveShard(preferredWeight int) Shard {
 }
 
 type weightedShardMap struct {
-	shards      []Shard
-	mutex       *sync.RWMutex
-	totalWeight int
-	nodes       map[string]*nodeData
+	shards          []Shard
+	mutex           *sync.RWMutex
+	totalWeight     int
+	nodes           map[string]*nodeData
+	maxWorkerID     int
+	workerIDCounter int
 }
 
 // NewShardMap creates a new shard mapper instance.
 func NewShardMap() ShardMap {
 	return &weightedShardMap{
-		shards:      make([]Shard, 0),
-		mutex:       &sync.RWMutex{},
-		totalWeight: 0,
-		nodes:       make(map[string]*nodeData),
+		shards:          make([]Shard, 0),
+		mutex:           &sync.RWMutex{},
+		totalWeight:     0,
+		nodes:           make(map[string]*nodeData),
+		workerIDCounter: 1,
+		maxWorkerID:     16383, // TODO: User-supplied parameter later on
 	}
 }
 
@@ -151,10 +156,14 @@ func (sm *weightedShardMap) UpdateNodes(nodeID ...string) {
 		sm.removeNode(v)
 	}
 }
+func (sm *weightedShardMap) nextWorkerID() int {
+	sm.workerIDCounter++
+	return sm.workerIDCounter % sm.maxWorkerID
+}
 
 func (sm *weightedShardMap) addNode(nodeID string) {
 	newNode := newNodeData(nodeID)
-
+	newNode.WorkerID = sm.nextWorkerID()
 	// Invariant: First node
 	if len(sm.nodes) == 0 {
 		for i := range sm.shards {
@@ -263,6 +272,7 @@ func (sm *weightedShardMap) MarshalBinary() ([]byte, error) {
 		msg.Nodes = append(msg.Nodes, &shardpb.WireNodes{
 			NodeId:   n,
 			NodeName: v.NodeID,
+			WorkerId: int32(v.WorkerID),
 		})
 		nodeMap[v.NodeID] = n
 		n++
@@ -299,7 +309,9 @@ func (sm *weightedShardMap) UnmarshalBinary(buf []byte) error {
 	nodeMap := make(map[int32]string)
 	for _, v := range msg.Nodes {
 		nodeMap[v.NodeId] = v.NodeName
-		sm.nodes[v.NodeName] = newNodeData(v.NodeName)
+		newNode := newNodeData(v.NodeName)
+		newNode.WorkerID = int(v.WorkerId)
+		sm.nodes[v.NodeName] = newNode
 	}
 	for _, v := range msg.Shards {
 		newShard := NewShard(int(v.Id), int(v.Weight))
@@ -319,4 +331,15 @@ func (sm *weightedShardMap) ShardCountForNode(nodeid string) int {
 		return 0
 	}
 	return len(node.Shards)
+}
+
+func (sm *weightedShardMap) WorkerID(nodeID string) int {
+	sm.mutex.RLock()
+	defer sm.mutex.RUnlock()
+
+	node, ok := sm.nodes[nodeID]
+	if !ok {
+		return -1
+	}
+	return node.WorkerID
 }
