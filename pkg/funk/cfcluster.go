@@ -503,7 +503,7 @@ func (c *clusterfunkCluster) ackShardMap(index uint64, endpoint string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 	resp, err := client.ConfirmShardMap(ctx, &clusterpb.ConfirmShardMapRequest{
-		NodeID:   c.raftNode.LocalNodeID(),
+		NodeId:   c.raftNode.LocalNodeID(),
 		LogIndex: int64(index),
 	})
 	if err != nil {

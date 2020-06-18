@@ -4,18 +4,27 @@ package shardpb;
 
 option go_package = ".;shardpb";
 
+// The node ID and name list. This maps the nodes to each shard. The node
+// is responsible for looking up the shards itself.
+// The worker ID is assigned by the leader node. The worker ID might change
+// each time the cluster reshards.
 message WireNodes {
-  int32 NodeId = 1;
-  string NodeName = 2;
+  int32 node_id = 1;
+  string node_name = 2;
+  int32 worker_id = 3;
 }
 
+// A single shard with an ID, a weight and the node ID for the responsible
+// node.
 message WireShard {
-  int32 Id = 1;
-  int32 Weight = 2;
-  int32 NodeId = 3;
+  int32 id = 1;
+  int32 weight = 2;
+  int32 node_id = 3;
 }
 
+// Shard distribution with a list of nodes and their assigned ID and the
+// shards as set by the leader node.
 message ShardDistribution {
-  repeated WireNodes Nodes = 1;
-  repeated WireShard Shards = 2;
+  repeated WireNodes nodes = 1;
+  repeated WireShard shards = 2;
 }

@@ -74,7 +74,7 @@ func (c *clusterfunkCluster) ConfirmShardMap(ctx context.Context, req *clusterpb
 		log.WithFields(log.Fields{
 			"state": c.State().String(),
 			"index": req.LogIndex,
-			"node":  req.NodeID,
+			"node":  req.NodeId,
 		}).Warning("not in resharding mode")
 		return nil, errors.New("not in resharding mode")
 	}
@@ -87,7 +87,7 @@ func (c *clusterfunkCluster) ConfirmShardMap(ctx context.Context, req *clusterpb
 		}, nil
 	}
 
-	if c.handleAckReceived(req.NodeID, uint64(req.LogIndex)) {
+	if c.handleAckReceived(req.NodeId, uint64(req.LogIndex)) {
 		return &clusterpb.ConfirmShardMapResponse{
 			Success:      true,
 			CurrentIndex: req.LogIndex,
