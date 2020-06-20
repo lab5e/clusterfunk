@@ -311,7 +311,7 @@ func (sm *weightedShardMap) UnmarshalBinary(buf []byte) error {
 		nodeMap[v.NodeId] = v.NodeName
 		newNode := newNodeData(v.NodeName)
 		newNode.WorkerID = int(v.WorkerId)
-		if newNode.WorkerID > sm.maxWorkerID {
+		if newNode.WorkerID > maxWorkerID {
 			maxWorkerID = newNode.WorkerID
 		}
 		sm.nodes[v.NodeName] = newNode
