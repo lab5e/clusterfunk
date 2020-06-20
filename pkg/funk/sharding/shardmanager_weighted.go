@@ -301,7 +301,7 @@ func (sm *weightedShardMap) UnmarshalBinary(buf []byte) error {
 	if err := proto.Unmarshal(buf, msg); err != nil {
 		return err
 	}
-
+	maxWorkerID := -1
 	sm.totalWeight = 0
 	sm.nodes = make(map[string]*nodeData)
 	sm.shards = make([]Shard, 0)
@@ -311,6 +311,9 @@ func (sm *weightedShardMap) UnmarshalBinary(buf []byte) error {
 		nodeMap[v.NodeId] = v.NodeName
 		newNode := newNodeData(v.NodeName)
 		newNode.WorkerID = int(v.WorkerId)
+		if newNode.WorkerID > sm.maxWorkerID {
+			maxWorkerID = newNode.WorkerID
+		}
 		sm.nodes[v.NodeName] = newNode
 	}
 	for _, v := range msg.Shards {
@@ -319,6 +322,7 @@ func (sm *weightedShardMap) UnmarshalBinary(buf []byte) error {
 		sm.totalWeight += int(v.Weight)
 		sm.shards = append(sm.shards, newShard)
 	}
+	sm.workerIDCounter = maxWorkerID
 	return nil
 }
 
