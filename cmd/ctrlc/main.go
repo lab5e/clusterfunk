@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/ctrlc"
 	"github.com/alecthomas/kong"
+	"github.com/lab5e/clusterfunk/pkg/ctrlc"
 )
 
 func main() {

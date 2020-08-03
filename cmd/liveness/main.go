@@ -1,4 +1,5 @@
 package main
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -19,9 +20,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/clusterfunk/pkg/toolbox"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
+	"github.com/lab5e/clusterfunk/pkg/funk"
 )
 
 var eps = []string{

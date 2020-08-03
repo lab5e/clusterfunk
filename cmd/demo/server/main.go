@@ -21,17 +21,17 @@ import (
 	"os"
 	"runtime/pprof"
 
-	"github.com/ExploratoryEngineering/clusterfunk/cmd/demo/server/grpcserver"
 	"github.com/alecthomas/kong"
+	"github.com/lab5e/clusterfunk/cmd/demo/server/grpcserver"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	golog "log"
 
-	"github.com/ExploratoryEngineering/clusterfunk/cmd/demo/server/http"
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/sharding"
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
 	"github.com/ExploratoryEngineering/rest"
+	"github.com/lab5e/clusterfunk/cmd/demo/server/http"
+	"github.com/lab5e/clusterfunk/pkg/funk"
+	"github.com/lab5e/clusterfunk/pkg/funk/sharding"
+	"github.com/lab5e/clusterfunk/pkg/toolbox"
 	log "github.com/sirupsen/logrus"
 )
 

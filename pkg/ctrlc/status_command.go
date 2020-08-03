@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/managepb"
+	"github.com/lab5e/clusterfunk/pkg/funk/managepb"
 )
 
 // StatusCommand is a subcommand for the ctrlc CLI.

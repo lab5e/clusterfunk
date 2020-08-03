@@ -1,4 +1,5 @@
 package http
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -19,8 +20,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/sharding"
+	"github.com/lab5e/clusterfunk/pkg/funk"
+	"github.com/lab5e/clusterfunk/pkg/funk/sharding"
 
 	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"

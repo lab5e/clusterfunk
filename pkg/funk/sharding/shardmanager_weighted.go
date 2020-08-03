@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/sharding/shardpb"
+	"github.com/lab5e/clusterfunk/pkg/funk/sharding/shardpb"
 	"google.golang.org/protobuf/proto"
 )
 

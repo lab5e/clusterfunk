@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/managepb"
+	"github.com/lab5e/clusterfunk/pkg/funk/managepb"
 )
 
 // ShardsCommand is the subcommand that shows the shards in the cluster

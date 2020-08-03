@@ -1,4 +1,5 @@
 package funk
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -17,7 +18,7 @@ package funk
 import (
 	"testing"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/clusterfunk/pkg/toolbox"
 	"github.com/stretchr/testify/require"
 )
 

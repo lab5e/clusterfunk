@@ -1,4 +1,5 @@
 package clientfunk
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -17,8 +18,8 @@ package clientfunk
 import (
 	"time"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/clusterfunk/pkg/funk"
+	"github.com/lab5e/clusterfunk/pkg/toolbox"
 )
 
 // ZeroconfManagementLookup does a lookup in Zeroconf to find endpoints. The cluster

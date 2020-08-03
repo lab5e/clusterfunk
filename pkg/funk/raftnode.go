@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/clusterfunk/pkg/toolbox"
 	log "github.com/sirupsen/logrus"
 
 	"net"

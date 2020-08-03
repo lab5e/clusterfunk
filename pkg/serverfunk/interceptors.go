@@ -1,4 +1,5 @@
 package serverfunk
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -17,8 +18,8 @@ package serverfunk
 import (
 	"context"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/metrics"
+	"github.com/lab5e/clusterfunk/pkg/funk"
+	"github.com/lab5e/clusterfunk/pkg/funk/metrics"
 
 	"google.golang.org/grpc"
 )

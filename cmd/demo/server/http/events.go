@@ -1,4 +1,5 @@
 package http
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -15,8 +16,8 @@ package http
 //limitations under the License.
 //
 import (
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/sharding"
+	"github.com/lab5e/clusterfunk/pkg/funk"
+	"github.com/lab5e/clusterfunk/pkg/funk/sharding"
 )
 
 // This file contains the websocket events that will be sent to the client

@@ -24,12 +24,12 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/ExploratoryEngineering/clusterfunk/cmd/demo"
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/clientfunk"
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
 	"github.com/aclements/go-moremath/stats"
 	"github.com/alecthomas/kong"
+	"github.com/lab5e/clusterfunk/cmd/demo"
+	"github.com/lab5e/clusterfunk/pkg/clientfunk"
+	"github.com/lab5e/clusterfunk/pkg/funk"
+	"github.com/lab5e/clusterfunk/pkg/toolbox"
 )
 
 type parameters struct {

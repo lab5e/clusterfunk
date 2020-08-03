@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/managepb"
+	"github.com/lab5e/clusterfunk/pkg/funk/managepb"
 )
 
 // NodeCommand is the subcommand to add and remove nodes

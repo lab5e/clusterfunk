@@ -1,4 +1,5 @@
 package funk
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -20,7 +21,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/clusterfunk/pkg/toolbox"
 )
 
 // Ensure clients gets events when they die while acking

@@ -1,4 +1,5 @@
 package funk
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -18,7 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/clusterfunk/pkg/toolbox"
 )
 
 // ackCollection handles acknowledgement and timeouts on acknowledgements

@@ -1,6 +1,6 @@
 # Clusterfunk
 
-[GoDoc documentation @ pkg.go.dev](https://pkg.go.dev/github.com/ExploratoryEngineering/clusterfunk)
+[GoDoc documentation @ pkg.go.dev](https://pkg.go.dev/github.com/lab5e/clusterfunk)
 
 ## What it is
 

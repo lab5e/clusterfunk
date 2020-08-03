@@ -23,7 +23,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/clusterpb"
+	"github.com/lab5e/clusterfunk/pkg/funk/clusterpb"
 	"google.golang.org/grpc"
 )
 

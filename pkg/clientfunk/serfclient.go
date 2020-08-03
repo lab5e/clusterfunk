@@ -1,4 +1,5 @@
 package clientfunk
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -22,8 +23,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/clusterfunk/pkg/funk"
+	"github.com/lab5e/clusterfunk/pkg/toolbox"
 )
 
 // EndpointMonitor monitors a Serf cluster for endpoint changes. Endpoints

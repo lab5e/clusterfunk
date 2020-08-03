@@ -21,8 +21,8 @@ import (
 	"net"
 	"testing"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/managepb"
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/clusterfunk/pkg/funk/managepb"
+	"github.com/lab5e/clusterfunk/pkg/toolbox"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 )

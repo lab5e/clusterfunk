@@ -5,9 +5,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/clientfunk"
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/managepb"
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/clusterfunk/pkg/clientfunk"
+	"github.com/lab5e/clusterfunk/pkg/funk/managepb"
+	"github.com/lab5e/clusterfunk/pkg/toolbox"
 	"google.golang.org/grpc"
 )
 

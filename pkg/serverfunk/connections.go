@@ -1,4 +1,5 @@
 package serverfunk
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -18,10 +19,10 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
+	"github.com/lab5e/clusterfunk/pkg/funk"
 
+	"github.com/lab5e/clusterfunk/pkg/funk/sharding"
 	"github.com/sirupsen/logrus"
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/sharding"
 	"google.golang.org/grpc"
 )
 

@@ -1,4 +1,5 @@
 package grpcserver
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -20,10 +21,10 @@ import (
 	"math/rand"
 	"net"
 
-	"github.com/ExploratoryEngineering/clusterfunk/cmd/demo"
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/sharding"
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/serverfunk"
+	"github.com/lab5e/clusterfunk/cmd/demo"
+	"github.com/lab5e/clusterfunk/pkg/funk"
+	"github.com/lab5e/clusterfunk/pkg/funk/sharding"
+	"github.com/lab5e/clusterfunk/pkg/serverfunk"
 
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"

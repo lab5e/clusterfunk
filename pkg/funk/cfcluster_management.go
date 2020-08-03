@@ -25,8 +25,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/managepb"
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/clusterfunk/pkg/funk/managepb"
+	"github.com/lab5e/clusterfunk/pkg/toolbox"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"

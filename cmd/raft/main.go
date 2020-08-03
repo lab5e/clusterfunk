@@ -1,4 +1,5 @@
 package main
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -23,9 +24,9 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk"
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/sharding"
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/clusterfunk/pkg/funk"
+	"github.com/lab5e/clusterfunk/pkg/funk/sharding"
+	"github.com/lab5e/clusterfunk/pkg/toolbox"
 )
 
 const numShards = 10000

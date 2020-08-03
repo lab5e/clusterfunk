@@ -6,7 +6,7 @@ import (
 	"os"
 	"sort"
 
-	"github.com/ExploratoryEngineering/clusterfunk/pkg/funk/managepb"
+	"github.com/lab5e/clusterfunk/pkg/funk/managepb"
 )
 
 // EndpointsCommand is the subcommand to list endpoints
