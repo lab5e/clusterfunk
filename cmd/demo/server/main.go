@@ -27,11 +27,11 @@ import (
 
 	golog "log"
 
-	"github.com/ExploratoryEngineering/rest"
 	"github.com/lab5e/clusterfunk/cmd/demo/server/http"
 	"github.com/lab5e/clusterfunk/pkg/funk"
 	"github.com/lab5e/clusterfunk/pkg/funk/sharding"
 	"github.com/lab5e/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/gotoolbox/rest"
 	log "github.com/sirupsen/logrus"
 )
 
