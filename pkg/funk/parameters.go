@@ -23,6 +23,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/lab5e/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/gotoolbox/netutils"
 )
 
 // GRPCServerParameters is a parameter struct for gRPC services
@@ -60,7 +61,7 @@ func (p *Parameters) checkAndSetEndpoint(hostport *string) {
 	if *hostport != "" {
 		return
 	}
-	port, err := toolbox.FreeTCPPort()
+	port, err := netutils.FreeTCPPort()
 	if err != nil {
 		port = int(rand.Int31n(31000) + 1024)
 	}

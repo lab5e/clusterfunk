@@ -1,4 +1,5 @@
 package toolbox
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -18,6 +19,8 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+
+	"github.com/lab5e/gotoolbox/netutils"
 )
 
 // FindPublicIPv4 returns the public IPv4 address of the. If there's more than
@@ -97,7 +100,7 @@ func PortOfHostPort(hostport string) int {
 
 // RandomPublicEndpoint returns a random public endpoint on the host. It will use the first IPv4 address found on the host.
 func RandomPublicEndpoint() string {
-	port, err := FreeTCPPort()
+	port, err := netutils.FreeTCPPort()
 	if err != nil {
 		panic(err)
 	}
@@ -110,7 +113,7 @@ func RandomPublicEndpoint() string {
 
 // RandomLocalEndpoint returns a random endpoint on the loppback interface.
 func RandomLocalEndpoint() string {
-	port, err := FreeTCPPort()
+	port, err := netutils.FreeTCPPort()
 	if err != nil {
 		panic(err)
 	}

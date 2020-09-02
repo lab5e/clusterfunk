@@ -7,7 +7,7 @@ import (
 
 	"github.com/lab5e/clusterfunk/pkg/clientfunk"
 	"github.com/lab5e/clusterfunk/pkg/funk/managepb"
-	"github.com/lab5e/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/gotoolbox/grpcutil"
 	"google.golang.org/grpc"
 )
 
@@ -32,13 +32,13 @@ func connectToManagement(params ManagementServerParameters) managepb.ClusterMana
 		return nil
 	}
 
-	grpcParams := toolbox.GRPCClientParam{
+	grpcParams := grpcutil.GRPCClientParam{
 		ServerEndpoint:     params.Endpoint,
 		TLS:                params.TLS,
 		CAFile:             params.CertFile,
 		ServerHostOverride: params.HostnameOverride,
 	}
-	opts, err := toolbox.GetGRPCDialOpts(grpcParams)
+	opts, err := grpcutil.GetDialOpts(grpcParams)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Could not create GRPC dial options: %v\n", err)
 		return nil

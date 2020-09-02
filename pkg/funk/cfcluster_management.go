@@ -26,7 +26,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/lab5e/clusterfunk/pkg/funk/managepb"
-	"github.com/lab5e/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/gotoolbox/grpcutil"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -98,7 +98,7 @@ func (c *clusterfunkCluster) leaderManagementClient() (managepb.ClusterManagemen
 		ep := c.GetEndpoint(c.raftNode.LeaderNodeID(), ManagementEndpoint)
 
 		// TODO: Custom gRPC parameters goes here. Set cert if required
-		opts, err := toolbox.GetGRPCDialOpts(toolbox.GRPCClientParam{})
+		opts, err := grpcutil.GetDialOpts(grpcutil.GRPCClientParam{})
 		if err != nil {
 			return nil, err
 		}

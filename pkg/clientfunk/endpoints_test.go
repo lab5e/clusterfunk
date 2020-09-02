@@ -23,6 +23,7 @@ import (
 
 	"github.com/lab5e/clusterfunk/pkg/funk/managepb"
 	"github.com/lab5e/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/gotoolbox/grpcutil"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 )
@@ -40,16 +41,16 @@ func TestEndpointLookup(t *testing.T) {
 		assert.NoError(server.Serve(listener))
 	}()
 
-	eps, err := GetEndpoints("ep.test", toolbox.GRPCClientParam{ServerEndpoint: ep})
+	eps, err := GetEndpoints("ep.test", grpcutil.GRPCClientParam{ServerEndpoint: ep})
 	assert.NoError(err)
 	assert.Contains(eps, "127.1.2.3:1234")
 	assert.Contains(eps, "127.4.3.2:4321")
 	assert.Len(eps, 2)
 
-	_, err = GetEndpoints("ep.err", toolbox.GRPCClientParam{ServerEndpoint: ep})
+	_, err = GetEndpoints("ep.err", grpcutil.GRPCClientParam{ServerEndpoint: ep})
 	assert.Error(err)
 
-	_, err = GetEndpoints("ep.test", toolbox.GRPCClientParam{ServerEndpoint: toolbox.RandomLocalEndpoint()})
+	_, err = GetEndpoints("ep.test", grpcutil.GRPCClientParam{ServerEndpoint: toolbox.RandomLocalEndpoint()})
 	assert.Error(err)
 
 }

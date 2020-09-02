@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/lab5e/clusterfunk/pkg/toolbox"
+	gotoolbox "github.com/lab5e/gotoolbox/toolbox"
 )
 
 func registerService(name string) {
@@ -33,7 +34,7 @@ func registerService(name string) {
 		log.Printf("Error registering service: %v", err)
 		return
 	}
-	toolbox.WaitForCtrlC()
+	gotoolbox.WaitForSignal()
 
 	reg.Shutdown()
 }

@@ -21,14 +21,14 @@ import (
 	"time"
 
 	"github.com/lab5e/clusterfunk/pkg/funk/managepb"
-	"github.com/lab5e/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/gotoolbox/grpcutil"
 	"google.golang.org/grpc"
 )
 
 // GetEndpoints returns the endpoints in the cluster. This method uses the
 // gRPC management endpoint to query for endpoints.
-func GetEndpoints(name string, managementClientParam toolbox.GRPCClientParam) ([]string, error) {
-	opts, err := toolbox.GetGRPCDialOpts(managementClientParam)
+func GetEndpoints(name string, managementClientParam grpcutil.GRPCClientParam) ([]string, error) {
+	opts, err := grpcutil.GetDialOpts(managementClientParam)
 	if err != nil {
 		return nil, err
 	}

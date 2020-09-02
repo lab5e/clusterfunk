@@ -24,6 +24,7 @@ import (
 
 	"github.com/lab5e/clusterfunk/pkg/funk/managepb"
 	"github.com/lab5e/clusterfunk/pkg/funk/metrics"
+	"github.com/lab5e/gotoolbox/grpcutil"
 
 	log "github.com/sirupsen/logrus"
 
@@ -482,12 +483,12 @@ func (c *clusterfunkCluster) processShardMapCommitMessage(msg *LogMessage) {
 func (c *clusterfunkCluster) ackShardMap(index uint64, endpoint string) {
 	// Step 1 Leader ID
 	// Confirm the shard map
-	clientParam := toolbox.GRPCClientParam{
+	clientParam := grpcutil.GRPCClientParam{
 		ServerEndpoint: endpoint,
 		TLS:            false,
 		CAFile:         "",
 	}
-	opts, err := toolbox.GetGRPCDialOpts(clientParam)
+	opts, err := grpcutil.GetDialOpts(clientParam)
 	if err != nil {
 		//panic(fmt.Sprintf("Unable to acknowledge gRPC client parameters: %v", err))
 		log.WithError(err).Error("Unable to acknowledge gRPC client parameters")

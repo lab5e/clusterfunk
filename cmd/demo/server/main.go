@@ -32,6 +32,7 @@ import (
 	"github.com/lab5e/clusterfunk/pkg/funk/sharding"
 	"github.com/lab5e/clusterfunk/pkg/toolbox"
 	"github.com/lab5e/gotoolbox/rest"
+	gotoolbox "github.com/lab5e/gotoolbox/toolbox"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -123,7 +124,7 @@ func main() {
 	}
 	defer cluster.Stop()
 
-	toolbox.WaitForCtrlC()
+	gotoolbox.WaitForSignal()
 }
 
 // This prints the shard map and nodes in the cluster with the endpoint for

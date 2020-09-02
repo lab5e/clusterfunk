@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/lab5e/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/gotoolbox/toolbox"
 
 	"github.com/lab5e/clusterfunk/pkg/funk"
 )
@@ -73,6 +73,6 @@ func main() {
 			}
 		}()
 	}
-	toolbox.WaitForCtrlC()
+	toolbox.WaitForSignal()
 	fmt.Println("Stopping...")
 }
