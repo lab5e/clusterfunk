@@ -27,7 +27,7 @@ func (c *ServicesCommand) Run(args RunContext) error {
 	fmt.Printf("%-20s %s\n", "Name", "Listen address")
 	fmt.Println("---------------------------------------------------------------")
 	for _, v := range client.ServiceEndpoints() {
-		fmt.Printf("%-20s %s\n", v.Name, v.Endpoint)
+		fmt.Printf("%-20s %s\n", v.Name, v.ListenAddress)
 	}
 	return nil
 }

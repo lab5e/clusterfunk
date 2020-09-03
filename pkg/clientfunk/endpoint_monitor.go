@@ -56,7 +56,7 @@ type EndpointMonitor interface {
 type Endpoint struct {
 	ClusterMember bool   // Set to true if a member of the cluster
 	Name          string // Name of endpoint
-	Endpoint      string // Address:port of endpoint
+	ListenAddress string // Address:port of endpoint
 }
 
 type endpointMonitor struct {
@@ -92,7 +92,7 @@ func (e *endpointMonitor) newNode(n funk.SerfMember) {
 			newEP := Endpoint{
 				ClusterMember: n.Tags[funk.RaftEndpoint] != "",
 				Name:          k,
-				Endpoint:      v,
+				ListenAddress: v,
 			}
 			e.mutex.Lock()
 			e.endpoints = append(e.endpoints, newEP)
@@ -101,7 +101,7 @@ func (e *endpointMonitor) newNode(n funk.SerfMember) {
 			// This is an endpoint inside the cluster
 			// TODO: rewrite to use internal type
 			if newEP.ClusterMember {
-				AddClusterEndpoint(newEP.Name, newEP.Endpoint)
+				AddClusterEndpoint(newEP.Name, newEP.ListenAddress)
 			}
 		}
 	}
@@ -113,10 +113,10 @@ func (e *endpointMonitor) removeNode(n funk.SerfMember) {
 
 	for k, v := range n.Tags {
 		for i, ep := range e.endpoints {
-			if ep.Name == k && ep.Endpoint == v {
+			if ep.Name == k && ep.ListenAddress == v {
 				e.endpoints = append(e.endpoints[:i], e.endpoints[i+1:]...)
 				if ep.ClusterMember {
-					RemoveClusterEndpoint(ep.Name, ep.Endpoint)
+					RemoveClusterEndpoint(ep.Name, ep.ListenAddress)
 				}
 				return
 			}
