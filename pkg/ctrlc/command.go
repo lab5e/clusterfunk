@@ -10,6 +10,7 @@ type CommandList struct {
 	Node      NodeCommand        `kong:"cmd,help='Add and remove nodes in cluster'"`
 	Shards    ShardsCommand      `kong:"cmd,help='Show the shards in the cluster'"`
 	StepDown  StepDownCommand    `kong:"cmd,help='Step down as the current leader'"`
+	Services  ServicesCommand    `kong:"cmd,help='List (non-cluster) services'"`
 	Diag      DiagnosticsCommand `kong:"cmd,help='Show diagnostic information for zeroconf, serf and raft'"`
 }
 

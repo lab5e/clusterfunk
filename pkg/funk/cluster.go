@@ -150,6 +150,9 @@ const (
 	// ZeroconfManagementKind is the type used to register management endpoints
 	// in zeroconf.
 	ZeroconfManagementKind = "mgmt"
+
+	// ZeroconfServiceKind is the type used to register (non-cluster) services
+	ZeroconfServiceKind = "svc"
 )
 
 // The following is a list of well-known endpoints on nodes

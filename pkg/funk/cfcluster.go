@@ -160,6 +160,7 @@ func (c *clusterfunkCluster) Start() error {
 		log.WithError(err).Error("Error starting leader gRPC interface")
 	}
 	if c.config.ZeroConf {
+		// TOOD: Merge with service init code
 		c.registry = toolbox.NewZeroconfRegistry(c.config.Name)
 
 		var err error

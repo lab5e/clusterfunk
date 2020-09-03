@@ -1,8 +1,11 @@
 package funk
 
 import (
-	"errors"
 	"net"
+	"time"
+
+	"github.com/lab5e/clusterfunk/pkg/toolbox"
+	"github.com/sirupsen/logrus"
 )
 
 // ServiceNode is a node for services that will be discoverable but not a
@@ -15,6 +18,52 @@ type ServiceNode interface {
 }
 
 // NewServiceNode creates a new ServiceNode instance
-func NewServiceNode() (ServiceNode, error) {
-	return nil, errors.New("not implemented")
+func NewServiceNode(params ServiceParameters) (ServiceNode, error) {
+	params.Final()
+	ret := &serviceNode{
+		Serf: NewSerfNode(),
+	}
+	if params.ZeroConf {
+		// TODO: Merge this with cluster init code. Some similarities
+		registry := toolbox.NewZeroconfRegistry(params.Name)
+		var err error
+		addrs, err := registry.Resolve(ZeroconfSerfKind, 1*time.Second)
+		if err != nil {
+			return nil, err
+		}
+
+		if params.Serf.JoinAddress == "" {
+			if len(addrs) > 0 {
+				params.Serf.JoinAddress = addrs[0]
+			}
+			if len(addrs) == 0 {
+				logrus.Debug("No serf nodes found via zeroconf, wont join")
+			}
+		}
+
+		if err := registry.Register(ZeroconfSerfKind, params.NodeID, toolbox.PortOfHostPort(params.Serf.Endpoint)); err != nil {
+			return nil, err
+		}
+
+	}
+
+	if err := ret.Serf.Start(params.Name, params.Serf); err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
+type serviceNode struct {
+	Serf *SerfNode
+}
+
+func (s *serviceNode) RegisterServiceEndpoint(endpointName string, address net.Addr) error {
+	s.Serf.SetTag(endpointName, address.String())
+	return s.Serf.PublishTags()
+}
+
+func (s *serviceNode) Stop() {
+	if err := s.Serf.Stop(); err != nil {
+		logrus.WithError(err).Error("Error stopping Serf node")
+	}
 }

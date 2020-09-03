@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -41,14 +42,31 @@ type EndpointMonitor interface {
 
 	// WaitForEndpoints waits for the first endpoint to be set.
 	WaitForEndpoints()
+
+	// ServiceEndpoints returns a list of service endpoints in the Serf cluster
+	// which isn't from Raft nodes, ie associated services
+	ServiceEndpoints() []Endpoint
+
+	// ClusterEndpoints returns a list of cluster endpoints in the Serf cluster
+	// that's also members of the cluster, ie endpoints in the cluster.
+	ClusterEndpoints() []Endpoint
+}
+
+// Endpoint is a type to hold endpoint information
+type Endpoint struct {
+	ClusterMember bool   // Set to true if a member of the cluster
+	Name          string // Name of endpoint
+	Endpoint      string // Address:port of endpoint
 }
 
 type endpointMonitor struct {
-	serfNode *funk.SerfNode
-	wait     chan bool
+	serfNode  *funk.SerfNode
+	wait      chan bool
+	endpoints []Endpoint
+	mutex     *sync.Mutex
 }
 
-func (e *endpointMonitor) Start(clientName, clusterName string, zeroConf bool, config funk.SerfParameters) error {
+func (e *endpointMonitor) start(clientName, clusterName string, zeroConf bool, config funk.SerfParameters) error {
 	config.Final()
 	if zeroConf && config.JoinAddress == "" {
 		reg := toolbox.NewZeroconfRegistry(clusterName)
@@ -69,26 +87,39 @@ func (e *endpointMonitor) Start(clientName, clusterName string, zeroConf bool, c
 }
 
 func (e *endpointMonitor) newNode(n funk.SerfMember) {
-	if n.Tags[funk.RaftEndpoint] == "" {
-		// ignore node; this isn't a Raft node
-		return
-	}
 	for k, v := range n.Tags {
 		if strings.HasPrefix(k, funk.EndpointPrefix) {
-			AddClusterEndpoint(k, v)
+			newEP := Endpoint{
+				ClusterMember: n.Tags[funk.RaftEndpoint] != "",
+				Name:          k,
+				Endpoint:      v,
+			}
+			e.mutex.Lock()
+			e.endpoints = append(e.endpoints, newEP)
+			e.mutex.Unlock()
+
+			// This is an endpoint inside the cluster
+			// TODO: rewrite to use internal type
+			if newEP.ClusterMember {
+				AddClusterEndpoint(newEP.Name, newEP.Endpoint)
+			}
 		}
 	}
 }
 
 func (e *endpointMonitor) removeNode(n funk.SerfMember) {
-	if n.Tags[funk.RaftEndpoint] == "" {
-		// ignore node; this isn't a Raft node
-		return
-	}
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+
 	for k, v := range n.Tags {
-		// remove endpoint
-		if strings.HasPrefix(k, funk.EndpointPrefix) {
-			RemoveClusterEndpoint(k, v)
+		for i, ep := range e.endpoints {
+			if ep.Name == k && ep.Endpoint == v {
+				e.endpoints = append(e.endpoints[:i], e.endpoints[i+1:]...)
+				if ep.ClusterMember {
+					RemoveClusterEndpoint(ep.Name, ep.Endpoint)
+				}
+				return
+			}
 		}
 	}
 }
@@ -121,14 +152,43 @@ func (e *endpointMonitor) WaitForEndpoints() {
 	<-e.wait
 }
 
+func (e *endpointMonitor) ClusterEndpoints() []Endpoint {
+	var ret []Endpoint
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	for _, v := range e.endpoints {
+		if v.ClusterMember {
+			ret = append(ret, v)
+		}
+	}
+	return ret
+}
+
+func (e *endpointMonitor) ServiceEndpoints() []Endpoint {
+	var ret []Endpoint
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	for _, v := range e.endpoints {
+		if !v.ClusterMember {
+			ret = append(ret, v)
+		}
+	}
+	return ret
+}
+
 // StartEndpointMonitor monitors the Serf cluster for endpoints and updates
-// the gRPC endpoint list continuously. The client will be a Serf not but not
-// a member of the Raft cluster.
+// the gRPC endpoint list continuously. The client will be a Serf node but not
+// a Raft node and member of the cluster.
 // The client name is optional. If it is empty a random client name will be set.
 func StartEndpointMonitor(clientName, clusterName string, zeroConf bool, serfParameters funk.SerfParameters) (EndpointMonitor, error) {
 	ret := &endpointMonitor{
-		serfNode: funk.NewSerfNode(),
-		wait:     make(chan bool),
+		serfNode:  funk.NewSerfNode(),
+		wait:      make(chan bool),
+		endpoints: make([]Endpoint, 0),
+		mutex:     &sync.Mutex{},
 	}
-	return ret, ret.Start(clientName, clusterName, zeroConf, serfParameters)
+	if err := ret.start(clientName, clusterName, zeroConf, serfParameters); err != nil {
+		return nil, err
+	}
+	return ret, nil
 }
