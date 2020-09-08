@@ -137,6 +137,10 @@ type Cluster interface {
 	// retrieved from the Serf cluster. Note that there's no guarantee
 	// that the node will be responding on that endpoint.
 	GetEndpoint(nodeID string, endpointName string) string
+
+	// NewObserver returns a new endpoint observer for endpoints in and around
+	// the cluster
+	NewObserver() EndpointObserver
 }
 
 // The following are internal tags and values for nodes

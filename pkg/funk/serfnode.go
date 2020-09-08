@@ -414,6 +414,11 @@ func (s *SerfNode) memberList() []nodeItem {
 	return ret
 }
 
+// ID returns the
+func (s *SerfNode) ID() string {
+	return s.se.LocalMember().Name
+}
+
 type muteWriter struct {
 }
 

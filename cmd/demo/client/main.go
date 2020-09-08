@@ -28,19 +28,18 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/lab5e/clusterfunk/cmd/demo"
 	"github.com/lab5e/clusterfunk/pkg/clientfunk"
-	"github.com/lab5e/clusterfunk/pkg/funk"
 	"github.com/lab5e/clusterfunk/pkg/toolbox"
 )
 
 type parameters struct {
-	Endpoints    string              `kong:"help='Comma-separated list of endpoints to use. Will use zeroconf to find the parameters'"`
-	ClusterName  string              `kong:"help='Cluster name',default='clusterfunk'"`
-	Repeats      int                 `kong:"help='Number of times to repeat rpc call',default='50'"`
-	Sleep        time.Duration       `kong:"help='Sleep between invocations',default='100ms'"`
-	PrintSummary bool                `kong:"help='Print summary when finished',default='true'"`
-	ZeroConf     bool                `kong:"help='ZeroConf lookups for cluster',default='true'"`
-	Retry        bool                `kong:"help='Do a single retry for failed requests',default='true'"`
-	Serf         funk.SerfParameters `kong:"embed,prefix='serf-'"`
+	Endpoints    string        `kong:"help='Comma-separated list of endpoints to use. Will use zeroconf to find the parameters'"`
+	ClusterName  string        `kong:"help='Cluster name',default='clusterfunk'"`
+	Repeats      int           `kong:"help='Number of times to repeat rpc call',default='50'"`
+	Sleep        time.Duration `kong:"help='Sleep between invocations',default='100ms'"`
+	PrintSummary bool          `kong:"help='Print summary when finished',default='true'"`
+	ZeroConf     bool          `kong:"help='ZeroConf lookups for cluster',default='true'"`
+	Retry        bool          `kong:"help='Do a single retry for failed requests',default='true'"`
+	SeedNode     string        `kong:"help='Serf seed node to use',default=''"`
 }
 
 var config parameters
@@ -68,16 +67,15 @@ func main() {
 	// The endpoint monitor keeps the list of endpoints up to date by monitoring
 	// the Serf nodes in the cluster. When a new endpoint appears it will be picked
 	// up by the resolver and used by the client.
-	em, err := clientfunk.StartEndpointMonitor("", config.ClusterName, config.ZeroConf, config.Serf)
+	client, err := clientfunk.NewClusterClient(config.ClusterName, config.ZeroConf, config.SeedNode)
 	if err != nil {
-		fmt.Printf("Unable to start endpoint monitor: %v\n", err)
+		fmt.Printf("Unable to start cluster client monitor: %v\n", err)
 		return
 	}
-	defer em.Stop()
 
 	// Wait for the list of endpoints to be ready. It might take a few seconds for
 	// Serf to retrieve the list of nodes.
-	em.WaitForEndpoints()
+	client.WaitForEndpoint("ep.demo")
 
 	// Start timing the whole process. It won't be very accurat but it should give
 	// a nice approximatino.

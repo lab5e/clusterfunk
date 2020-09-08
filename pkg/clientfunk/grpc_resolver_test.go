@@ -1,4 +1,5 @@
 package clientfunk
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -16,40 +17,20 @@ package clientfunk
 //
 import (
 	"testing"
+	"time"
 
+	"github.com/lab5e/clusterfunk/pkg/funk"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/resolver"
 )
-
-func TestAddRemoveEndpoints(t *testing.T) {
-	assert := require.New(t)
-
-	assert.Len(cfEndpoints["ep.test"], 0)
-	AddClusterEndpoint("ep.test", "example.com:1234")
-	assert.Contains(cfEndpoints["ep.test"], resolver.Address{Addr: "example.com:1234"})
-	AddClusterEndpoint("ep.test", "example.com:4321")
-	assert.Len(cfEndpoints["ep.test"], 2)
-
-	RemoveClusterEndpoint("ep.none", "example.com:1234")
-	RemoveClusterEndpoint("ep.none", "example.com:1234")
-
-	RemoveClusterEndpoint("ep.test", "example.com:1234")
-	assert.Len(cfEndpoints["ep.test"], 1)
-	RemoveClusterEndpoint("ep.test", "example.com:4321")
-	assert.Len(cfEndpoints["ep.test"], 0)
-
-	UpdateClusterEndpoints("ep.test", []string{"example.com:1", "example.com:2", "example.com:3"})
-	assert.Len(cfEndpoints["ep.test"], 3)
-	UpdateClusterEndpoints("ep.test", []string{})
-	assert.Len(cfEndpoints["ep.test"], 0)
-}
 
 func TestClusterResolverBuilder(t *testing.T) {
 	assert := require.New(t)
 
-	delete(cfEndpoints, "ep.test")
-	AddClusterEndpoint("ep.test", "example.com:1234")
+	delete(resolverBuilder.resolverEndpoints, "ep.test")
+	resolverBuilder.addEndpoint(funk.Endpoint{
+		Name:          "ep.test",
+		ListenAddress: "example.com:1234"})
 
 	conn, err := grpc.Dial("cluster:///ep.test", grpc.WithInsecure(), grpc.WithDefaultServiceConfig(GRPCServiceConfig))
 	assert.NoError(err)
@@ -58,4 +39,68 @@ func TestClusterResolverBuilder(t *testing.T) {
 
 	_, err = grpc.Dial("cluster:///xep.test", grpc.WithInsecure(), grpc.WithDefaultServiceConfig(GRPCServiceConfig))
 	assert.Error(err)
+}
+
+// Do a white box test of the resolver just to ensure basic coverage.
+func TestResolverBuilder(t *testing.T) {
+	assert := require.New(t)
+	for k := range resolverBuilder.resolverEndpoints {
+		delete(resolverBuilder.resolverEndpoints, k)
+	}
+	resolverBuilder.updateEndpoints([]funk.Endpoint{
+		funk.Endpoint{Name: "ep.1", ListenAddress: "example.com:1"},
+		funk.Endpoint{Name: "ep.2", ListenAddress: "example.com:1"},
+		funk.Endpoint{Name: "ep.3", ListenAddress: "example.com:1"},
+	})
+	resolverBuilder.addEndpoint(funk.Endpoint{
+		Name:          "ep.5",
+		ListenAddress: "example.com:2222",
+	})
+	resolverBuilder.removeEndpoint(funk.Endpoint{
+		Name:          "ep.5",
+		ListenAddress: "something.example.com:1234",
+	})
+	assert.Len(resolverBuilder.resolverEndpoints, 4)
+	resolverBuilder.removeEndpoint(funk.Endpoint{
+		Name:          "ep.1",
+		ListenAddress: "example.com:1",
+	})
+	resolverBuilder.removeEndpoint(funk.Endpoint{
+		Name:          "ep.2",
+		ListenAddress: "example.com:1",
+	})
+	resolverBuilder.removeEndpoint(funk.Endpoint{
+		Name:          "ep.3",
+		ListenAddress: "example.com:1",
+	})
+	assert.Len(resolverBuilder.resolverEndpoints, 1)
+
+	eventChan := make(chan funk.NodeEvent)
+	em := funk.NewEndpointObserver("local", eventChan, nil)
+	resolverBuilder.registerObserver(em)
+	resolverBuilder.registerObserver(em)
+
+	defer em.Shutdown()
+	eventChan <- funk.NodeEvent{
+		Event: funk.SerfNodeJoined,
+		Node: funk.SerfMember{
+			NodeID: "remote",
+			State:  funk.SerfAlive,
+			Tags: map[string]string{
+				"ep.nn": "example.com:99",
+			},
+		},
+	}
+	eventChan <- funk.NodeEvent{
+		Event: funk.SerfNodeLeft,
+		Node: funk.SerfMember{
+			NodeID: "remote",
+			State:  funk.SerfAlive,
+			Tags: map[string]string{
+				"ep.nn": "example.com:99",
+			},
+		},
+	}
+
+	time.Sleep(10 * time.Millisecond)
 }

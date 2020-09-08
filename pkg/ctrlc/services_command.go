@@ -9,8 +9,8 @@ import (
 
 // ServicesCommand is a command to show cluster diagnostics
 type ServicesCommand struct {
-	ZeroConf    bool                `kong:"help='Use ZeroConf to discover Serf nodes',default='true'"`
 	ClusterName string              `kong:"help='Name of cluster',default='clusterfunk'"`
+	ZeroConf    bool                `kong:"help='Use ZeroConf to discover Serf nodes',default='true'"`
 	Serf        funk.SerfParameters `kong:"embed,prefix='serf-'"`
 }
 
@@ -19,14 +19,19 @@ func (c *ServicesCommand) Run(args RunContext) error {
 	params := funk.SerfParameters{}
 	params.Final()
 
-	client, err := clientfunk.StartEndpointMonitor("ctrlc", args.ClusterCommands().Services.ClusterName, args.ClusterCommands().Services.ZeroConf, params)
+	param := args.ClusterCommands().Services
+	client, err := clientfunk.NewClusterClient(
+		param.ClusterName,
+		param.ZeroConf,
+		param.Serf.JoinAddress)
 	if err != nil {
 		return err
 	}
-	client.WaitForEndpoints()
+	client.WaitForEndpoint(funk.RaftEndpoint)
+
 	fmt.Printf("%-20s %s\n", "Name", "Listen address")
 	fmt.Println("---------------------------------------------------------------")
-	for _, v := range client.ServiceEndpoints() {
+	for _, v := range client.Endpoints() {
 		fmt.Printf("%-20s %s\n", v.Name, v.ListenAddress)
 	}
 	return nil

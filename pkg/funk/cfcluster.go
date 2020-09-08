@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -105,6 +106,27 @@ func (c *clusterfunkCluster) SetEndpoint(name, endpoint string) {
 
 func (c *clusterfunkCluster) GetEndpoint(nodeID string, endpointName string) string {
 	return c.serfNode.Node(nodeID).Tags[endpointName]
+}
+
+func (c *clusterfunkCluster) NewObserver() EndpointObserver {
+	// Build a list of existing endpoints
+	var eps []Endpoint
+	for _, v := range c.serfNode.Nodes() {
+		local := (v.NodeID == c.NodeID())
+		clusterMember := v.Tags[RaftEndpoint] != ""
+		for name, listenAddr := range v.Tags {
+			if strings.HasPrefix(name, EndpointPrefix) {
+				eps = append(eps, Endpoint{
+					ListenAddress: listenAddr,
+					Name:          name,
+					Local:         local,
+					Cluster:       clusterMember,
+					Active:        (v.State == SerfAlive),
+				})
+			}
+		}
+	}
+	return NewEndpointObserver(c.NodeID(), c.serfNode.Events(), eps)
 }
 
 func (c *clusterfunkCluster) Stop() {

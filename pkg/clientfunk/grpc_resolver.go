@@ -19,12 +19,20 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/lab5e/clusterfunk/pkg/funk"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/resolver"
 )
 
+// TODO: Integrate the client and endpoint monitor into the resolverBuilder
+
+var resolverBuilder *clusterResolverBuilder
+
 func init() {
-	resolverBuilder = &clusterResolverBuilder{}
+	resolverBuilder = &clusterResolverBuilder{
+		mutex:             &sync.RWMutex{},
+		resolverEndpoints: make(map[string][]resolver.Address),
+	}
 
 	// This must be called during init -- see gRPC documentation
 	resolver.Register(resolverBuilder)
@@ -42,21 +50,98 @@ const GRPCServiceConfig = `{
 	"loadBalancingPolicy": "round_robin"
 }`
 
-var resolverBuilder *clusterResolverBuilder
-var mutex = &sync.RWMutex{}
-var cfEndpoints = make(map[string][]resolver.Address)
-
 type clusterResolverBuilder struct {
+	endpointChan      <-chan funk.Endpoint
+	resolverEndpoints map[string][]resolver.Address
+	mutex             *sync.RWMutex
 }
 
+func (b *clusterResolverBuilder) registerObserver(o funk.EndpointObserver) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	if b.endpointChan != nil {
+		return
+	}
+	b.endpointChan = o.Observe()
+	go b.observeEndpoints()
+}
+
+func (b *clusterResolverBuilder) observeEndpoints() {
+	for ep := range b.endpointChan {
+		if ep.Active {
+			b.addEndpoint(ep)
+			continue
+		}
+		b.removeEndpoint(ep)
+	}
+}
+
+// updateEndpoints initiates the list with a new set of endpoints
+func (b *clusterResolverBuilder) updateEndpoints(endpoints []funk.Endpoint) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	for _, ep := range endpoints {
+		list, ok := b.resolverEndpoints[ep.Name]
+		if !ok {
+			list = make([]resolver.Address, 0)
+		}
+		list = append(list, resolver.Address{
+			Addr: ep.ListenAddress,
+		})
+		b.resolverEndpoints[ep.Name] = list
+	}
+}
+
+func (b *clusterResolverBuilder) addEndpoint(ep funk.Endpoint) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	eps, ok := b.resolverEndpoints[ep.Name]
+	if !ok {
+		eps = make([]resolver.Address, 0)
+	}
+	eps = append(eps, resolver.Address{Addr: ep.ListenAddress})
+	b.resolverEndpoints[ep.Name] = eps
+}
+
+func (b *clusterResolverBuilder) removeEndpoint(ep funk.Endpoint) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	eps, ok := b.resolverEndpoints[ep.Name]
+	if !ok {
+		return
+	}
+	for i, v := range eps {
+		if v.Addr == ep.ListenAddress {
+			eps = append(eps[:i], eps[i+1:]...)
+		}
+	}
+	if len(eps) == 0 {
+		delete(b.resolverEndpoints, ep.Name)
+		return
+	}
+	b.resolverEndpoints[ep.Name] = eps
+
+}
+
+func (b *clusterResolverBuilder) getAddresses(name string) []resolver.Address {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+	ret, ok := b.resolverEndpoints[name]
+	if !ok {
+		return nil
+	}
+	return ret
+}
 func (b *clusterResolverBuilder) Build(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOptions) (resolver.Resolver, error) {
 	if target.Scheme != ClusterfunkSchemaName {
 		return nil, fmt.Errorf("unsupported scheme: %s", target.Scheme)
 	}
-	mutex.RLock()
-	defer mutex.RUnlock()
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
 
 	ret := &clusterResolver{
+		source: b,
 		cc:     cc,
 		target: target,
 	}
@@ -68,13 +153,14 @@ func (b *clusterResolverBuilder) Scheme() string {
 }
 
 type clusterResolver struct {
+	source *clusterResolverBuilder
 	cc     resolver.ClientConn
 	target resolver.Target
 }
 
 func (c *clusterResolver) updateState() error {
-	addrs, ok := cfEndpoints[c.target.Endpoint]
-	if !ok {
+	addrs := c.source.getAddresses(c.target.Endpoint)
+	if addrs == nil {
 		return fmt.Errorf("unknown endpoint (%s) for resolver", c.target.Endpoint)
 	}
 	// Look up the name and respond with the updated list.
@@ -92,58 +178,4 @@ func (c *clusterResolver) ResolveNow(resolver.ResolveNowOptions) {
 
 func (c *clusterResolver) Close() {
 	// nothing to do
-}
-
-// UpdateClusterEndpoints updates all of the cluster endpoints with a given
-// name. The existing cluster endpoints with that name is removed from the
-// collection used by the gRPC resolver.
-func UpdateClusterEndpoints(endpointName string, endpoints []string) {
-	mutex.Lock()
-	defer mutex.Unlock()
-
-	delete(cfEndpoints, endpointName)
-
-	list := make([]resolver.Address, 0)
-
-	for _, v := range endpoints {
-		list = append(list, resolver.Address{
-			Addr: v,
-		})
-	}
-	cfEndpoints[endpointName] = list
-}
-
-// AddClusterEndpoint adds a single cluster endpoint to the collection used by
-// the gRPC resolver. The same endpoint can be added multiple times.
-func AddClusterEndpoint(endpointName, endpoint string) {
-	mutex.Lock()
-	defer mutex.Unlock()
-	eps, ok := cfEndpoints[endpointName]
-	if !ok {
-		eps = make([]resolver.Address, 0)
-	}
-	eps = append(eps, resolver.Address{Addr: endpoint})
-	cfEndpoints[endpointName] = eps
-}
-
-// RemoveClusterEndpoint removes a single cluster endpoint from the collection
-// used by the gRPC resolver. All endpoints with the given name and endpoint
-// will be removed from the collection.
-func RemoveClusterEndpoint(endpointName, endpoint string) {
-	mutex.Lock()
-	defer mutex.Unlock()
-	eps, ok := cfEndpoints[endpointName]
-	if !ok {
-		return
-	}
-	for i, v := range eps {
-		if v.Addr == endpoint {
-			eps = append(eps[:i], eps[i+1:]...)
-		}
-	}
-	if len(eps) == 0 {
-		delete(cfEndpoints, endpointName)
-		return
-	}
-	cfEndpoints[endpointName] = eps
 }

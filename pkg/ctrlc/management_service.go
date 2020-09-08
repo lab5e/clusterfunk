@@ -5,8 +5,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/lab5e/clusterfunk/pkg/clientfunk"
+	"github.com/lab5e/clusterfunk/pkg/funk"
 	"github.com/lab5e/clusterfunk/pkg/funk/managepb"
+	"github.com/lab5e/clusterfunk/pkg/toolbox"
 	"github.com/lab5e/gotoolbox/grpcutil"
 	"google.golang.org/grpc"
 )
@@ -19,7 +20,8 @@ func connectToManagement(params ManagementServerParameters) managepb.ClusterMana
 			fmt.Fprintf(os.Stderr, "Needs a cluster name if zeroconf is to be used for discovery")
 			return nil
 		}
-		ep, err := clientfunk.ZeroconfManagementLookup(params.Name)
+		zr := toolbox.NewZeroconfRegistry(params.Name)
+		ep, err := zr.ResolveFirst(funk.ZeroconfManagementKind, 1*time.Second)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Zeroconf lookup error when searching for cluster %s: %v\n", params.Name, err)
 			return nil
