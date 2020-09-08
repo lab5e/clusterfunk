@@ -10,6 +10,7 @@ bins:
 	cd cmd/demo/server && go build -o ../../../bin/demo
 	cd cmd/demo/client && go build -o ../../../bin/client
 	cd cmd/raft && go build -o ../../bin/raft
+	cd cmd/seed && go build -o ../../bin/seed
 
 test:
 	go test ./... --cover

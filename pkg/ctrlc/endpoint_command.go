@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"time"
 
 	"github.com/lab5e/clusterfunk/pkg/funk/managepb"
 )
@@ -13,7 +12,6 @@ import (
 // EndpointsCommand is the subcommand to list endpoints
 type EndpointsCommand struct {
 	Filter string `kong:"optional,arg,help='Filter on prefix'"`
-	Live   bool   `kong:"help='Live view, update every 1s',default='false'"`
 }
 
 // Run executes the endpoint command
@@ -22,18 +20,6 @@ func (c *EndpointsCommand) Run(args RunContext) error {
 	if client == nil {
 		return errStd
 	}
-	if args.ClusterCommands().Endpoints.Live {
-		for {
-			c.queryEndpoints(client, args, true)
-			fmt.Println()
-			fmt.Println("Press Ctrl+C to stop live view")
-			time.Sleep(1 * time.Second)
-		}
-	}
-	return c.queryEndpoints(client, args, false)
-
-}
-func (c *EndpointsCommand) queryEndpoints(client managepb.ClusterManagementClient, args RunContext, clearScreen bool) error {
 	ctx, done := context.WithTimeout(context.Background(), gRPCTimeout)
 	defer done()
 
@@ -65,9 +51,6 @@ func (c *EndpointsCommand) queryEndpoints(client managepb.ClusterManagementClien
 		return nodes[i] < nodes[j]
 	})
 
-	if clearScreen {
-		fmt.Printf("\033c")
-	}
 	fmt.Printf("Endpoints for cluster '%s'\n", args.ClusterServer().Name)
 	fmt.Printf("------------------------------------------------\n")
 	for _, nodeid := range nodes {
