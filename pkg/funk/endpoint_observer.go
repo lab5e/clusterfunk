@@ -4,8 +4,6 @@ import (
 	"errors"
 	"strings"
 	"sync"
-
-	"github.com/sirupsen/logrus"
 )
 
 // Endpoint is
@@ -160,12 +158,10 @@ func (e *endpointObserver) FindFirst(name string) (Endpoint, error) {
 
 func (e *endpointObserver) WaitForEndpoints() {
 	<-e.waitCh
-	logrus.Debug("no Wait")
 }
 
 func (e *endpointObserver) startObserving(localNode string, events <-chan NodeEvent) {
 	for ev := range events {
-		logrus.Debugf("Got event: %+v", ev)
 		for name, listen := range ev.Node.Tags {
 			if strings.HasPrefix(name, EndpointPrefix) {
 				ep := Endpoint{
@@ -184,11 +180,9 @@ func (e *endpointObserver) startObserving(localNode string, events <-chan NodeEv
 				}
 			}
 		}
-		logrus.Debug("Send to wait channel")
 		select {
 		case e.waitCh <- true:
 		default:
-			logrus.Debug("Nobody's waiting")
 		}
 	}
 }
@@ -229,7 +223,6 @@ func (e *endpointObserver) removeEndpoints(ep Endpoint) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
-	logrus.Debugf("Sending endpoint %+v to observers", ep)
 	for _, v := range e.subscribers {
 		v <- ep
 	}

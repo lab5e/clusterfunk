@@ -42,7 +42,7 @@ type Parameters struct {
 	Name             string               `kong:"help='Cluster name',default='clusterfunk'"`
 	Interface        string               `kong:"help='Interface address for services'"`
 	Verbose          bool                 `kong:"help='Verbose logging for Serf and Raft'"`
-	NodeID           string               `kong:"help='Node ID for Serf and Raft'"`
+	NodeID           string               `kong:"help='Node ID for Serf and Raft',default=''"`
 	ZeroConf         bool                 `kong:"help='Zero-conf startup',default='true'"`
 	NonVoting        bool                 `kong:"help='Nonvoting node',default='false'"`
 	NonMember        bool                 `kong:"help='Non-member',default='false'"`
