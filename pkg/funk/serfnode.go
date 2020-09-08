@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -417,6 +418,27 @@ func (s *SerfNode) memberList() []nodeItem {
 // ID returns the
 func (s *SerfNode) ID() string {
 	return s.se.LocalMember().Name
+}
+
+// Endpoints returns all the endpoints in the cluster
+func (s *SerfNode) Endpoints() []Endpoint {
+	endpoints := make([]Endpoint, 0)
+	for _, node := range s.Nodes() {
+		localNode := (node.NodeID == s.ID())
+		clusterNode := node.Tags[RaftEndpoint] != ""
+		for k, v := range node.Tags {
+			if strings.HasPrefix(k, EndpointPrefix) {
+				endpoints = append(endpoints, Endpoint{
+					NodeID:        node.NodeID,
+					Name:          k,
+					ListenAddress: v,
+					Local:         localNode,
+					Cluster:       clusterNode,
+				})
+			}
+		}
+	}
+	return endpoints
 }
 
 type muteWriter struct {

@@ -8,6 +8,7 @@ import (
 
 // Endpoint is
 type Endpoint struct {
+	NodeID        string // NodeID is the ID of the node that registered the endpoint
 	ListenAddress string // ListenAddress is the registered address for the endpoint
 	Name          string // Name is the name of the endpoint
 	Active        bool   // Active is set to true if the endpoint is from an active node
@@ -165,6 +166,7 @@ func (e *endpointObserver) startObserving(localNode string, events <-chan NodeEv
 		for name, listen := range ev.Node.Tags {
 			if strings.HasPrefix(name, EndpointPrefix) {
 				ep := Endpoint{
+					NodeID:        ev.Node.NodeID,
 					ListenAddress: listen,
 					Name:          name,
 					Local:         (ev.Node.NodeID == localNode),

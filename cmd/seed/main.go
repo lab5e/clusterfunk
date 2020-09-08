@@ -16,12 +16,13 @@ import (
 )
 
 type parameters struct {
-	ClusterName string                  `kong:"help='Cluster name',default='clusterfunk'"`
-	ZeroConf    bool                    `kong:"help='ZeroConf lookups for cluster',default='true'"`
-	NodeID      string                  `kong:"help='Node ID for seed node',default=''"`
-	Serf        funk.SerfParameters     `kong:"embed,prefix='serf-'"`
-	Log         gotoolbox.LogParameters `kong:"embed,prefix='log-'"`
-	LiveView    bool                    `kong:"help='Display live view of nodes',default='false'"`
+	ClusterName  string                  `kong:"help='Cluster name',default='clusterfunk'"`
+	ZeroConf     bool                    `kong:"help='ZeroConf lookups for cluster',default='true'"`
+	NodeID       string                  `kong:"help='Node ID for seed node',default=''"`
+	Serf         funk.SerfParameters     `kong:"embed,prefix='serf-'"`
+	Log          gotoolbox.LogParameters `kong:"embed,prefix='log-'"`
+	LiveView     bool                    `kong:"help='Display live view of nodes',default='false'"`
+	ShowAllNodes bool                    `kong:"help='Show all nodes, not just nodes alive',default='false'"`
 }
 
 func main() {
@@ -80,7 +81,7 @@ func main() {
 	if config.LiveView {
 		for {
 			clearScreen()
-			dumpEndpoints(config.ClusterName, serfNode.LoadMembers())
+			dumpEndpoints(config.ClusterName, config.ShowAllNodes, serfNode.LoadMembers())
 			spin()
 		}
 	}
@@ -88,7 +89,7 @@ func main() {
 	gotoolbox.WaitForSignal()
 
 }
-func dumpEndpoints(clusterName string, members []funk.SerfMember) {
+func dumpEndpoints(clusterName string, showAllNodes bool, members []funk.SerfMember) {
 	sort.Slice(members, func(i, j int) bool {
 		return members[i].NodeID < members[j].NodeID
 	})
@@ -97,6 +98,9 @@ func dumpEndpoints(clusterName string, members []funk.SerfMember) {
 	fmt.Printf("------------------------------------------------\n")
 
 	for _, node := range members {
+		if node.State != funk.SerfAlive && !showAllNodes {
+			continue
+		}
 		fmt.Printf("Node: %s (%s)\n", node.NodeID, node.State)
 		var tags []string
 		for k := range node.Tags {

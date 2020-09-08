@@ -58,9 +58,13 @@ type clusterResolverBuilder struct {
 
 func (b *clusterResolverBuilder) registerObserver(o funk.EndpointObserver) {
 	b.mutex.Lock()
-	defer b.mutex.Unlock()
-	if b.endpointChan != nil {
+	ch := b.endpointChan
+	b.mutex.Unlock()
+	if ch != nil {
 		return
+	}
+	for _, ep := range o.Endpoints() {
+		b.addEndpoint(ep)
 	}
 	b.endpointChan = o.Observe()
 	go b.observeEndpoints()

@@ -11,6 +11,10 @@ import (
 
 // Client is a cluster client interface.
 type Client interface {
+	// Register an endpoint . Clients do not provide endpoints but if they
+	// provide some other interface out to the rest of the world it's nice to
+	// include it in the node metadata.
+	RegisterEndpoint(name string, listenAddress string) error
 	// WaitForEndpoint waits for an endpoint to become available.
 	WaitForEndpoint(name string)
 	// ServiceEndpoints lists all available service endpoints
@@ -46,7 +50,8 @@ func NewClusterClient(clusterName string, zeroConf bool, seedNode string) (Clien
 	if err := cc.serfNode.Start(nodeID, serfConfig); err != nil {
 		return nil, err
 	}
-	cc.observer = funk.NewEndpointObserver(nodeID, cc.serfNode.Events(), nil)
+	time.Sleep(1 * time.Second)
+	cc.observer = funk.NewEndpointObserver(nodeID, cc.serfNode.Events(), cc.serfNode.Endpoints())
 
 	// Attach this to the resolverBuilder if required
 	resolverBuilder.registerObserver(cc.observer)
@@ -56,6 +61,11 @@ func NewClusterClient(clusterName string, zeroConf bool, seedNode string) (Clien
 type clusterClient struct {
 	serfNode *funk.SerfNode
 	observer funk.EndpointObserver
+}
+
+func (c *clusterClient) RegisterEndpoint(name, listenAddress string) error {
+	c.serfNode.SetTag(name, listenAddress)
+	return c.serfNode.PublishTags()
 }
 
 func (c *clusterClient) WaitForEndpoint(name string) {
@@ -77,6 +87,7 @@ func (c *clusterClient) WaitForEndpoint(name string) {
 		if ep.Name == name {
 			select {
 			case found <- ep.ListenAddress:
+
 			default:
 				// An endpoint is already found, ignore
 			}

@@ -231,19 +231,17 @@ func (c *clusterfunkCluster) FindEndpoint(ctx context.Context, req *managepb.End
 		NodeId:    c.NodeID(),
 		Endpoints: make([]*managepb.EndpointInfo, 0),
 	}
-	for _, v := range c.serfNode.Nodes() {
-		for k, val := range v.Tags {
-			if strings.HasPrefix(k, EndpointPrefix) {
-				if strings.Contains(k, req.EndpointName) {
-					ret.Endpoints = append(ret.Endpoints, &managepb.EndpointInfo{
-						NodeId:   v.NodeID,
-						Name:     k,
-						HostPort: val,
-					})
-				}
-			}
+	for _, v := range c.serfNode.Endpoints() {
+		if strings.Contains(v.Name, req.EndpointName) {
+			ret.Endpoints = append(ret.Endpoints, &managepb.EndpointInfo{
+				NodeId:   v.NodeID,
+				Name:     v.Name,
+				HostPort: v.ListenAddress,
+			})
 		}
+
 	}
+
 	return ret, nil
 }
 
@@ -252,16 +250,12 @@ func (c *clusterfunkCluster) ListEndpoints(ctx context.Context, req *managepb.Li
 		NodeId:    c.NodeID(),
 		Endpoints: make([]*managepb.EndpointInfo, 0),
 	}
-	for _, v := range c.serfNode.Nodes() {
-		for k, val := range v.Tags {
-			if strings.HasPrefix(k, EndpointPrefix) {
-				ret.Endpoints = append(ret.Endpoints, &managepb.EndpointInfo{
-					NodeId:   v.NodeID,
-					Name:     k,
-					HostPort: val,
-				})
-			}
-		}
+	for _, v := range c.serfNode.Endpoints() {
+		ret.Endpoints = append(ret.Endpoints, &managepb.EndpointInfo{
+			NodeId:   v.NodeID,
+			Name:     v.Name,
+			HostPort: v.ListenAddress,
+		})
 	}
 	return ret, nil
 }
