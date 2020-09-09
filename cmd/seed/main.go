@@ -85,6 +85,16 @@ func main() {
 			spin()
 		}
 	}
+	// Dump Serf events
+	go func(evCh <-chan funk.NodeEvent) {
+		for ev := range evCh {
+			logrus.WithFields(logrus.Fields{
+				"nodeId": ev.Node.NodeID,
+				"event":  ev.Event.String(),
+				"state":  ev.Node.State,
+			}).Debug("Serf event")
+		}
+	}(serfNode.Events())
 	logrus.WithField("endpoint", config.Serf.Endpoint).Info("Seed node started")
 	gotoolbox.WaitForSignal()
 
