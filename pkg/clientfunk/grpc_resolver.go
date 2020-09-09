@@ -118,6 +118,7 @@ func (b *clusterResolverBuilder) removeEndpoint(ep funk.Endpoint) {
 	for i, v := range eps {
 		if v.Addr == ep.ListenAddress {
 			eps = append(eps[:i], eps[i+1:]...)
+			break
 		}
 	}
 	if len(eps) == 0 {

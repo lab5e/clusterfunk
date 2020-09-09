@@ -74,6 +74,11 @@ func TestResolverBuilder(t *testing.T) {
 		ListenAddress: "example.com:1",
 	})
 	assert.Len(resolverBuilder.resolverEndpoints, 1)
+	resolverBuilder.removeEndpoint(funk.Endpoint{
+		Name:          "ep.5",
+		ListenAddress: "example.com:2222",
+	})
+	assert.Len(resolverBuilder.resolverEndpoints, 0)
 
 	eventChan := make(chan funk.NodeEvent)
 	em := funk.NewEndpointObserver("local", eventChan, nil)
