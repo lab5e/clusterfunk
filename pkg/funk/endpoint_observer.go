@@ -19,7 +19,8 @@ type Endpoint struct {
 // EndpointObserver observes the cluster and generates events when endpoints
 // are registered and deregistered. Note that the endpoints might be registered
 // but the service might not be available. The list of endpoints is only
-// advisory.
+// advisory. Nodes can't unregister endpoints; once it is registered it will
+// stick around until the node goes away. The listen addresses can be changed.
 type EndpointObserver interface {
 	// Observe returns a channel that will send newly discovered endpoints. The
 	// channel is closed when the observer shuts down. The consumers should read
@@ -41,9 +42,6 @@ type EndpointObserver interface {
 
 	// FindEndpoint returns the first partially or complete matching endpoint.
 	FindFirst(name string) (Endpoint, error)
-
-	// WaitForEndpoints blocks until the first set of endpoints is receveied
-	WaitForEndpoints()
 }
 
 // NewEndpointObserver creates a new EndpointObserver instance.
@@ -52,7 +50,6 @@ func NewEndpointObserver(localNodeID string, events <-chan NodeEvent, existing [
 		mutex:       &sync.Mutex{},
 		endpoints:   make(map[string][]Endpoint),
 		subscribers: make([]chan Endpoint, 0),
-		waitCh:      make(chan bool),
 	}
 	// Populate existing endpoints if they're set.
 	for _, ep := range existing {
@@ -66,7 +63,6 @@ type endpointObserver struct {
 	mutex       *sync.Mutex
 	endpoints   map[string][]Endpoint
 	subscribers []chan Endpoint
-	waitCh      chan bool
 }
 
 func (e *endpointObserver) Observe() <-chan Endpoint {
@@ -89,6 +85,7 @@ func (e *endpointObserver) Unobserve(ch <-chan Endpoint) {
 	for i, v := range e.subscribers {
 		if v == ch {
 			e.subscribers = append(e.subscribers[:i], e.subscribers[i+1:]...)
+			close(v)
 			return
 		}
 	}
@@ -121,10 +118,10 @@ func (e *endpointObserver) Endpoints() []Endpoint {
 
 // endpointNameMatches returns true if the name matches the search term
 func endpointNameMatches(name, search string) bool {
-	if strings.HasPrefix(name, search) {
+	if name == search {
 		return true
 	}
-	if strings.HasPrefix(name[3:], search) {
+	if name[3:] == search {
 		return true
 	}
 	return false
@@ -157,10 +154,6 @@ func (e *endpointObserver) FindFirst(name string) (Endpoint, error) {
 	return Endpoint{}, errors.New("no endpoint found")
 }
 
-func (e *endpointObserver) WaitForEndpoints() {
-	<-e.waitCh
-}
-
 func (e *endpointObserver) startObserving(localNode string, events <-chan NodeEvent) {
 	for ev := range events {
 		for name, listen := range ev.Node.Tags {
@@ -178,13 +171,15 @@ func (e *endpointObserver) startObserving(localNode string, events <-chan NodeEv
 				case SerfNodeLeft:
 					e.removeEndpoints(ep)
 				case SerfNodeUpdated:
-					e.appendEndpoints(ep)
+					switch ev.Node.State {
+					case SerfAlive:
+						e.appendEndpoints(ep)
+					default:
+						// ie SerfFailed
+						e.removeEndpoints(ep)
+					}
 				}
 			}
-		}
-		select {
-		case e.waitCh <- true:
-		default:
 		}
 	}
 }
@@ -205,8 +200,13 @@ func (e *endpointObserver) appendEndpoints(ep Endpoint) {
 	for name, eps := range e.endpoints {
 		if name == ep.Name {
 			// Append to list if it doesn't already exist
-			for _, v := range eps {
-				if v.ListenAddress == ep.ListenAddress {
+			for i, v := range eps {
+				if v.Name == ep.Name && v.NodeID == ep.NodeID {
+					// Check if the listen address has changed
+					if v.ListenAddress != ep.ListenAddress {
+						eps[i] = ep
+						e.endpoints[name] = eps
+					}
 					return
 				}
 			}

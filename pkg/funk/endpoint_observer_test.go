@@ -1,7 +1,10 @@
 package funk
 
 import (
+	"fmt"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -9,136 +12,206 @@ import (
 func TestNameMatcher(t *testing.T) {
 	assert := require.New(t)
 
-	assert.True(endpointNameMatches("ep.name", "ep."))
-	assert.True(endpointNameMatches("ep.name", "ep.n"))
+	assert.False(endpointNameMatches("ep.name", "ep."))
+	assert.False(endpointNameMatches("ep.name", "ep.n"))
 	assert.True(endpointNameMatches("ep.name", "ep.name"))
-	assert.True(endpointNameMatches("ep.name", "na"))
+	assert.False(endpointNameMatches("ep.name", "na"))
 	assert.True(endpointNameMatches("ep.name", "name"))
-	assert.True(endpointNameMatches("ep.name", ""))
+	assert.False(endpointNameMatches("ep.name", ""))
 
 	assert.False(endpointNameMatches("ep.name", "namename"))
 	assert.False(endpointNameMatches("ep.name", "ep.nom"))
 	assert.False(endpointNameMatches("ep.name", "nom"))
 }
 
-/* todo: fix race condition in here somewhere
-// Launch a local Serf node, register a few endpoints and ensure they're registered
-func TestObserver(t *testing.T) {
-	logrus.SetLevel(logrus.TraceLevel)
-
+func TestObserverInputEvents(t *testing.T) {
 	assert := require.New(t)
 
 	ch := make(chan NodeEvent)
 	em := NewEndpointObserver("local", ch, nil)
 	defer em.Shutdown()
 
-	// Generate a few add and remove events. The actual implementation would
-	// use events from a SerfNode instance here.
-	ch <- NodeEvent{
-		Event: SerfNodeJoined,
-		Node: SerfMember{
-			NodeID: "local",
-			State:  "active",
-			Tags: map[string]string{
-				"ep.no1": "localhost:1",
-				"ep.no2": "localhost:2",
-				"ep.no3": "localhost:3",
+	var events []NodeEvent
+	// Generate 10 nodes with 10 endpoints via events
+	for i := 0; i < 10; i++ {
+		ev := NodeEvent{
+			Event: SerfNodeJoined,
+			Node: SerfMember{
+				NodeID: fmt.Sprintf("id%d", i),
+				State:  SerfAlive,
+				Tags: map[string]string{
+					"ep.test": "listenaddress",
+				},
 			},
-		}}
-	ch <- NodeEvent{
-		Event: SerfNodeJoined,
-		Node: SerfMember{
-			NodeID: "remote",
-			State:  "active",
-			Tags: map[string]string{
-				"ep.no1": "remote:1",
-				"ep.no2": "remote:2",
-				"ep.no3": "remote:3",
-			},
-		}}
-	ep, err := em.FindFirst("ep.no1")
-	assert.NoError(err)
-	assert.Equal(ep.Name, "ep.no1")
-
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		obs := em.Observe()
-		for ev := range obs {
-			logrus.Debugf("Got event: %+v", ev)
-			if ev.ListenAddress == "last:1" {
-				wg.Done()
-			}
 		}
-	}()
+		events = append(events, ev)
+		ch <- ev
+	}
+	// Dump the last event into the channel to ensure everything is read
+	// (the channel is unbuffered)
+	ch <- events[0]
+	endpoints := em.Endpoints()
+	assert.Len(endpoints, 10)
 
-	ch <- NodeEvent{
-		Event: SerfNodeUpdated,
-		Node: SerfMember{
-			NodeID: "remote2",
-			State:  "active",
-			Tags: map[string]string{
-				"ep.no4":  "remote2:4",
-				"ep.raft": "remote2:2",
-			},
-		}}
+	endpoints = em.Find("ep.test")
+	assert.Len(endpoints, 10)
 
-	ch <- NodeEvent{
-		Event: SerfNodeLeft,
-		Node: SerfMember{
-			NodeID: "remote",
-			State:  "inactive",
-			Tags: map[string]string{
-				"ep.no1": "remote:1",
-			},
-		}}
-
-	ch <- NodeEvent{
-		Event: SerfNodeLeft,
-		Node: SerfMember{
-			NodeID: "last",
-			State:  "inactive",
-			Tags: map[string]string{
-				"ep.no999": "last:1",
-			},
-		}}
-
-	wg.Wait()
-
-	eps := em.Endpoints()
-	assert.NotNil(eps)
-	assert.Len(eps, 7)
-
-	ep, err = em.FindFirst("ep.raft")
+	ep, err := em.FindFirst("ep.test")
 	assert.NoError(err)
-	assert.Equal("ep.raft", ep.Name)
-	assert.Equal("remote2:2", ep.ListenAddress)
-	assert.True(ep.Cluster)
+	assert.Equal("listenaddress", ep.ListenAddress)
 
-	eps = em.Find("ep.no1")
-	assert.Len(eps, 1)
+	// Generate 10 updates, add a new endpoint and update the existing
+	for i, ev := range events {
+		ev.Event = SerfNodeUpdated
+		ev.Node.Tags["ep.test"] = "listen2"
+		ev.Node.Tags["ep.test2"] = "listen3"
+		events[i] = ev
+		ch <- ev
+	}
+	ch <- events[2]
 
-	// Race condition!, who's there? Knock knock!
-	ready := &sync.WaitGroup{}
-	ready.Add(1)
-	wg.Add(1)
-	go func() {
-		logrus.Debug("Wait")
-		ready.Done()
-		em.WaitForEndpoints()
-		logrus.Debug("Done waiting")
-		wg.Done()
-	}()
-	ready.Wait()
-	ch <- NodeEvent{
-		Event: SerfNodeUpdated,
-		Node: SerfMember{
-			NodeID: "up",
-			State:  "inactive",
-			Tags: map[string]string{
-				"ep.no99": "up:1",
-			},
-		}}
-	wg.Wait()
+	endpoints = em.Endpoints()
+	assert.Len(endpoints, 20)
+
+	endpoints = em.Find("ep.test2")
+	assert.Len(endpoints, 10)
+
+	endpoints = em.Find("ep.test")
+	assert.Len(endpoints, 10)
+
+	endpoints = em.Find("ep.unknown")
+	assert.Len(endpoints, 0)
+
+	_, err = em.FindFirst("ep.test2")
+	assert.NoError(err)
+	_, err = em.FindFirst("ep.unknown")
+	assert.Error(err)
+
+	// Send updates with the node state set to SerfFailed. The endpoints should
+	// be removed
+	for _, ev := range events {
+		ev.Event = SerfNodeUpdated
+		ev.Node.State = SerfFailed
+		ch <- ev
+	}
+	ch <- events[3]
+
+	endpoints = em.Endpoints()
+	assert.Len(endpoints, 0)
+
+	// Another round, update
+	for _, ev := range events {
+		ev.Event = SerfNodeUpdated
+		ch <- ev
+	}
+	ch <- events[1]
+
+	endpoints = em.Endpoints()
+	assert.Len(endpoints, 20)
+
+	for i, ev := range events {
+		ev.Event = SerfNodeLeft
+		events[i] = ev
+		ch <- ev
+	}
+	ch <- events[1]
+	endpoints = em.Endpoints()
+	assert.Len(endpoints, 0)
+
 }
-*/
+
+// Ensure observers are updated accordingly
+func TestObserverOutputEvents(t *testing.T) {
+	assert := require.New(t)
+
+	ch := make(chan NodeEvent)
+	em := NewEndpointObserver("local", ch, nil)
+	defer em.Shutdown()
+
+	activeCount := new(int32)
+	inactiveCount := new(int32)
+	atomic.StoreInt32(activeCount, 0)
+	atomic.StoreInt32(inactiveCount, 0)
+
+	observerFunc := func(obsChan <-chan Endpoint) {
+		for ep := range obsChan {
+			if ep.Active {
+				atomic.AddInt32(activeCount, 1)
+				continue
+			}
+			atomic.AddInt32(inactiveCount, 1)
+		}
+	}
+	obsCh := em.Observe()
+	go observerFunc(obsCh)
+	go observerFunc(em.Observe())
+
+	var events []NodeEvent
+	// Generate 10 nodes with 10 endpoints via events
+	for i := 0; i < 10; i++ {
+		ev := NodeEvent{
+			Event: SerfNodeJoined,
+			Node: SerfMember{
+				NodeID: fmt.Sprintf("id%d", i),
+				State:  SerfAlive,
+				Tags: map[string]string{
+					"ep.test": "listenaddress",
+				},
+			},
+		}
+		events = append(events, ev)
+		ch <- ev
+	}
+
+	// Busy wait until active is 10 since we don't know when
+	// the event will be processed. There will be twice as
+	// many events going out since we have two observers.
+	n := 0
+	for {
+		if atomic.LoadInt32(activeCount) == 20 {
+			break
+		}
+		time.Sleep(1 * time.Millisecond)
+		n++
+		assert.Less(n, 1000)
+	}
+
+	// Generate 10 remove events and repeat busy wait
+	for _, ev := range events {
+		ev.Event = SerfNodeLeft
+		ch <- ev
+	}
+
+	n = 0
+	for {
+		if atomic.LoadInt32(inactiveCount) == 20 {
+			break
+		}
+		time.Sleep(1 * time.Millisecond)
+		n++
+		assert.Less(n, 1000)
+	}
+
+	em.Unobserve(obsCh)
+}
+
+// Fairly simple test, just ensure existing endpoints are picked up
+func TestExistingEndpointObserver(t *testing.T) {
+	assert := require.New(t)
+
+	ch := make(chan NodeEvent)
+	em := NewEndpointObserver("local", ch, []Endpoint{
+		Endpoint{
+			Active:        true,
+			Cluster:       true,
+			Name:          "ep.existing",
+			ListenAddress: "local",
+		},
+	})
+	defer em.Shutdown()
+
+	assert.Len(em.Endpoints(), 1)
+	ep, err := em.FindFirst("ep.existing")
+	assert.NoError(err)
+	assert.Equal("local", ep.ListenAddress)
+}
