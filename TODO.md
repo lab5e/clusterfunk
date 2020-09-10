@@ -1,5 +1,11 @@
 # TODOs
 
+* Node state handling. The nodes have semi-defined states when starting and
+  shutting down. See several points below.
+
+* Delay publishing endpoints for the Raft node until it's joined the cluster, just
+  publish the ep.raft endpoint. Maybe create a new endpoint named ep.raft-notjoin or similar?
+
 * Clean up endpoint handling. It's a mess. Use "endpoint" as a type when operating
   on endpoints.
 
@@ -28,6 +34,7 @@
 * Serve read only requests while resharding. This requires some care when
   implementing the actual service so it's not at the top of the list but
   if a reshard/read operation is slow it makes sense to serve read only
-  requests while new data is read into memory.
+  requests while new data is read into memory. A partial working service always
+  (well, most of the time) trumps a not-working service.
 
 * Read only state for nodes could be useful but requires custom implementation.
