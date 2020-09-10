@@ -25,6 +25,7 @@ import (
 	"github.com/lab5e/clusterfunk/pkg/funk/managepb"
 	"github.com/lab5e/clusterfunk/pkg/funk/metrics"
 	"github.com/lab5e/gotoolbox/grpcutil"
+	"github.com/lab5e/gotoolbox/netutils"
 
 	log "github.com/sirupsen/logrus"
 
@@ -96,8 +97,16 @@ func (c *clusterfunkCluster) NodeID() string {
 	return c.config.NodeID
 }
 
-func (c *clusterfunkCluster) SetEndpoint(name, endpoint string) {
-	c.serfNode.SetTag(name, endpoint)
+func (c *clusterfunkCluster) SetEndpoint(name, listenAddress string) {
+	// Sanity check the endpoint. If it's the loopback adapter it might not be
+	// what you want.
+	if netutils.IsLoopbackAddress(listenAddress) {
+		log.WithFields(log.Fields{
+			"listenAddress": listenAddress,
+			"name":          name,
+		}).Warning("Registering endpoint with loopback adapter. The endpoint won't be reachable for anyone but local clients.")
+	}
+	c.serfNode.SetTag(name, listenAddress)
 	if err := c.serfNode.PublishTags(); err != nil {
 		log.WithError(err).Error("Error adding endpoint")
 	}
