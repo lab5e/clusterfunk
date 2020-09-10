@@ -18,7 +18,7 @@ package funk
 import (
 	"errors"
 	"fmt"
-	golog "log"
+	"log"
 	"net"
 	"os"
 	"strconv"
@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/lab5e/clusterfunk/pkg/toolbox"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/hashicorp/serf/serf"
 )
@@ -152,7 +152,7 @@ func (s *SerfNode) Start(nodeID string, cfg SerfParameters) error {
 	config.EventCh = eventCh
 
 	if cfg.Verbose {
-		config.Logger = golog.New(os.Stderr, "serf", golog.LstdFlags)
+		config.Logger = log.New(os.Stderr, "serf", log.LstdFlags)
 	} else {
 		mutedLogger := newMutedLogger()
 		config.Logger = mutedLogger
@@ -381,7 +381,7 @@ func (s *SerfNode) serfEventHandler(events chan serf.Event) {
 			// Do nothing
 
 		default:
-			log.WithField("event", ev).Error("Unknown event")
+			logrus.WithField("event", ev).Error("Unknown event")
 		}
 	}
 }
@@ -448,8 +448,8 @@ func (m *muteWriter) Write(buf []byte) (int, error) {
 	return len(buf), nil
 }
 
-// GetMutedLogger returns a pointer to a log.Logger instance that is logging
+// GetMutedLogger returns a pointer to a logrus.Logger instance that is logging
 // to the Big Bit Bucket In The Sky...or Cloud
-func newMutedLogger() *golog.Logger {
-	return golog.New(&muteWriter{}, "sssh", golog.LstdFlags)
+func newMutedLogger() *log.Logger {
+	return log.New(&muteWriter{}, "sssh", log.LstdFlags)
 }

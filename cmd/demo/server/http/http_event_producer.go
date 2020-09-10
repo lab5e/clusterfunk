@@ -1,4 +1,5 @@
 package http
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -18,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // The event producer is used to distribute the events to the websockets.There
@@ -69,7 +70,7 @@ func (m *msgSender) Send(msg interface{}) {
 			// ok - keep sending
 		case <-time.After(10 * time.Millisecond):
 			// drop the channel
-			log.Info("Closing socket since it timed out")
+			logrus.Info("Closing socket since it timed out")
 			close(v)
 			m.chans = append(m.chans[:i], m.chans[i+1:]...)
 		}

@@ -20,7 +20,7 @@ import (
 	"sync"
 
 	"github.com/lab5e/clusterfunk/pkg/funk"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/resolver"
 )
 
@@ -177,7 +177,7 @@ func (c *clusterResolver) updateState() error {
 
 func (c *clusterResolver) ResolveNow(resolver.ResolveNowOptions) {
 	if err := c.updateState(); err != nil {
-		log.WithError(err).Error("couldn't re-resolve endpoint")
+		logrus.WithError(err).Error("couldn't re-resolve endpoint")
 	}
 }
 

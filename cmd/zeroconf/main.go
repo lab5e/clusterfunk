@@ -18,20 +18,20 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"math/rand"
 	"time"
 
 	"github.com/lab5e/clusterfunk/pkg/toolbox"
 	gotoolbox "github.com/lab5e/gotoolbox/toolbox"
+	"github.com/sirupsen/logrus"
 )
 
 func registerService(name string) {
-	log.Println("Registering service")
+	logrus.Println("Registering service")
 	reg := toolbox.NewZeroconfRegistry(name)
 
 	if err := reg.Register("node", fmt.Sprintf("%08x", rand.Int()), int(rand.Int31n(31000))+1001); err != nil {
-		log.Printf("Error registering service: %v", err)
+		logrus.Printf("Error registering service: %v", err)
 		return
 	}
 	gotoolbox.WaitForSignal()
@@ -40,16 +40,16 @@ func registerService(name string) {
 }
 
 func browseService(name string) {
-	log.Println("Browse service")
+	logrus.Println("Browse service")
 	reg := toolbox.NewZeroconfRegistry(name)
 	results, err := reg.Resolve("node", 2*time.Second)
 	if err != nil {
-		log.Printf("Error browsing for zeroconf: %v", err)
+		logrus.Printf("Error browsing for zeroconf: %v", err)
 		return
 	}
 
 	for i := range results {
-		log.Printf("Item: %s", results[i])
+		logrus.Printf("Item: %s", results[i])
 	}
 }
 

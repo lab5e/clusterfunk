@@ -82,7 +82,7 @@ type ShardMap interface {
 	WorkerID(nodeID string) int
 
 	// The marshaling methods are used to save and restore the shard manager
-	// from the Raft log.
+	// from the Raft logrus.
 
 	encoding.BinaryMarshaler
 	encoding.BinaryUnmarshaler

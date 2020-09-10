@@ -22,9 +22,9 @@ import (
 
 	"github.com/lab5e/clusterfunk/pkg/funk"
 	"github.com/lab5e/clusterfunk/pkg/funk/sharding"
+	"github.com/sirupsen/logrus"
 
 	"github.com/gorilla/websocket"
-	log "github.com/sirupsen/logrus"
 )
 
 // ConsoleEndpointName is the name of the HTTP endpoint in the cluster
@@ -53,7 +53,7 @@ const (
 func websocketHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.WithError(err).Error("Unable to upgrade connection")
+		logrus.WithError(err).Error("Unable to upgrade connection")
 		return
 	}
 	defer conn.Close()
@@ -61,7 +61,7 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 	// Send the preset events from the producer first
 	for _, msg := range messageProducer.Presets() {
 		if err := conn.WriteJSON(msg); err != nil {
-			log.WithError(err).Error(err)
+			logrus.WithError(err).Error(err)
 			return
 		}
 	}
@@ -71,7 +71,7 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 	// ... then forward updated events
 	for msg := range p {
 		if err := conn.WriteJSON(msg); err != nil {
-			log.WithError(err).Error("error writing message")
+			logrus.WithError(err).Error("error writing message")
 			return
 		}
 	}
@@ -93,14 +93,14 @@ func StartWebserver(endpoint string, cluster funk.Cluster, shards sharding.Shard
 	// included assets.
 	_, err := os.Lstat(fmt.Sprintf("%s/index.html", uiPath))
 	if err == nil {
-		log.Info("Using external HTML assets")
+		logrus.Info("Using external HTML assets")
 		mux.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir(uiPath))))
 	} else {
-		log.WithError(err).Info("Using embedded HTML assets")
+		logrus.WithError(err).Info("Using embedded HTML assets")
 		mux.Handle("/", http.StripPrefix("/", http.FileServer(Assets)))
 	}
 	mux.HandleFunc("/statusws", websocketHandler)
-	log.WithField("endpoint", endpoint).Info("HTTP server started")
+	logrus.WithField("endpoint", endpoint).Info("HTTP server started")
 
 	srv := &http.Server{
 		Addr:    endpoint,

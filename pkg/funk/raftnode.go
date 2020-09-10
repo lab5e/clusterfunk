@@ -21,7 +21,7 @@ import (
 	"io"
 
 	"github.com/lab5e/clusterfunk/pkg/toolbox"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"net"
 	"os"
@@ -181,21 +181,21 @@ func (r *RaftNode) Start(nodeID string, cfg RaftParameters) error {
 
 	if cfg.DiskStore {
 		raftdir := fmt.Sprintf("./%s", nodeID)
-		log.WithField("dbdir", raftdir).Info("Using boltDB and snapshot store")
+		logrus.WithField("dbdir", raftdir).Info("Using boltDB and snapshot store")
 		if err := os.MkdirAll(raftdir, os.ModePerm); err != nil {
-			log.WithError(err).WithField("dbdir", raftdir).Error("Unable to create store dir")
+			logrus.WithError(err).WithField("dbdir", raftdir).Error("Unable to create store dir")
 			return err
 		}
 		boltDB, err := raftboltdb.NewBoltStore(filepath.Join(raftdir, fmt.Sprintf("%s.db", nodeID)))
 		if err != nil {
-			log.WithError(err).Error("Unable to create boltDB")
+			logrus.WithError(err).Error("Unable to create boltDB")
 			return err
 		}
 		logStore = boltDB
 		stableStore = boltDB
 		snapshotStore, err = raft.NewFileSnapshotStore(raftdir, 3, os.Stderr)
 		if err != nil {
-			log.WithError(err).WithField("dbdir", raftdir).Error("Unable to create snapshot store")
+			logrus.WithError(err).WithField("dbdir", raftdir).Error("Unable to create snapshot store")
 			return err
 		}
 	} else {
@@ -209,7 +209,7 @@ func (r *RaftNode) Start(nodeID string, cfg RaftParameters) error {
 	}
 
 	if cfg.Bootstrap {
-		log.Info("Bootstrapping new cluster")
+		logrus.Info("Bootstrapping new cluster")
 		configuration := raft.Configuration{
 			Servers: []raft.Server{
 				{
@@ -297,7 +297,7 @@ func (r *RaftNode) observerFunc(ch chan raft.Observation) {
 			// Not using this at the moment
 
 		default:
-			log.WithFields(log.Fields{
+			logrus.WithFields(logrus.Fields{
 				"event": k,
 				"data":  k.Data,
 			}).Error("Unknown Raft event")
@@ -316,7 +316,7 @@ func (r *RaftNode) Stop(removeWhenStopping bool) error {
 	}
 
 	if err := r.ra.Shutdown().Error(); err != nil {
-		log.WithError(err).Info("Got error on shutdown")
+		logrus.WithError(err).Info("Got error on shutdown")
 	}
 	r.ra = nil
 	r.localNodeID = ""
@@ -413,7 +413,7 @@ func (r *RaftNode) Leader() bool {
 	return (r.ra.VerifyLeader().Error() == nil)
 }
 
-// AppendLogEntry appends a log entry to the log. The function returns when
+// AppendLogEntry appends a log entry to the logrus. The function returns when
 // there's a quorum in the cluster
 func (r *RaftNode) AppendLogEntry(data []byte) (uint64, error) {
 	r.mutex.RLock()
@@ -489,7 +489,7 @@ func (r *RaftNode) removeNode(id string) {
 func (r *RaftNode) RefreshNodes() {
 	cfg := r.ra.GetConfiguration()
 	if cfg.Error() != nil {
-		log.WithError(cfg.Error()).Warn("Unable to update nodes")
+		logrus.WithError(cfg.Error()).Warn("Unable to update nodes")
 		return
 	}
 	list := []string{}
@@ -526,7 +526,7 @@ func (r *RaftNode) scheduleInternalEvent(ev RaftEventType, timeout time.Duration
 			// happens because a node goes down or fails and then a
 			// cluster size notification is sent but on rare occasions when
 			// a node silently fails it won't trigger a size change event.
-			log.WithFields(log.Fields{
+			logrus.WithFields(logrus.Fields{
 				"event":     ev.String(),
 				"timeoutMs": timeout / time.Millisecond,
 			}).Warn("Scheduled event sent")
@@ -606,7 +606,7 @@ func (r *RaftNode) Snapshot() (raft.FSMSnapshot, error) {
 // concurrently with any other command. The FSM must discard all previous
 // state.
 func (r *RaftNode) Restore(io.ReadCloser) error {
-	log.Info("FSMSnapshot Restore")
+	logrus.Info("FSMSnapshot Restore")
 	return nil
 }
 
@@ -641,7 +641,7 @@ type raftSnapshot struct {
 // Persist should dump all necessary state to the WriteCloser 'sink',
 // and call sink.Close() when finished or call sink.Cancel() on error.
 func (r *raftSnapshot) Persist(sink raft.SnapshotSink) error {
-	log.Info("FSMSnapshot Persist")
+	logrus.Info("FSMSnapshot Persist")
 	sink.Close()
 	return nil
 }
@@ -649,5 +649,5 @@ func (r *raftSnapshot) Persist(sink raft.SnapshotSink) error {
 // Release is invoked when we are finished with the snapshot.
 func (r *raftSnapshot) Release() {
 	// nothing happens here.
-	log.Info("FSMSnapshot Release")
+	logrus.Info("FSMSnapshot Release")
 }

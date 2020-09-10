@@ -21,9 +21,8 @@ import (
 	"net"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/lab5e/clusterfunk/pkg/funk/clusterpb"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
@@ -51,7 +50,7 @@ func (c *clusterfunkCluster) startLeaderService() error {
 	fail := make(chan error)
 	go func(ch chan error) {
 		if err := c.leaderServer.Serve(listener); err != nil {
-			log.WithError(err).Error("Unable to launch leader gRPC interface")
+			logrus.WithError(err).Error("Unable to launch leader gRPC interface")
 			ch <- err
 		}
 	}(fail)
@@ -71,7 +70,7 @@ func (c *clusterfunkCluster) ConfirmShardMap(ctx context.Context, req *clusterpb
 		return nil, errors.New("not a leader")
 	}
 	if c.State() != Resharding {
-		log.WithFields(log.Fields{
+		logrus.WithFields(logrus.Fields{
 			"state": c.State().String(),
 			"index": req.LogIndex,
 			"node":  req.NodeId,

@@ -22,11 +22,10 @@ import (
 	"os/signal"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/lab5e/clusterfunk/pkg/funk"
 	"github.com/lab5e/clusterfunk/pkg/funk/sharding"
 	"github.com/lab5e/clusterfunk/pkg/toolbox"
+	"github.com/sirupsen/logrus"
 )
 
 const numShards = 10000
@@ -53,12 +52,12 @@ func main() {
 		panic(err)
 	}
 
-	log.SetFormatter(&log.TextFormatter{FullTimestamp: true, TimestampFormat: "15:04:05.000"})
+	logrus.SetFormatter(&logrus.TextFormatter{FullTimestamp: true, TimestampFormat: "15:04:05.000"})
 
 	checker = funk.NewLivenessChecker(10*time.Millisecond, 3)
 	go func(ev <-chan string) {
 		for id := range ev {
-			log.WithField("id", id).Info("Client died")
+			logrus.WithField("id", id).Info("Client died")
 		}
 	}(checker.DeadEvents())
 	if err := start(config); err != nil {
@@ -67,7 +66,7 @@ func main() {
 
 	defer func() {
 		if err := raftNode.Stop(config.AutoJoin); err != nil {
-			log.WithError(err).Info("Got error when stopping Raft node. Ignoring it since I'm shutting down.")
+			logrus.WithError(err).Info("Got error when stopping Raft node. Ignoring it since I'm shutting down.")
 		}
 	}()
 	waitForExit()
@@ -129,16 +128,16 @@ func start(config funk.Parameters) error {
 	if err := serfNode.Start(config.NodeID, config.Serf); err != nil {
 		return err
 	}
-	log.Info("Starting")
+	logrus.Info("Starting")
 	return nil
 }
 
 func raftEvents(ch <-chan funk.RaftEventType) {
 	for e := range ch {
-		log.WithField("event", e.String()).Info("raft event")
+		logrus.WithField("event", e.String()).Info("raft event")
 		switch e {
 		case funk.RaftClusterSizeChanged:
-			log.WithFields(log.Fields{
+			logrus.WithFields(logrus.Fields{
 				"size":    raftNode.Nodes.Size(),
 				"members": raftNode.Nodes.List(),
 			}).Info("Cluster")
@@ -162,7 +161,7 @@ func raftEvents(ch <-chan funk.RaftEventType) {
 			checker.Clear()
 		case funk.RaftReceivedLog:
 		default:
-			log.WithField("event", e).Info("Unknown event received")
+			logrus.WithField("event", e).Info("Unknown event received")
 		}
 	}
 }
@@ -173,14 +172,14 @@ func serfEvents(ch <-chan funk.NodeEvent) {
 		case funk.SerfNodeJoined:
 			if raftNode.Leader() {
 				if err := raftNode.AddClusterNode(ev.Node.NodeID, ev.Node.Tags[funk.RaftEndpoint]); err != nil {
-					log.WithError(err).WithField("member", ev.Node.NodeID).Error("Error adding member")
+					logrus.WithError(err).WithField("member", ev.Node.NodeID).Error("Error adding member")
 				}
 			}
 			continue
 		case funk.SerfNodeLeft:
 			if raftNode.Leader() {
 				if err := raftNode.RemoveClusterNode(ev.Node.NodeID, ev.Node.Tags[funk.RaftEndpoint]); err != nil {
-					log.WithError(err).WithField("member", ev.Node.NodeID).Error("Error removing member")
+					logrus.WithError(err).WithField("member", ev.Node.NodeID).Error("Error removing member")
 				}
 			}
 			// Ignoring updates and failed nodes. Failed nodes are handled by Raft. Updates aren't used

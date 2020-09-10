@@ -17,6 +17,7 @@ package main
 //
 import (
 	"fmt"
+	"log"
 	gohttp "net/http"
 	"os"
 	"runtime/pprof"
@@ -24,8 +25,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/lab5e/clusterfunk/cmd/demo/server/grpcserver"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-
-	golog "log"
+	"github.com/sirupsen/logrus"
 
 	"github.com/lab5e/clusterfunk/cmd/demo/server/http"
 	"github.com/lab5e/clusterfunk/pkg/funk"
@@ -33,7 +33,6 @@ import (
 	"github.com/lab5e/clusterfunk/pkg/toolbox"
 	"github.com/lab5e/gotoolbox/rest"
 	gotoolbox "github.com/lab5e/gotoolbox/toolbox"
-	log "github.com/sirupsen/logrus"
 )
 
 const numShards = 10000
@@ -42,7 +41,7 @@ const demoEndpointName = "ep.demo"
 
 var logLevel = "info"
 var config parameters
-var defaultLogger = log.New()
+var defaultLogger = logrus.New()
 var cluster funk.Cluster
 var shards sharding.ShardMap
 var webserverEndpoint string
@@ -72,7 +71,7 @@ func main() {
 	if config.CPUProfilerFile != "" {
 		f, err := os.Create(config.CPUProfilerFile)
 		if err != nil {
-			log.Fatal(err)
+			logrus.Fatal(err)
 		}
 		if err := pprof.StartCPUProfile(f); err != nil {
 			panic(fmt.Sprintf("Error starting CPU profiler: %v", err))
@@ -95,7 +94,7 @@ func main() {
 
 	gohttp.Handle("/metrics", rest.AddCORSHeaders(promhttp.Handler().ServeHTTP))
 	go func() {
-		log.WithField("endpoint", metricsEndpoint).Info("Prometheus metrics endpoint starting")
+		logrus.WithField("endpoint", metricsEndpoint).Info("Prometheus metrics endpoint starting")
 		fmt.Println("Error serving metrics: ", gohttp.ListenAndServe(metricsEndpoint, nil))
 	}()
 
@@ -104,7 +103,7 @@ func main() {
 
 	go func(ch <-chan funk.Event) {
 		for ev := range ch {
-			log.Infof("Cluster state: %s  role: %s", ev.State.String(), ev.Role.String())
+			logrus.Infof("Cluster state: %s  role: %s", ev.State.String(), ev.Role.String())
 
 			http.UpdateClusterStatus(cluster)
 
@@ -119,7 +118,7 @@ func main() {
 	cluster.SetEndpoint(http.ConsoleEndpointName, webserverEndpoint)
 	cluster.SetEndpoint(http.MetricsEndpointName, metricsEndpoint)
 	if err := cluster.Start(); err != nil {
-		log.WithError(err).Error("Error starting cluster")
+		logrus.WithError(err).Error("Error starting cluster")
 		return
 	}
 	defer cluster.Stop()
@@ -138,38 +137,38 @@ func printShardMap(shards sharding.ShardMap, c funk.Cluster, endpoint string) {
 		}
 	}
 
-	log.Info("--- Peer info ---")
-	log.Infof("%d shards allocated to me (out of %d total)", myShards, len(allShards))
+	logrus.Info("--- Peer info ---")
+	logrus.Infof("%d shards allocated to me (out of %d total)", myShards, len(allShards))
 	for _, v := range shards.NodeList() {
 		m := "  "
 		if v == c.NodeID() {
 			m = "->"
 		}
-		log.Infof("%s Node %15s is serving at %s", m, v, c.GetEndpoint(v, endpoint))
+		logrus.Infof("%s Node %15s is serving at %s", m, v, c.GetEndpoint(v, endpoint))
 	}
-	log.Infof("--- End ---")
+	logrus.Infof("--- End ---")
 }
 
 func setupLogging() {
 	// This mutes the logs from the log package in go. The default log level
 	// for these are "info" so anything logged by the default logger will be
 	// muted.
-	defaultLogger.SetLevel(log.WarnLevel)
-	defaultLogger.Formatter = &log.TextFormatter{FullTimestamp: true, TimestampFormat: "15:04:05.000"}
+	defaultLogger.SetLevel(logrus.WarnLevel)
+	defaultLogger.Formatter = &logrus.TextFormatter{FullTimestamp: true, TimestampFormat: "15:04:05.000"}
 	w := defaultLogger.Writer()
 	defer w.Close()
-	golog.SetOutput(w)
+	log.SetOutput(w)
 
 	// Set log level for logrus. The default level is Debug. The demo client will
 	// log everything at Info or above.
 	switch logLevel {
 	case "info":
-		log.SetLevel(log.InfoLevel)
+		logrus.SetLevel(logrus.InfoLevel)
 	case "debug":
-		log.SetLevel(log.DebugLevel)
+		logrus.SetLevel(logrus.DebugLevel)
 	case "warn":
-		log.SetLevel(log.WarnLevel)
+		logrus.SetLevel(logrus.WarnLevel)
 	}
 
-	log.SetFormatter(&log.TextFormatter{FullTimestamp: true, TimestampFormat: "15:04:05.000"})
+	logrus.SetFormatter(&logrus.TextFormatter{FullTimestamp: true, TimestampFormat: "15:04:05.000"})
 }

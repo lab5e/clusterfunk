@@ -20,10 +20,9 @@ import (
 	"math/rand"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/lab5e/clusterfunk/pkg/toolbox"
 	"github.com/lab5e/gotoolbox/netutils"
+	"github.com/sirupsen/logrus"
 )
 
 // GRPCServerParameters is a parameter struct for gRPC services
@@ -79,7 +78,7 @@ func (p *Parameters) Final() {
 		ip, err := toolbox.FindPublicIPv4()
 		p.Interface = ip.String()
 		if err != nil {
-			log.WithError(err).Error("Unable to get public IP")
+			logrus.WithError(err).Error("Unable to get public IP")
 			p.Interface = "localhost"
 		}
 	}
@@ -90,7 +89,7 @@ func (p *Parameters) Final() {
 	p.checkAndSetEndpoint(&p.LivenessEndpoint)
 
 	// Log endpoints regardless of verbose or not.
-	log.WithFields(log.Fields{
+	logrus.WithFields(logrus.Fields{
 		"serfEndpoint":       p.Serf.Endpoint,
 		"raftEndpoint":       p.Raft.RaftEndpoint,
 		"managementEndpoint": p.Management.Endpoint,

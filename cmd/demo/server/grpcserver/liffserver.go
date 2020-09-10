@@ -25,8 +25,8 @@ import (
 	"github.com/lab5e/clusterfunk/pkg/funk"
 	"github.com/lab5e/clusterfunk/pkg/funk/sharding"
 	"github.com/lab5e/clusterfunk/pkg/serverfunk"
+	"github.com/sirupsen/logrus"
 
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
@@ -49,15 +49,15 @@ func StartDemoServer(endpoint string, endpointName string, cluster funk.Cluster,
 
 	listener, err := net.Listen("tcp", endpoint)
 	if err != nil {
-		log.WithError(err).
+		logrus.WithError(err).
 			WithField("endpoint", endpoint).
 			Panic("Unable to create TCP listener")
 	}
 
-	log.WithField("endpoint", endpoint).Info("Lauching gRPC demo server")
+	logrus.WithField("endpoint", endpoint).Info("Lauching gRPC demo server")
 
 	if err := server.Serve(listener); err != nil {
-		log.WithError(err).
+		logrus.WithError(err).
 			WithField("endpoint", endpoint).
 			Panic("Unable to launch node management gRPC interface")
 	}

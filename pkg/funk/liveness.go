@@ -1,4 +1,5 @@
 package funk
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -19,7 +20,7 @@ import (
 	"net"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // LivenessChecker is a liveness checker. It does a (very simple) high freqyency
@@ -90,7 +91,7 @@ func (u *udpLivenessClient) launch(endpoint string) {
 			default:
 			}
 			if err := conn.SetReadDeadline(time.Now().Add(1 * time.Second)); err != nil {
-				log.WithError(err).Warning("Can't set deadline for socket")
+				logrus.WithError(err).Warning("Can't set deadline for socket")
 				time.Sleep(1 * time.Second)
 				continue
 			}
@@ -156,7 +157,7 @@ func (c *singleChecker) checkerProc(id, endpoint string, interval time.Duration)
 	for {
 		select {
 		case <-c.stopCh:
-			log.Infof("Terminating leveness checker to %s", endpoint)
+			logrus.Infof("Terminating leveness checker to %s", endpoint)
 			return
 		default:
 			// keep on running
@@ -184,7 +185,7 @@ func (c *singleChecker) checkerProc(id, endpoint string, interval time.Duration)
 		waitCh := time.After(waitInterval)
 
 		if err := conn.SetWriteDeadline(time.Now().Add(interval)); err != nil {
-			log.WithError(err).Warning("Can't set deadline for liveness check socket")
+			logrus.WithError(err).Warning("Can't set deadline for liveness check socket")
 			conn.Close()
 			conn = nil
 			time.Sleep(waitInterval)
@@ -201,7 +202,7 @@ func (c *singleChecker) checkerProc(id, endpoint string, interval time.Duration)
 			continue
 		}
 		if err := conn.SetReadDeadline(time.Now().Add(interval)); err != nil {
-			log.WithError(err).Warning("Can't set deadline for liveness check socket")
+			logrus.WithError(err).Warning("Can't set deadline for liveness check socket")
 			conn.Close()
 			conn = nil
 			time.Sleep(waitInterval)

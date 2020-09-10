@@ -1,4 +1,5 @@
 package funk
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -17,12 +18,12 @@ package funk
 import (
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // This file contains the internal state methods
 func (c *clusterfunkCluster) logStateChange() {
-	log.WithFields(log.Fields{
+	logrus.WithFields(logrus.Fields{
 		"state": c.state.String(),
 		"role":  c.role.String()}).Debug("State changed")
 }

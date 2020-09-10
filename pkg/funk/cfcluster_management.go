@@ -23,10 +23,9 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/lab5e/clusterfunk/pkg/funk/managepb"
 	"github.com/lab5e/gotoolbox/grpcutil"
+	"github.com/sirupsen/logrus"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -66,7 +65,7 @@ func (c *clusterfunkCluster) startManagementServices() error {
 	fail := make(chan error)
 	go func(ch chan error) {
 		if err := c.mgmtServer.Serve(listener); err != nil {
-			log.WithError(err).Error("Unable to launch node management gRPC interface")
+			logrus.WithError(err).Error("Unable to launch node management gRPC interface")
 			ch <- err
 		}
 	}(fail)

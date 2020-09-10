@@ -10,7 +10,7 @@ Each node exposes one or more endpoints. The endpoints are announced via the Ser
 
 * A node can't serve requests unless a leader is elected.
 * A node can only serve requests that maps to one of the shards the node owns.
-* The leader will generate the shard map and write it to the replicated log.
+* The leader will generate the shard map and write it to the replicated logrus.
 * A node can't serve requests without a commited shard map.
 * The shard map is distributed via the cluster's replicated log
 * Requests will be queued while there's a leader election in progress or a resharding process has started.
@@ -19,7 +19,7 @@ Each node exposes one or more endpoints. The endpoints are announced via the Ser
 
 ## Sharding the cluster
 
-When a node leaves the cluster or a leader is elected the nodes stop serving requests. The leader generates a new shard map and distributes it via the replicated log. The shard map is acknowledged by the nodes through a separate channel. If one of the nodes fails to acknowledge the shard map a new map is generated without the node and the process is repeated. Once the shard map is confirmed by the nodes the committed shard map is distributed via the replicated log.
+When a node leaves the cluster or a leader is elected the nodes stop serving requests. The leader generates a new shard map and distributes it via the replicated logrus. The shard map is acknowledged by the nodes through a separate channel. If one of the nodes fails to acknowledge the shard map a new map is generated without the node and the process is repeated. Once the shard map is confirmed by the nodes the committed shard map is distributed via the replicated logrus.
 
 Nodes acknowledge the shard map to the leader itself and the leader replies with OK if this is the current shard map or ERROR and the log entry for the current shard map index.
 

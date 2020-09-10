@@ -14,4 +14,3 @@ cluster.
 
 This is a simple seed node that dumps the nodes and endpoints in the Serf
 cluster so it can be used as a diagnostic tool as well.
-

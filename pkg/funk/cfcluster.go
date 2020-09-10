@@ -26,8 +26,7 @@ import (
 	"github.com/lab5e/clusterfunk/pkg/funk/metrics"
 	"github.com/lab5e/gotoolbox/grpcutil"
 	"github.com/lab5e/gotoolbox/netutils"
-
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/lab5e/clusterfunk/pkg/funk/clusterpb"
 	"google.golang.org/protobuf/proto"
@@ -101,14 +100,14 @@ func (c *clusterfunkCluster) SetEndpoint(name, listenAddress string) {
 	// Sanity check the endpoint. If it's the loopback adapter it might not be
 	// what you want.
 	if netutils.IsLoopbackAddress(listenAddress) {
-		log.WithFields(log.Fields{
+		logrus.WithFields(logrus.Fields{
 			"listenAddress": listenAddress,
 			"name":          name,
 		}).Warning("Registering endpoint with loopback adapter. The endpoint won't be reachable for anyone but local clients.")
 	}
 	c.serfNode.SetTag(name, listenAddress)
 	if err := c.serfNode.PublishTags(); err != nil {
-		log.WithError(err).Error("Error adding endpoint")
+		logrus.WithError(err).Error("Error adding endpoint")
 	}
 }
 
@@ -125,14 +124,14 @@ func (c *clusterfunkCluster) Stop() {
 
 	if c.raftNode.Leader() {
 		if err := c.raftNode.StepDown(); err != nil {
-			log.WithError(err).Warning("Unable to step down as leader before leaving")
+			logrus.WithError(err).Warning("Unable to step down as leader before leaving")
 		}
 	}
 	if err := c.raftNode.Stop(c.config.AutoJoin); err != nil {
-		log.WithError(err).Warning("Error stopping Raft node. Will stop anyways")
+		logrus.WithError(err).Warning("Error stopping Raft node. Will stop anyways")
 	}
 	if err := c.serfNode.Stop(); err != nil {
-		log.WithError(err).Warning("Error stopping Serf node. Will stop anyways.")
+		logrus.WithError(err).Warning("Error stopping Serf node. Will stop anyways.")
 	}
 
 	c.setRole(Unknown)
@@ -167,10 +166,10 @@ func (c *clusterfunkCluster) Start() error {
 
 	// Launch node management endpoint
 	if err := c.startManagementServices(); err != nil {
-		log.WithError(err).Error("Unable to start management endpoint")
+		logrus.WithError(err).Error("Unable to start management endpoint")
 	}
 	if err := c.startLeaderService(); err != nil {
-		log.WithError(err).Error("Error starting leader gRPC interface")
+		logrus.WithError(err).Error("Error starting leader gRPC interface")
 	}
 	if c.config.ZeroConf {
 		// TOOD: Merge with service init code
@@ -187,7 +186,7 @@ func (c *clusterfunkCluster) Start() error {
 				c.config.Serf.JoinAddress = addrs[0]
 			}
 			if len(addrs) == 0 {
-				log.Debug("No Serf nodes found, bootstrapping cluster")
+				logrus.Debug("No Serf nodes found, bootstrapping cluster")
 				c.config.Raft.Bootstrap = true
 			}
 		}
@@ -206,7 +205,7 @@ func (c *clusterfunkCluster) Start() error {
 		// leaders might linger in the Raft cluster even if they've shut down so
 		// purge old nodes that have left the Serf cluster regularly
 		go func() {
-			log.Info("Starting stale node check for ZeroConf cluster")
+			logrus.Info("Starting stale node check for ZeroConf cluster")
 			for {
 				time.Sleep(10 * time.Second)
 				if !c.raftNode.Leader() {
@@ -214,16 +213,16 @@ func (c *clusterfunkCluster) Start() error {
 				}
 				raftList, err := c.raftNode.memberList()
 				if err != nil {
-					log.WithError(err).Warning("Unable to check member list in Raft cluster")
+					logrus.WithError(err).Warning("Unable to check member list in Raft cluster")
 					continue
 				}
 				for _, rn := range raftList {
 					sn := c.serfNode.Node(rn.ID)
 					if sn.State != SerfAlive {
 						// purge the node from the Raft cluster
-						log.WithField("node", rn.ID).Info("Removing stale Raft node")
+						logrus.WithField("node", rn.ID).Info("Removing stale Raft node")
 						if err := c.raftNode.RemoveClusterNode(rn.ID, sn.Tags[RaftEndpoint]); err != nil {
-							log.WithError(err).Warning("Unable to remove stale Raft node")
+							logrus.WithError(err).Warning("Unable to remove stale Raft node")
 						}
 					}
 				}
@@ -278,7 +277,7 @@ func (c *clusterfunkCluster) raftEventLoop(ch <-chan RaftEventType) {
 			toolbox.TimeCall(func() { c.handleReceiveLog() }, "ReceivedLog")
 
 		default:
-			log.WithField("eventType", e).Error("Unknown event received")
+			logrus.WithField("eventType", e).Error("Unknown event received")
 		}
 	}
 }
@@ -295,7 +294,7 @@ func (c *clusterfunkCluster) handleLeaderEvent() {
 		if node.Tags[RaftEndpoint] != "" {
 			// this is a Raft member
 			if !c.raftNode.Nodes.Contains(node.NodeID) {
-				log.WithField("nodeid", node.NodeID).Error("Raft configuration does not contain node")
+				logrus.WithField("nodeid", node.NodeID).Error("Raft configuration does not contain node")
 			}
 		}
 	}
@@ -325,12 +324,12 @@ func (c *clusterfunkCluster) checkAckStatus() {
 		c.unacknowledged.Done()
 
 		if !c.raftNode.Leader() {
-			log.WithField("nodes", unackNodes).Warning("Ack timeout for nodes but I'm no longer the leader")
+			logrus.WithField("nodes", unackNodes).Warning("Ack timeout for nodes but I'm no longer the leader")
 			return
 		}
 
 		// TODO: rewrite a bit. There's a lot of shuffling around with types here.
-		log.WithField("nodes", unackNodes).Warning("Ack timed out for one or more nodes. Repeating sharding.")
+		logrus.WithField("nodes", unackNodes).Warning("Ack timed out for one or more nodes. Repeating sharding.")
 		if c.raftNode.Leader() {
 			// remove nodes from list, start new size change
 			list := c.raftNode.Nodes.List()
@@ -342,9 +341,9 @@ func (c *clusterfunkCluster) checkAckStatus() {
 
 			if box.Size() == 0 {
 				// No nodes have responded to me. Step down as leader.
-				log.Warning("No nodes have acked. Stepping down as leader.")
+				logrus.Warning("No nodes have acked. Stepping down as leader.")
 				if err := c.raftNode.StepDown(); err != nil {
-					log.Warning("Unable to step down as leader")
+					logrus.Warning("Unable to step down as leader")
 				}
 				return
 			}
@@ -359,11 +358,11 @@ func (c *clusterfunkCluster) handleClusterSizeChanged(nodeList []string) {
 	}
 
 	c.setState(Resharding)
-	// reshard cluster, distribute via replicated log.
+	// reshard cluster, distribute via replicated logrus.
 
 	c.shardManager.UpdateNodes(nodeList...)
 	if len(nodeList) == 0 {
-		log.Error("Cluster does not contain any nodes. Nothing to do when size changes")
+		logrus.Error("Cluster does not contain any nodes. Nothing to do when size changes")
 		return
 	}
 	proposedShardMap, err := c.shardManager.MarshalBinary()
@@ -383,7 +382,7 @@ func (c *clusterfunkCluster) handleClusterSizeChanged(nodeList []string) {
 			panic("I'm the leader but I could not write the log")
 		}
 		// otherwise -- just log it and continue
-		log.WithError(err).Error("Could not write log entry for new shard map")
+		logrus.WithError(err).Error("Could not write log entry for new shard map")
 	}
 	// Reset the list of acked nodes and
 	c.unacknowledged = newAckCollection()
@@ -393,7 +392,7 @@ func (c *clusterfunkCluster) handleClusterSizeChanged(nodeList []string) {
 	c.cfmetrics.SetShardCount(c.raftNode.LocalNodeID(), c.shardManager.ShardCountForNode(c.raftNode.LocalNodeID()))
 	c.cfmetrics.SetShardIndex(c.raftNode.LocalNodeID(), index)
 
-	log.WithFields(log.Fields{"index": index}).Debugf("Shard map index")
+	logrus.WithFields(logrus.Fields{"index": index}).Debugf("Shard map index")
 
 	// Next messages will be ackReceived when the changes has replicated
 	// out to the other nodes.
@@ -435,7 +434,7 @@ func (c *clusterfunkCluster) handleReceiveLog() {
 			c.processShardMapCommitMessage(&msg)
 
 		default:
-			log.WithField("logType", msg.MessageType).Error("Unknown log type in replication log")
+			logrus.WithField("logType", msg.MessageType).Error("Unknown log type in replication log")
 		}
 	}
 }
@@ -505,12 +504,12 @@ func (c *clusterfunkCluster) ackShardMap(index uint64, endpoint string) {
 	opts, err := grpcutil.GetDialOpts(clientParam)
 	if err != nil {
 		//panic(fmt.Sprintf("Unable to acknowledge gRPC client parameters: %v", err))
-		log.WithError(err).Error("Unable to acknowledge gRPC client parameters")
+		logrus.WithError(err).Error("Unable to acknowledge gRPC client parameters")
 		return
 	}
 	conn, err := grpc.Dial(clientParam.ServerEndpoint, opts...)
 	if err != nil {
-		log.WithError(err).Error("Unable to dial server when acking shard map")
+		logrus.WithError(err).Error("Unable to dial server when acking shard map")
 		return
 	}
 	defer conn.Close()
@@ -530,7 +529,7 @@ func (c *clusterfunkCluster) ackShardMap(index uint64, endpoint string) {
 	if !resp.Success {
 		if uint64(resp.CurrentIndex) == index {
 			// It's only an error if the index is the same
-			log.WithFields(log.Fields{
+			logrus.WithFields(logrus.Fields{
 				"index":       index,
 				"leaderIndex": resp.CurrentIndex,
 			}).Error("Leader rejected ack")
@@ -561,7 +560,7 @@ func (c *clusterfunkCluster) sendCommitMessage(index uint64) {
 			panic("I'm the leader but I could not write the log")
 		}
 		// otherwise -- just log it and continue
-		log.WithError(err).Error("Could not write log entry for new shard map")
+		logrus.WithError(err).Error("Could not write log entry for new shard map")
 	}
 }
 
@@ -577,9 +576,9 @@ func (c *clusterfunkCluster) serfEventLoop(ch <-chan NodeEvent) {
 				switch ev.Event {
 				case SerfNodeJoined, SerfNodeUpdated:
 					if knownNodes.Add(ev.Node.NodeID) && c.config.AutoJoin && c.Role() == Leader {
-						log.Warnf("Adding serf node %s to cluster", ev.Node.NodeID)
+						logrus.Warnf("Adding serf node %s to cluster", ev.Node.NodeID)
 						if err := c.raftNode.AddClusterNode(ev.Node.NodeID, ev.Node.Tags[RaftEndpoint]); err != nil {
-							log.WithError(err).WithField("event", ev).Error("Error adding member")
+							logrus.WithError(err).WithField("event", ev).Error("Error adding member")
 						} else {
 							c.livenessChecker.Add(ev.Node.NodeID, ev.Node.Tags[LivenessEndpoint])
 						}
@@ -588,17 +587,17 @@ func (c *clusterfunkCluster) serfEventLoop(ch <-chan NodeEvent) {
 					known := knownNodes.Remove(ev.Node.NodeID)
 
 					if c.config.AutoJoin && c.Role() == Leader {
-						log.WithField("node", ev.Node.NodeID).Info("Removing serf node")
+						logrus.WithField("node", ev.Node.NodeID).Info("Removing serf node")
 						if err := c.raftNode.RemoveClusterNode(ev.Node.NodeID, ev.Node.Tags[RaftEndpoint]); err != nil {
 							if known {
-								log.WithError(err).WithField("event", ev).Error("Error removing member")
+								logrus.WithError(err).WithField("event", ev).Error("Error removing member")
 							}
 						}
 						c.livenessChecker.Remove(ev.Node.NodeID)
 					}
 
 				default:
-					log.WithField("event", ev.Event).Warn("Unknown SerfNode event type")
+					logrus.WithField("event", ev.Event).Warn("Unknown SerfNode event type")
 				}
 			}
 		}(c.serfNode.Events())

@@ -1,6 +1,7 @@
 // +build vfsgen
 
 package main
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -17,10 +18,10 @@ package main
 //limitations under the License.
 //
 import (
-	"log"
 	gohttp "net/http"
 
 	"github.com/shurcooL/vfsgen"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
@@ -30,6 +31,6 @@ func main() {
 		Filename:     "static_vfsdata.go",
 	})
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 }

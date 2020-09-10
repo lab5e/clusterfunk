@@ -1,4 +1,5 @@
 package fsmtool
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -18,9 +19,9 @@ import (
 	"fmt"
 	"io"
 
-	log "github.com/sirupsen/logrus"
-
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 // StateTransitionTable is a tool to manage state transitions.
@@ -83,7 +84,7 @@ func (s *StateTransitionTable) SetState(state interface{}) bool {
 		}
 	}
 	if s.AllowInvalid {
-		log.Errorf("%s: Invalid state transition %s -> %s", s.Name, s.CurrentState, state)
+		logrus.Errorf("%s: Invalid state transition %s -> %s", s.Name, s.CurrentState, state)
 		s.CurrentState = state
 		return true
 	}
@@ -95,7 +96,7 @@ func (s *StateTransitionTable) Apply(newState interface{}, code func(stt *StateT
 	oldState := s.CurrentState
 	if !s.SetState(newState) {
 		if s.LogOnError {
-			log.WithFields(log.Fields{
+			logrus.WithFields(logrus.Fields{
 				"fsm":          s.Name,
 				"currentState": s.CurrentState,
 				"newState":     newState,
@@ -116,7 +117,7 @@ func (s *StateTransitionTable) Apply(newState interface{}, code func(stt *StateT
 	if s.LogTransitions {
 		stop := time.Now()
 		execTime := float64(stop.Sub(start)) / float64(time.Millisecond)
-		log.WithFields(log.Fields{
+		logrus.WithFields(logrus.Fields{
 			"fsm":          s.Name,
 			"currentState": oldState,
 			"newState":     newState,
