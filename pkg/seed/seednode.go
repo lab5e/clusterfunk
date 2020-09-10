@@ -2,27 +2,27 @@ package seed
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"sort"
-	"strconv"
 	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/lab5e/clusterfunk/pkg/funk"
 	"github.com/lab5e/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/gotoolbox/netutils"
 	gotoolbox "github.com/lab5e/gotoolbox/toolbox"
 	"github.com/sirupsen/logrus"
 )
 
 type parameters struct {
-	ClusterName  string                  `kong:"help='Cluster name',default='clusterfunk'"`
-	ZeroConf     bool                    `kong:"help='ZeroConf lookups for cluster',default='true'"`
-	NodeID       string                  `kong:"help='Node ID for seed node',default=''"`
-	Serf         funk.SerfParameters     `kong:"embed,prefix='serf-'"`
-	Log          gotoolbox.LogParameters `kong:"embed,prefix='log-'"`
-	LiveView     bool                    `kong:"help='Display live view of nodes',default='false'"`
-	ShowAllNodes bool                    `kong:"help='Show all nodes, not just nodes alive',default='false'"`
+	ClusterName     string                  `kong:"help='Cluster name',default='clusterfunk'"`
+	ZeroConf        bool                    `kong:"help='ZeroConf lookups for cluster',default='true'"`
+	NodeID          string                  `kong:"help='Node ID for seed node',default=''"`
+	SerfPort        int                     `kong:"help='Port to use for Serf',default='0'"`
+	SerfJoinAddress string                  `kong:"help='Join address for Serf', default=''"`
+	Log             gotoolbox.LogParameters `kong:"embed,prefix='log-'"`
+	LiveView        bool                    `kong:"help='Display live view of nodes',default='false'"`
+	ShowAllNodes    bool                    `kong:"help='Show all nodes, not just nodes alive',default='false'"`
 }
 
 // Run is a ready-to run (just call it from main()) implementation of
@@ -48,24 +48,37 @@ func Run() {
 	if config.NodeID == "" {
 		config.NodeID = toolbox.RandomID()
 	}
-	config.Serf.Final()
+	if config.SerfPort == 0 {
+		config.SerfPort, err = netutils.FreeTCPPort()
+		if err != nil {
+			logrus.WithError(err).Error("Could not find free port")
+			os.Exit(2)
+		}
+	}
+	publicIP, err := netutils.FindPublicIPv4()
+	if err != nil {
+		logrus.WithError(err).Error("Could not determine public IP")
+		os.Exit(2)
+	}
+	serfConfig := funk.SerfParameters{
+		Endpoint:    fmt.Sprintf("%s:%d", publicIP, config.SerfPort),
+		Verbose:     (logrus.GetLevel() >= logrus.DebugLevel),
+		JoinAddress: config.SerfJoinAddress,
+	}
+	serfConfig.Final()
+
+	logrus.WithFields(logrus.Fields{
+		"nodeID":       config.NodeID,
+		"serfEndpoint": serfConfig.Endpoint,
+		"joinAddress":  serfConfig.JoinAddress,
+	}).Info("Serf configuration")
 
 	logrus.WithField("nodeId", config.NodeID).Info("Starting seed node")
 
 	if config.ZeroConf {
 		zr := toolbox.NewZeroconfRegistry(config.ClusterName)
-		_, port, err := net.SplitHostPort(config.Serf.Endpoint)
 
-		if err != nil {
-			logrus.WithError(err).WithField("hostport", config.Serf.Endpoint).Error("Host:port string is invalid")
-			os.Exit(2)
-		}
-		portNum, err := strconv.Atoi(port)
-		if err != nil {
-			logrus.WithError(err).WithField("hostport", config.Serf.Endpoint).Error("Host:port string is invalid")
-			os.Exit(2)
-		}
-		if err := zr.Register(funk.ZeroconfSerfKind, config.NodeID, portNum); err != nil {
+		if err := zr.Register(funk.ZeroconfSerfKind, config.NodeID, config.SerfPort); err != nil {
 			logrus.WithError(err).Error("Unable to register in ZeroConf")
 			os.Exit(2)
 		}
@@ -73,7 +86,7 @@ func Run() {
 	}
 
 	serfNode := funk.NewSerfNode()
-	if err := serfNode.Start(config.NodeID, config.Serf); err != nil {
+	if err := serfNode.Start(config.NodeID, serfConfig); err != nil {
 		logrus.WithError(err).Error("Unable to start Serf node")
 		os.Exit(2)
 	}
@@ -94,10 +107,9 @@ func Run() {
 				"nodeId": ev.Node.NodeID,
 				"event":  ev.Event.String(),
 				"state":  ev.Node.State,
-			}).Debug("Serf event")
+			}).Info("Serf event")
 		}
 	}(serfNode.Events())
-	logrus.WithField("endpoint", config.Serf.Endpoint).Info("Seed node started")
 	gotoolbox.WaitForSignal()
 
 }
