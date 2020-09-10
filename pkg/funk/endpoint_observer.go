@@ -6,16 +6,6 @@ import (
 	"sync"
 )
 
-// Endpoint is
-type Endpoint struct {
-	NodeID        string // NodeID is the ID of the node that registered the endpoint
-	ListenAddress string // ListenAddress is the registered address for the endpoint
-	Name          string // Name is the name of the endpoint
-	Active        bool   // Active is set to true if the endpoint is from an active node
-	Local         bool   // Local is set to true if this is on the local node
-	Cluster       bool   // Cluster is set to true if the node is a member of the cluster
-}
-
 // EndpointObserver observes the cluster and generates events when endpoints
 // are registered and deregistered. Note that the endpoints might be registered
 // but the service might not be available. The list of endpoints is only
