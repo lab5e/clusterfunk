@@ -30,6 +30,6 @@ func TestToPublicEndpoint(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal("1.2.3.4:9999", s)
 
-	s, err = ToPublicEndpoint("something")
+	_, err = ToPublicEndpoint("something")
 	assert.Error(err)
 }
