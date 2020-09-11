@@ -88,11 +88,10 @@ func (p *Parameters) Final() {
 	p.checkAndSetEndpoint(&p.LeaderEndpoint)
 	p.checkAndSetEndpoint(&p.LivenessEndpoint)
 
-	// Log endpoints regardless of verbose or not.
 	logrus.WithFields(logrus.Fields{
 		"serfEndpoint":       p.Serf.Endpoint,
 		"raftEndpoint":       p.Raft.RaftEndpoint,
 		"managementEndpoint": p.Management.Endpoint,
 		"livenessEndpoint":   p.LivenessEndpoint,
-	}).Info("Endpoint configuration")
+	}).Debug("Endpoint configuration")
 }

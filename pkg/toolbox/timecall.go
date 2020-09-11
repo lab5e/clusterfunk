@@ -27,5 +27,5 @@ func TimeCall(call func(), description string) {
 	start := time.Now()
 	call()
 	diff := time.Since(start)
-	logrus.Infof("%s took %f ms to execute", description, float64(diff)/float64(time.Millisecond))
+	logrus.Debugf("%s took %f ms to execute", description, float64(diff)/float64(time.Millisecond))
 }

@@ -205,7 +205,7 @@ func (c *clusterfunkCluster) Start() error {
 		// leaders might linger in the Raft cluster even if they've shut down so
 		// purge old nodes that have left the Serf cluster regularly
 		go func() {
-			logrus.Info("Starting stale node check for ZeroConf cluster")
+			logrus.Debug("Starting stale node check for ZeroConf cluster")
 			for {
 				time.Sleep(10 * time.Second)
 				if !c.raftNode.Leader() {
@@ -576,7 +576,7 @@ func (c *clusterfunkCluster) serfEventLoop(ch <-chan NodeEvent) {
 				switch ev.Event {
 				case SerfNodeJoined, SerfNodeUpdated:
 					if knownNodes.Add(ev.Node.NodeID) && c.config.AutoJoin && c.Role() == Leader {
-						logrus.Warnf("Adding serf node %s to cluster", ev.Node.NodeID)
+						logrus.WithField("node", ev.Node.NodeID).Debug("Adding serf node")
 						if err := c.raftNode.AddClusterNode(ev.Node.NodeID, ev.Node.Tags[RaftEndpoint]); err != nil {
 							logrus.WithError(err).WithField("event", ev).Error("Error adding member")
 						} else {
@@ -587,7 +587,7 @@ func (c *clusterfunkCluster) serfEventLoop(ch <-chan NodeEvent) {
 					known := knownNodes.Remove(ev.Node.NodeID)
 
 					if c.config.AutoJoin && c.Role() == Leader {
-						logrus.WithField("node", ev.Node.NodeID).Info("Removing serf node")
+						logrus.WithField("node", ev.Node.NodeID).Debug("Removing serf node")
 						if err := c.raftNode.RemoveClusterNode(ev.Node.NodeID, ev.Node.Tags[RaftEndpoint]); err != nil {
 							if known {
 								logrus.WithError(err).WithField("event", ev).Error("Error removing member")

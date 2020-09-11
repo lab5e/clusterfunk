@@ -529,7 +529,7 @@ func (r *RaftNode) scheduleInternalEvent(ev RaftEventType, timeout time.Duration
 			logrus.WithFields(logrus.Fields{
 				"event":     ev.String(),
 				"timeoutMs": timeout / time.Millisecond,
-			}).Warn("Scheduled event sent")
+			}).Debug("Did not receive expected event. Generating it.")
 			r.sendInternalEvent(ev)
 		}
 	}()
