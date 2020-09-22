@@ -1,7 +1,6 @@
 package funk
 
 import (
-	"net"
 	"time"
 
 	"github.com/lab5e/clusterfunk/pkg/toolbox"
@@ -13,7 +12,7 @@ import (
 // the cluster but service nodes are more loosely related and may provide
 // services to the cluster itself.
 type ServiceNode interface {
-	RegisterServiceEndpoint(endpointName string, address net.Addr) error
+	RegisterServiceEndpoint(endpointName string, listenAddress string) error
 	Stop()
 }
 
@@ -57,8 +56,8 @@ type serviceNode struct {
 	Serf *SerfNode
 }
 
-func (s *serviceNode) RegisterServiceEndpoint(endpointName string, address net.Addr) error {
-	s.Serf.SetTag(endpointName, address.String())
+func (s *serviceNode) RegisterServiceEndpoint(endpointName string, listenAddress string) error {
+	s.Serf.SetTag(endpointName, listenAddress)
 	return s.Serf.PublishTags()
 }
 
