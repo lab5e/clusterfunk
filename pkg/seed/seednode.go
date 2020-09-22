@@ -108,6 +108,9 @@ func Run() {
 				"event":  ev.Event.String(),
 				"state":  ev.Node.State,
 			}).Info("Serf event")
+			for k, v := range ev.Node.Tags {
+				logrus.WithField(k, v).Infof("Tags for node %s", ev.Node.NodeID)
+			}
 		}
 	}(serfNode.Events())
 	gotoolbox.WaitForSignal()
