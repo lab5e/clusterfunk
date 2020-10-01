@@ -44,7 +44,9 @@ func TestRaftCluster(t *testing.T) {
 
 	evts1 := node1.Events()
 
-	assert.NoError(node1.Start(id1, params1), "Start should be successful")
+	bs, err := node1.Start(id1, params1)
+	assert.NoError(err, "Start should be successful")
+	assert.True(bs)
 
 	waitForEvent := func(ev RaftEventType, ch <-chan RaftEventType) {
 		lastEvent := RaftEventType(-1)
@@ -60,12 +62,16 @@ func TestRaftCluster(t *testing.T) {
 
 	assert.Error(node1.Stop(false), "Expected error when stopping a 2nd time")
 
-	assert.NoError(node1.Start(id1, params1), "2nd start should be success")
+	bs, err = node1.Start(id1, params1)
+	assert.True(bs, "Bootstrap 2nd time succeeds")
+	assert.NoError(err, "2nd start should be success")
 	waitForEvent(RaftBecameLeader, evts1)
 
 	node2 := NewRaftNode()
-	//evts2 := node2.Events()
-	assert.NoError(node2.Start(id2, params2), "2nd node should launch")
+
+	bs, err = node2.Start(id2, params2)
+	assert.False(bs, "2nd node should not bootstrap")
+	assert.NoError(err, "2nd node should launch")
 
 	assert.NoError(node1.AddClusterNode(id2, params2.RaftEndpoint), "Node 2 should join successfully")
 
@@ -76,7 +82,9 @@ func TestRaftCluster(t *testing.T) {
 
 	node3 := NewRaftNode()
 	evts3 := node3.Events()
-	assert.NoError(node3.Start(id3, params3))
+	bs, err = node3.Start(id3, params3)
+	assert.False(bs, "3rd node should not bootstrap")
+	assert.NoError(err)
 	assert.NoError(node1.AddClusterNode(id3, params3.RaftEndpoint))
 
 	waitForEvent(RaftBecameFollower, evts3)
@@ -85,7 +93,7 @@ func TestRaftCluster(t *testing.T) {
 	assert.False(node2.Leader())
 	assert.False(node3.Leader())
 
-	_, err := node3.AppendLogEntry(dummyLogBuffer)
+	_, err = node3.AppendLogEntry(dummyLogBuffer)
 	assert.Error(err, "Should get error when appending log entry and isn't leader")
 
 	index, err := node1.AppendLogEntry(dummyLogBuffer)

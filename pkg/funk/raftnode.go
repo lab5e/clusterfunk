@@ -116,12 +116,14 @@ type RaftParameters struct {
 	DebugLog     bool   `kong:"help='Show debug log messages for Raft',default='false'"`
 }
 
-// Start launches the node
-func (r *RaftNode) Start(nodeID string, cfg RaftParameters) error {
+// Start launches the node. The return value is set to true if the cluster
+// is bootstrapped
+func (r *RaftNode) Start(nodeID string, cfg RaftParameters) (bool, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
+
 	if r.ra != nil {
-		return errors.New("raft cluster is already started")
+		return false, errors.New("raft cluster is already started")
 	}
 
 	config := raft.DefaultConfig()
@@ -138,7 +140,7 @@ func (r *RaftNode) Start(nodeID string, cfg RaftParameters) error {
 
 	addr, err := net.ResolveTCPAddr("tcp", cfg.RaftEndpoint)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	/* These are the defaults:
@@ -171,7 +173,7 @@ func (r *RaftNode) Start(nodeID string, cfg RaftParameters) error {
 	}
 	transport, err := raft.NewTCPTransport(addr.String(), addr, 3, 500*time.Millisecond, logger)
 	if err != nil {
-		return err
+		return false, err
 	}
 	r.raftEndpoint = string(transport.LocalAddr())
 
@@ -184,19 +186,19 @@ func (r *RaftNode) Start(nodeID string, cfg RaftParameters) error {
 		logrus.WithField("dbdir", raftdir).Info("Using boltDB and snapshot store")
 		if err := os.MkdirAll(raftdir, os.ModePerm); err != nil {
 			logrus.WithError(err).WithField("dbdir", raftdir).Error("Unable to create store dir")
-			return err
+			return false, err
 		}
 		boltDB, err := raftboltdb.NewBoltStore(filepath.Join(raftdir, fmt.Sprintf("%s.db", nodeID)))
 		if err != nil {
 			logrus.WithError(err).Error("Unable to create boltDB")
-			return err
+			return false, err
 		}
 		logStore = boltDB
 		stableStore = boltDB
 		snapshotStore, err = raft.NewFileSnapshotStore(raftdir, 3, os.Stderr)
 		if err != nil {
 			logrus.WithError(err).WithField("dbdir", raftdir).Error("Unable to create snapshot store")
-			return err
+			return false, err
 		}
 	} else {
 		logStore = raft.NewInmemStore()
@@ -205,9 +207,10 @@ func (r *RaftNode) Start(nodeID string, cfg RaftParameters) error {
 	}
 	r.ra, err = raft.NewRaft(config, r, logStore, stableStore, snapshotStore, transport)
 	if err != nil {
-		return err
+		return false, err
 	}
 
+	bootstrap := false
 	if cfg.Bootstrap {
 		logrus.Info("Bootstrapping new cluster")
 		configuration := raft.Configuration{
@@ -220,8 +223,9 @@ func (r *RaftNode) Start(nodeID string, cfg RaftParameters) error {
 		}
 		f := r.ra.BootstrapCluster(configuration)
 		if f.Error() != nil {
-			return f.Error()
+			return false, f.Error()
 		}
+		bootstrap = true
 	}
 	observerChan := make(chan raft.Observation)
 
@@ -234,7 +238,7 @@ func (r *RaftNode) Start(nodeID string, cfg RaftParameters) error {
 	r.localNodeID = nodeID
 	r.sendInternalEvent(RaftBecameFollower)
 
-	return nil
+	return bootstrap, nil
 }
 
 func (r *RaftNode) coalesceEvents() {

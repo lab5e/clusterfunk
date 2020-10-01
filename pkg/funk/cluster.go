@@ -15,7 +15,10 @@ package funk
 //See the License for the specific language governing permissions and
 //limitations under the License.
 //
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 // NodeState is the enumeration of different states a node can be in.
 type NodeState int32
@@ -84,6 +87,11 @@ func (n NodeRole) String() string {
 const (
 	// SerfStatusKey is the key for the serf status
 	SerfStatusKey = "serf.status"
+
+	// clusterCreated is the key for the created tag. It's set by the node
+	// that bootstraps the cluster. Technically it's writable by all nodes in
+	// the cluster but...
+	clusterCreated = "cf.created"
 )
 
 // Event is the interface for cluster events that are triggered. The events are
@@ -141,6 +149,10 @@ type Cluster interface {
 	// NewObserver returns a new endpoint observer for endpoints in and around
 	// the cluster
 	NewObserver() EndpointObserver
+
+	// Created returns the time the cluster was created. This is set when the
+	// cluster is bootstrapped.
+	Created() time.Time
 }
 
 // The following are internal tags and values for nodes

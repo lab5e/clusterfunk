@@ -199,11 +199,25 @@ func (s *SerfNode) SetTag(name, value string) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	if value == "" {
+		logrus.Debugf("Deleting tag %s", name)
 		delete(s.tags, name)
 		return
 	}
 	s.tags[name] = value
 	s.changedTags = true
+}
+
+// GetClusterTag returns the first tag in the cluster that matches the name.
+// if no matching tag is found an empty string is returned.
+func (s *SerfNode) GetClusterTag(name string) string {
+	for _, node := range s.Nodes() {
+		for k, v := range node.Tags {
+			if k == name {
+				return v
+			}
+		}
+	}
+	return ""
 }
 
 // PublishTags publishes the tags to the other members of the cluster
@@ -219,6 +233,7 @@ func (s *SerfNode) PublishTags() error {
 	if !s.changedTags {
 		return nil
 	}
+	logrus.WithField("tags", s.tags).Debug("publishing tags")
 	s.changedTags = false
 	return s.se.SetTags(s.tags)
 }

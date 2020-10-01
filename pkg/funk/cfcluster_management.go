@@ -136,6 +136,7 @@ func (c *clusterfunkCluster) GetStatus(ctx context.Context, req *managepb.GetSta
 			RaftNodeCount: 0,
 			SerfNodeCount: 0,
 			LeaderNodeId:  "",
+			Created:       c.Created().UnixNano(),
 		}
 
 		if c.raftNode.Leader() {

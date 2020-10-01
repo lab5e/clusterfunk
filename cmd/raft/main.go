@@ -116,7 +116,7 @@ func start(config funk.Parameters) error {
 
 	go raftEvents(raftNode.Events())
 
-	if err := raftNode.Start(config.NodeID, config.Raft); err != nil {
+	if _, err := raftNode.Start(config.NodeID, config.Raft); err != nil {
 		return err
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/lab5e/clusterfunk/pkg/funk/managepb"
 )
@@ -26,7 +27,11 @@ func (c *StatusCommand) Run(args RunContext) error {
 		fmt.Fprintf(os.Stderr, "Error retrieving status: %v\n", err)
 		return errStd
 	}
+	t := time.Unix(0, res.Created)
+	d := time.Since(t)
 	fmt.Printf("Cluster name: %s\n", res.ClusterName)
+	fmt.Printf("Created at    %s  (%dd, %02dh, %02dm, %02ds ago)\n", t.Format(time.RFC822),
+		int64(d.Hours()/24), int64(d.Hours()), int64(d.Minutes()), int64(d.Seconds()))
 	fmt.Printf("Node ID:      %s\n", res.LocalNodeId)
 	fmt.Printf("State:        %s\n", res.LocalState)
 	fmt.Printf("Role:         %s\n", res.LocalRole)

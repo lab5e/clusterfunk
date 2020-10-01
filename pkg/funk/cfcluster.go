@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -235,10 +236,15 @@ func (c *clusterfunkCluster) Start() error {
 	}
 	go c.raftEventLoop(c.raftNode.Events())
 
-	if err := c.raftNode.Start(c.config.NodeID, c.config.Raft); err != nil {
+	bootstrap, err := c.raftNode.Start(c.config.NodeID, c.config.Raft)
+	if err != nil {
 		return err
 	}
-
+	if bootstrap {
+		t := time.Now()
+		logrus.Infof("Bootstrapping cluster at %v", t)
+		c.serfNode.SetTag(clusterCreated, fmt.Sprintf("%d", t.UnixNano()))
+	}
 	// TODO: Start Serf node when Raft node has joined the cluster, not before
 	// if the autojoin parameter is set to false. Raft nodes that haven't joined
 	// will show up as members of the cluster (for the ctrlc tool) but they
@@ -625,4 +631,16 @@ func (c *clusterfunkCluster) updateLivenessChecks() {
 			c.livenessChecker.Add(v, ep)
 		}
 	}
+}
+
+func (c *clusterfunkCluster) Created() time.Time {
+	created := c.serfNode.GetClusterTag(clusterCreated)
+	ct, err := strconv.ParseInt(created, 10, 63)
+	if err != nil {
+		logrus.WithError(err).
+			WithField("createTime", created).
+			Error("Could not read cluster create time from Serf")
+		return time.Now()
+	}
+	return time.Unix(0, ct)
 }
