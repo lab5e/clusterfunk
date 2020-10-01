@@ -15,7 +15,7 @@ require (
 	github.com/prometheus/client_golang v1.7.1
 	github.com/shurcooL/httpfs v0.0.0-20190707220628-8d4bc4ba7749 // indirect
 	github.com/shurcooL/vfsgen v0.0.0-20200627165143-92b8a710ab6c
-	github.com/sirupsen/logrus v1.6.0
+	github.com/sirupsen/logrus v1.7.0
 	github.com/stretchr/testify v1.6.1
 	google.golang.org/grpc v1.31.0
 	google.golang.org/protobuf v1.25.0
