@@ -347,3 +347,36 @@ func (sm *weightedShardMap) WorkerID(nodeID string) int {
 	}
 	return node.WorkerID
 }
+
+func (sm *weightedShardMap) DeletedShards(nodeID string, oldMap ShardMap) []Shard {
+	sm.mutex.RLock()
+	defer sm.mutex.RUnlock()
+
+	return sm.notInSet(nodeID, sm.shards, oldMap.Shards())
+}
+
+func (sm *weightedShardMap) NewShards(nodeID string, oldMap ShardMap) []Shard {
+	sm.mutex.RLock()
+	defer sm.mutex.RUnlock()
+	return sm.notInSet(nodeID, oldMap.Shards(), sm.shards)
+}
+
+// Return the shards in set2 but not in set1
+func (sm *weightedShardMap) notInSet(nodeID string, set1 []Shard, set2 []Shard) []Shard {
+	existing := make(map[int]int)
+	for _, v := range set1 {
+		if v.NodeID() == nodeID {
+			existing[v.ID()] = v.ID()
+		}
+	}
+
+	var removed []Shard
+	for _, v := range set2 {
+		if v.NodeID() == nodeID {
+			if _, ok := existing[v.ID()]; !ok {
+				removed = append(removed, v)
+			}
+		}
+	}
+	return removed
+}

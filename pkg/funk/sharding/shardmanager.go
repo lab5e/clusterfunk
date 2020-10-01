@@ -81,6 +81,14 @@ type ShardMap interface {
 	// WorkerID returns the worker ID for the node
 	WorkerID(nodeID string) int
 
+	// NewShards lists the new shards in this map compared to the old one. This
+	// node is now responsible for these shards.
+	NewShards(nodeID string, oldMap ShardMap) []Shard
+
+	// DeletedShards lists the deleted shards in this map compared to the old
+	// one. These shards can be dropped by the node when there's a reshard.
+	DeletedShards(nodeID string, oldMap ShardMap) []Shard
+
 	// The marshaling methods are used to save and restore the shard manager
 	// from the Raft logrus.
 

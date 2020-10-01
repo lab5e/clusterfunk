@@ -1,4 +1,5 @@
 package sharding
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -221,6 +222,23 @@ func TestMarshalUnmarshalBinary(t *testing.T) {
 	}
 }
 
+func TestNewAndOldSet(t *testing.T) {
+	assert := require.New(t)
+
+	oldSM := NewShardMap()
+	assert.NoError(oldSM.Init(10, nil))
+	oldSM.UpdateNodes("node1")
+
+	newSM := NewShardMap()
+	assert.NoError(newSM.Init(10, nil))
+	newSM.UpdateNodes("node1", "node2")
+
+	added := newSM.NewShards("node1", oldSM)
+	assert.Len(added, 0)
+	removed := newSM.DeletedShards("node1", oldSM)
+	assert.Len(removed, 5)
+
+}
 func BenchmarkMarshalManager(b *testing.B) {
 	weights := make([]int, benchmarkShardCount)
 	for i := range weights {
