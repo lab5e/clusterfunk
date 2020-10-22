@@ -437,17 +437,23 @@ func (s *SerfNode) ID() string {
 
 // Endpoints returns all the endpoints in the cluster
 func (s *SerfNode) Endpoints() []Endpoint {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	// Get a refreshed list of endpoints from the serf implementation
 	endpoints := make([]Endpoint, 0)
-	for _, node := range s.Nodes() {
-		localNode := (node.NodeID == s.ID())
-		clusterNode := node.Tags[RaftEndpoint] != ""
-		for k, v := range node.Tags {
+	if s.se == nil {
+		// TODO(stalehd): Consider changing the startup to make this a non-issue
+		panic("Serf node is nil. Can't retrieve endpoints without a running node")
+	}
+	for _, m := range s.se.Members() {
+		_, clusterNode := m.Tags[RaftEndpoint]
+		for k, v := range m.Tags {
 			if strings.HasPrefix(k, EndpointPrefix) {
 				endpoints = append(endpoints, Endpoint{
-					NodeID:        node.NodeID,
+					NodeID:        m.Name,
 					Name:          k,
 					ListenAddress: v,
-					Local:         localNode,
+					Local:         (m.Name == s.ID()),
 					Cluster:       clusterNode,
 				})
 			}
