@@ -234,9 +234,10 @@ func (c *clusterfunkCluster) FindEndpoint(ctx context.Context, req *managepb.End
 	for _, v := range c.serfNode.Endpoints() {
 		if strings.Contains(v.Name, req.EndpointName) {
 			ret.Endpoints = append(ret.Endpoints, &managepb.EndpointInfo{
-				NodeId:   v.NodeID,
-				Name:     v.Name,
-				HostPort: v.ListenAddress,
+				NodeId:      v.NodeID,
+				Name:        v.Name,
+				HostPort:    v.ListenAddress,
+				ServiceName: v.Service,
 			})
 		}
 
@@ -252,9 +253,10 @@ func (c *clusterfunkCluster) ListEndpoints(ctx context.Context, req *managepb.Li
 	}
 	for _, v := range c.serfNode.Endpoints() {
 		ret.Endpoints = append(ret.Endpoints, &managepb.EndpointInfo{
-			NodeId:   v.NodeID,
-			Name:     v.Name,
-			HostPort: v.ListenAddress,
+			NodeId:      v.NodeID,
+			Name:        v.Name,
+			HostPort:    v.ListenAddress,
+			ServiceName: v.Service,
 		})
 	}
 	return ret, nil

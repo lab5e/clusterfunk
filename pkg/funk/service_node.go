@@ -17,7 +17,7 @@ type ServiceNode interface {
 }
 
 // NewServiceNode creates a new ServiceNode instance
-func NewServiceNode(params ServiceParameters) (ServiceNode, error) {
+func NewServiceNode(serviceName string, params ServiceParameters) (ServiceNode, error) {
 	params.Final()
 	ret := &serviceNode{
 		Serf: NewSerfNode(),
@@ -46,7 +46,7 @@ func NewServiceNode(params ServiceParameters) (ServiceNode, error) {
 
 	}
 
-	if err := ret.Serf.Start(params.NodeID, params.Name, params.Serf); err != nil {
+	if err := ret.Serf.Start(params.NodeID, serviceName, params.Serf); err != nil {
 		return nil, err
 	}
 	return ret, nil
