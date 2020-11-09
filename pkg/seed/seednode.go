@@ -86,7 +86,7 @@ func Run() {
 	}
 
 	serfNode := funk.NewSerfNode()
-	if err := serfNode.Start(config.NodeID, serfConfig); err != nil {
+	if err := serfNode.Start(config.NodeID, "", serfConfig); err != nil {
 		logrus.WithError(err).Error("Unable to start Serf node")
 		os.Exit(2)
 	}

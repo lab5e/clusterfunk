@@ -255,7 +255,7 @@ func (c *clusterfunkCluster) Start() error {
 
 	go c.serfEventLoop(c.serfNode.Events())
 
-	return c.serfNode.Start(c.config.NodeID, c.config.Serf)
+	return c.serfNode.Start(c.config.NodeID, c.name, c.config.Serf)
 }
 
 func (c *clusterfunkCluster) raftEventLoop(ch <-chan RaftEventType) {

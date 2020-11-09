@@ -47,7 +47,7 @@ func NewClusterClient(clusterName string, zeroConf bool, seedNode string) (Clien
 	}
 	cc.serfNode = funk.NewSerfNode()
 	nodeID := fmt.Sprintf("client_%s", toolbox.RandomID())
-	if err := cc.serfNode.Start(nodeID, serfConfig); err != nil {
+	if err := cc.serfNode.Start(nodeID, "", serfConfig); err != nil {
 		return nil, err
 	}
 	time.Sleep(1 * time.Second)

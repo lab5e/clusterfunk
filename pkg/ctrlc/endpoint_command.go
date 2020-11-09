@@ -33,9 +33,11 @@ func (c *EndpointsCommand) Run(args RunContext) error {
 		return errStd
 	}
 
+	services := make(map[string]string)
 	// Sort endpoints by node, then print list of endpoints under each node
 	endpoints := make(map[string][]*managepb.EndpointInfo)
 	for _, v := range res.Endpoints {
+		services[v.NodeId] = v.ServiceName
 		epList, ok := endpoints[v.NodeId]
 		if !ok {
 			epList = make([]*managepb.EndpointInfo, 0)
@@ -54,7 +56,7 @@ func (c *EndpointsCommand) Run(args RunContext) error {
 	fmt.Printf("Endpoints for cluster '%s'\n", args.ClusterServer().Name)
 	fmt.Printf("------------------------------------------------\n")
 	for _, nodeid := range nodes {
-		fmt.Printf("Node: %s\n", nodeid)
+		fmt.Printf("Node: %s, Service: %s\n", nodeid, services[nodeid])
 		epList := endpoints[nodeid]
 		sort.Slice(epList, func(i, j int) bool {
 			return epList[i].Name < epList[j].Name

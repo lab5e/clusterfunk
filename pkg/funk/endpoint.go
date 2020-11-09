@@ -15,6 +15,7 @@ type Endpoint struct {
 	Active        bool   // Active is set to true if the endpoint is from an active node
 	Local         bool   // Local is set to true if this is on the local node
 	Cluster       bool   // Cluster is set to true if the node is a member of the cluster
+	Service       string // Name of service that is listening
 }
 
 // ToPublicEndpoint converts an ip:port string into a format suitable for

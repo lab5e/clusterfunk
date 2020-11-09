@@ -125,7 +125,7 @@ func start(config funk.Parameters) error {
 
 	go serfEvents(serfNode.Events())
 
-	if err := serfNode.Start(config.NodeID, config.Serf); err != nil {
+	if err := serfNode.Start(config.NodeID, "", config.Serf); err != nil {
 		return err
 	}
 	logrus.Info("Starting")

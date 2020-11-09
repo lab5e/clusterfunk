@@ -178,4 +178,5 @@ const (
 	RaftEndpoint       = "ep.raft"
 	ManagementEndpoint = "ep.clusterfunk.management" //  gRPC endpoint for management
 	LivenessEndpoint   = "ep.liveness"
+	SerfServiceName    = "meta.serviceName"
 )

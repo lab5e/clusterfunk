@@ -112,8 +112,8 @@ func (s *SerfParameters) Final() {
 	}
 }
 
-// Start launches the serf node
-func (s *SerfNode) Start(nodeID string, cfg SerfParameters) error {
+// Start launches the serf node. The service name can be left blank for clients.
+func (s *SerfNode) Start(nodeID string, serviceName string, cfg SerfParameters) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -158,7 +158,9 @@ func (s *SerfNode) Start(nodeID string, cfg SerfParameters) error {
 		config.Logger = mutedLogger
 		config.MemberlistConfig.Logger = mutedLogger
 	}
-
+	if serviceName != "" {
+		s.tags[SerfServiceName] = serviceName
+	}
 	// Assign tags
 	config.Tags = s.tags
 
@@ -451,6 +453,7 @@ func (s *SerfNode) Endpoints() []Endpoint {
 			if strings.HasPrefix(k, EndpointPrefix) {
 				endpoints = append(endpoints, Endpoint{
 					NodeID:        m.Name,
+					Service:       m.Tags[SerfServiceName],
 					Name:          k,
 					ListenAddress: v,
 					Local:         (m.Name == s.ID()),

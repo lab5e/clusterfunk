@@ -46,7 +46,7 @@ func NewServiceNode(params ServiceParameters) (ServiceNode, error) {
 
 	}
 
-	if err := ret.Serf.Start(params.NodeID, params.Serf); err != nil {
+	if err := ret.Serf.Start(params.NodeID, params.Name, params.Serf); err != nil {
 		return nil, err
 	}
 	return ret, nil
