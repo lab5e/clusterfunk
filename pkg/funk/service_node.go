@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/lab5e/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/gotoolbox/netutils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -40,7 +41,7 @@ func NewServiceNode(serviceName string, params ServiceParameters) (ServiceNode, 
 			}
 		}
 
-		if err := registry.Register(ZeroconfSerfKind, params.NodeID, toolbox.PortOfHostPort(params.Serf.Endpoint)); err != nil {
+		if err := registry.Register(ZeroconfSerfKind, params.NodeID, netutils.PortOfHostPort(params.Serf.Endpoint)); err != nil {
 			return nil, err
 		}
 

@@ -75,7 +75,7 @@ func (p *Parameters) Final() {
 		p.NodeID = toolbox.RandomID()
 	}
 	if p.Interface == "" {
-		ip, err := toolbox.FindPublicIPv4()
+		ip, err := netutils.FindPublicIPv4()
 		p.Interface = ip.String()
 		if err != nil {
 			logrus.WithError(err).Error("Unable to get public IP")

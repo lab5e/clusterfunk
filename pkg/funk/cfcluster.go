@@ -195,10 +195,10 @@ func (c *clusterfunkCluster) Start() error {
 			return errors.New("there's already a cluster with that name")
 		}
 
-		if err := c.registry.Register(ZeroconfSerfKind, c.config.NodeID, toolbox.PortOfHostPort(c.config.Serf.Endpoint)); err != nil {
+		if err := c.registry.Register(ZeroconfSerfKind, c.config.NodeID, netutils.PortOfHostPort(c.config.Serf.Endpoint)); err != nil {
 			return err
 		}
-		if err := c.registry.Register(ZeroconfManagementKind, c.config.NodeID, toolbox.PortOfHostPort(c.config.Management.Endpoint)); err != nil {
+		if err := c.registry.Register(ZeroconfManagementKind, c.config.NodeID, netutils.PortOfHostPort(c.config.Management.Endpoint)); err != nil {
 			return err
 		}
 

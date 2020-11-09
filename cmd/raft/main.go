@@ -25,6 +25,7 @@ import (
 	"github.com/lab5e/clusterfunk/pkg/funk"
 	"github.com/lab5e/clusterfunk/pkg/funk/sharding"
 	"github.com/lab5e/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/gotoolbox/netutils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -86,7 +87,7 @@ func start(config funk.Parameters) error {
 		return errors.New("cluster name not specified")
 	}
 
-	localLiveEndpoint := toolbox.RandomPublicEndpoint()
+	localLiveEndpoint := netutils.RandomPublicEndpoint()
 
 	serfNode = funk.NewSerfNode()
 	serfNode.SetTag(livenessEndpoint, localLiveEndpoint)
@@ -107,7 +108,7 @@ func start(config funk.Parameters) error {
 			}
 			config.Serf.JoinAddress = addrs[0]
 		}
-		if err := registry.Register("serf", config.NodeID, toolbox.PortOfHostPort(config.Serf.Endpoint)); err != nil {
+		if err := registry.Register("serf", config.NodeID, netutils.PortOfHostPort(config.Serf.Endpoint)); err != nil {
 			return err
 		}
 

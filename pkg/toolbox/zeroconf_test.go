@@ -1,4 +1,5 @@
 package toolbox
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -19,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lab5e/gotoolbox/netutils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -40,7 +42,7 @@ func TestZeroConf(t *testing.T) {
 
 	res, err := zr.ResolveFirst("some-node", 250*time.Millisecond)
 	assert.NoError(err)
-	ip, err := FindPublicIPv4()
+	ip, err := netutils.FindPublicIPv4()
 	assert.NoError(err)
 	assert.Equal(res, fmt.Sprintf("%s:9999", ip))
 }

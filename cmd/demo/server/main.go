@@ -30,7 +30,7 @@ import (
 	"github.com/lab5e/clusterfunk/cmd/demo/server/http"
 	"github.com/lab5e/clusterfunk/pkg/funk"
 	"github.com/lab5e/clusterfunk/pkg/funk/sharding"
-	"github.com/lab5e/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/gotoolbox/netutils"
 	"github.com/lab5e/gotoolbox/rest"
 	gotoolbox "github.com/lab5e/gotoolbox/toolbox"
 )
@@ -88,9 +88,9 @@ func main() {
 
 	setupLogging()
 
-	demoServerEndpoint := toolbox.RandomPublicEndpoint()
-	webserverEndpoint = toolbox.RandomPublicEndpoint()
-	metricsEndpoint = toolbox.RandomPublicEndpoint()
+	demoServerEndpoint := netutils.RandomPublicEndpoint()
+	webserverEndpoint = netutils.RandomPublicEndpoint()
+	metricsEndpoint = netutils.RandomPublicEndpoint()
 
 	gohttp.Handle("/metrics", rest.AddCORSHeaders(promhttp.Handler().ServeHTTP))
 	go func() {

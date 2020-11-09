@@ -22,6 +22,7 @@ import (
 
 	"github.com/lab5e/clusterfunk/pkg/funk/sharding"
 	"github.com/lab5e/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/gotoolbox/netutils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -48,12 +49,12 @@ func TestCfCluster(t *testing.T) {
 
 	params1 := Parameters{
 		Raft: RaftParameters{
-			RaftEndpoint: toolbox.RandomLocalEndpoint(),
+			RaftEndpoint: netutils.RandomLocalEndpoint(),
 			DiskStore:    false,
 			Bootstrap:    true,
 		},
 		Serf: SerfParameters{
-			Endpoint:    toolbox.RandomLocalEndpoint(),
+			Endpoint:    netutils.RandomLocalEndpoint(),
 			JoinAddress: "",
 		},
 		AutoJoin:         true,

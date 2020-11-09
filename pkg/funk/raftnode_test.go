@@ -18,7 +18,7 @@ package funk
 import (
 	"testing"
 
-	"github.com/lab5e/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/gotoolbox/netutils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -35,9 +35,9 @@ func TestRaftCluster(t *testing.T) {
 	id1 := "node1"
 	id2 := "node2"
 	id3 := "node3"
-	params1 := RaftParameters{Bootstrap: true, DiskStore: false, RaftEndpoint: toolbox.RandomLocalEndpoint()}
-	params2 := RaftParameters{Bootstrap: false, DiskStore: false, RaftEndpoint: toolbox.RandomLocalEndpoint()}
-	params3 := RaftParameters{Bootstrap: false, DiskStore: false, RaftEndpoint: toolbox.RandomLocalEndpoint()}
+	params1 := RaftParameters{Bootstrap: true, DiskStore: false, RaftEndpoint: netutils.RandomLocalEndpoint()}
+	params2 := RaftParameters{Bootstrap: false, DiskStore: false, RaftEndpoint: netutils.RandomLocalEndpoint()}
+	params3 := RaftParameters{Bootstrap: false, DiskStore: false, RaftEndpoint: netutils.RandomLocalEndpoint()}
 
 	// Make a three-node cluster
 	node1 := NewRaftNode()

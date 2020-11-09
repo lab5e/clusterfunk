@@ -21,7 +21,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/lab5e/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/gotoolbox/netutils"
 )
 
 // Ensure clients gets events when they die while acking
@@ -30,9 +30,9 @@ func TestLiveness(t *testing.T) {
 	const retries = 3
 	assert := require.New(t)
 
-	ep1 := toolbox.RandomLocalEndpoint()
-	ep2 := toolbox.RandomLocalEndpoint()
-	ep3 := toolbox.RandomLocalEndpoint()
+	ep1 := netutils.RandomLocalEndpoint()
+	ep2 := netutils.RandomLocalEndpoint()
+	ep3 := netutils.RandomLocalEndpoint()
 
 	localA := NewLivenessClient(ep1)
 	localB := NewLivenessClient(ep2)

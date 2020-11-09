@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lab5e/clusterfunk/pkg/toolbox"
+	"github.com/lab5e/gotoolbox/netutils"
 	"github.com/sirupsen/logrus"
 
 	"github.com/hashicorp/serf/serf"
@@ -108,7 +108,7 @@ type SerfParameters struct {
 // Final populates empty fields with default values
 func (s *SerfParameters) Final() {
 	if s.Endpoint == "" {
-		s.Endpoint = toolbox.RandomPublicEndpoint()
+		s.Endpoint = netutils.RandomPublicEndpoint()
 	}
 }
 
