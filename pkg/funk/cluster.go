@@ -174,9 +174,10 @@ const (
 // The following is a list of well-known endpoints on nodes
 const (
 	//These are
-	SerfEndpoint       = "ep.serf"
-	RaftEndpoint       = "ep.raft"
-	ManagementEndpoint = "ep.clusterfunk.management" //  gRPC endpoint for management
-	LivenessEndpoint   = "ep.liveness"
-	SerfServiceName    = "meta.serviceName"
+	SerfEndpoint           = "ep.serf"
+	RaftEndpoint           = "ep.raft"
+	ManagementEndpoint     = "ep.clusterfunk.management" //  gRPC endpoint for management
+	LivenessEndpoint       = "ep.liveness"
+	SerfServiceName        = "meta.serviceName"
+	MonitoringEndpointName = "ep.monitoring" // Typically Prometheus endpoint with /metrics and /healthz
 )
