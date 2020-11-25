@@ -29,7 +29,7 @@ type Client interface {
 // cluster. If zeroConf is set to true mDNS/ZeroConf will be used to find a
 // serf node to attach to. If the zeroConf parameter is set to false the
 // seedNode parameter is used to attach to a Serf node.
-func NewClusterClient(clusterName string, zeroConf bool, seedNode string) (Client, error) {
+func NewClusterClient(clusterName string, zeroConf bool, seedNode string, name string) (Client, error) {
 	serfConfig := funk.SerfParameters{}
 	serfConfig.JoinAddress = seedNode
 	serfConfig.Final()
@@ -47,6 +47,7 @@ func NewClusterClient(clusterName string, zeroConf bool, seedNode string) (Clien
 	}
 	cc.serfNode = funk.NewSerfNode()
 	nodeID := fmt.Sprintf("client_%s", toolbox.RandomID())
+	cc.serfNode.SetTag(funk.SerfServiceName, name)
 	if err := cc.serfNode.Start(nodeID, "", serfConfig); err != nil {
 		return nil, err
 	}
