@@ -1,4 +1,5 @@
 package sharding
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -18,25 +19,26 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 const numTests = 100000
 const numShards = 50
 
 func TestIntegerSharding(t *testing.T) {
+	assert := require.New(t)
+
 	calc := NewIntSharder(numShards)
 	distribution := make(map[int]int)
 	for i := 0; i < numTests; i++ {
 		shardNo := calc(rand.Int31())
 		distribution[shardNo]++
 	}
-	if len(distribution) > numShards {
-		t.Fatalf("Expected a maximum of %d shards but got %d", numShards, len(distribution))
-	}
+	assert.LessOrEqual(len(distribution), numShards, "Expected a maximum of %d shards but got %d", numShards, len(distribution))
+
 	for k, v := range distribution {
-		if v > 4*(numTests/numShards) {
-			t.Fatalf("Shard on %d is unbalanced with %d elements (typical = %d, max = %d)", k, v, numTests/numShards, 4*numTests/numShards)
-		}
+		assert.LessOrEqual(v, 4*(numTests/numShards), "Shard on %d is unbalanced with %d elements (typical = %d, max = %d)", k, v, numTests/numShards, 4*numTests/numShards)
 	}
 }
 
