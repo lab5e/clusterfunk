@@ -85,11 +85,22 @@ func Run() {
 		defer zr.Shutdown()
 	}
 
-	serfNode := funk.NewSerfNode()
-	if err := serfNode.Start(config.NodeID, "", serfConfig); err != nil {
-		logrus.WithError(err).Error("Unable to start Serf node")
-		os.Exit(2)
+	var serfNode *funk.SerfNode
+	sleepTime := 2 * time.Second
+	for {
+		serfNode := funk.NewSerfNode()
+		if err := serfNode.Start(config.NodeID, "", serfConfig); err != nil {
+			logrus.WithError(err).Errorf("Unable to start Serf node. Will retry in %d seconds", sleepTime)
+			time.Sleep(sleepTime)
+			sleepTime *= 2
+			if sleepTime > 32*time.Second {
+				sleepTime = 32 * time.Second
+			}
+			continue
+		}
+		break
 	}
+	serfNode.SetTag(funk.SerfServiceName, "seed")
 	serfNode.PublishTags()
 	defer serfNode.Stop()
 
