@@ -88,7 +88,7 @@ func Run() {
 	var serfNode *funk.SerfNode
 	sleepTime := 2 * time.Second
 	for {
-		serfNode := funk.NewSerfNode()
+		serfNode = funk.NewSerfNode()
 		if err := serfNode.Start(config.NodeID, "", serfConfig); err != nil {
 			logrus.WithError(err).Errorf("Unable to start Serf node. Will retry in %d seconds", sleepTime)
 			time.Sleep(sleepTime)
