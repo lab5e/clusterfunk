@@ -22,6 +22,7 @@ import (
 	"github.com/lab5e/clusterfunk/pkg/funk/metrics"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 // ShardConversionFunc is the shard conversion function, ie return a shard based
@@ -50,7 +51,13 @@ func createClusterfunkUnaryInterceptor(localID string, shardFn ShardConversionFu
 			return nil, err
 		}
 		if client != nil {
-			err := client.Invoke(ctx, info.FullMethod, req, ret)
+			// Change metadata to outgoing metadata since it won't be valid for the clients.
+			md, ok := metadata.FromIncomingContext(ctx)
+			outCtx := ctx
+			if ok {
+				outCtx = metadata.NewOutgoingContext(ctx, md)
+			}
+			err := client.Invoke(outCtx, info.FullMethod, req, ret)
 			m.LogRequest(localID, nodeID, info.FullMethod)
 			return ret, err
 		}
