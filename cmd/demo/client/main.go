@@ -67,7 +67,7 @@ func main() {
 	// The endpoint monitor keeps the list of endpoints up to date by monitoring
 	// the Serf nodes in the cluster. When a new endpoint appears it will be picked
 	// up by the resolver and used by the client.
-	client, err := clientfunk.NewClusterClient(config.ClusterName, config.ZeroConf, config.SeedNode)
+	client, err := clientfunk.NewClusterClient(config.ClusterName, config.ZeroConf, config.SeedNode, "democlient")
 	if err != nil {
 		fmt.Printf("Unable to start cluster client monitor: %v\n", err)
 		return
