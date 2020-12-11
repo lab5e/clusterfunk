@@ -25,9 +25,15 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+// LocalShard is a return value to the ShardConversionFunc if you want processing
+// to be on the local node. With a round robin load balancer this will be evenly
+// distributed on all nodes.
+const LocalShard = -1
+
 // ShardConversionFunc is the shard conversion function, ie return a shard based
 // on the request parameter to the gRPC server methods. It will also return the
-// expected response object for the request.
+// expected response object for the request. If the shard is a negative value the
+// local node is used.
 type ShardConversionFunc func(request interface{}) (shard int, response interface{})
 
 // WithClusterFunk returns server options for Clusterfunk gRPC servers. This
@@ -45,22 +51,24 @@ func WithClusterFunk(cluster funk.Cluster, shardFn ShardConversionFunc, clientPr
 func createClusterfunkUnaryInterceptor(localID string, shardFn ShardConversionFunc, clientProxy *ProxyConnections, m metrics.Sink) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		shard, ret := shardFn(req)
-		client, nodeID, err := clientProxy.GetConnection(shard)
-		if err != nil {
-			return nil, err
-		}
-		if client != nil {
-			// Change metadata to outgoing metadata since it won't be valid for the clients.
-			md, ok := metadata.FromIncomingContext(ctx)
-			outCtx := ctx
-			if ok {
-				outCtx = metadata.NewOutgoingContext(ctx, md)
+		if shard >= 0 {
+			client, nodeID, err := clientProxy.GetConnection(shard)
+			if err != nil {
+				return nil, err
 			}
-			err := client.Invoke(outCtx, info.FullMethod, req, ret)
-			m.LogRequest(localID, nodeID, info.FullMethod)
-			return ret, err
+			if client != nil {
+				// Change metadata to outgoing metadata since it won't be valid for the clients.
+				md, ok := metadata.FromIncomingContext(ctx)
+				outCtx := ctx
+				if ok {
+					outCtx = metadata.NewOutgoingContext(ctx, md)
+				}
+				err := client.Invoke(outCtx, info.FullMethod, req, ret)
+				m.LogRequest(localID, nodeID, info.FullMethod)
+				return ret, err
+			}
 		}
-		ret, err = handler(ctx, req)
+		ret, err := handler(ctx, req)
 		m.LogRequest(localID, localID, info.FullMethod)
 		return ret, err
 	}
