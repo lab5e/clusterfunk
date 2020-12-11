@@ -27,7 +27,7 @@ import (
 
 // ShardConversionFunc is the shard conversion function, ie return a shard based
 // on the request parameter to the gRPC server methods. It will also return the
-// expected response object for the request. This *does* require a un
+// expected response object for the request.
 type ShardConversionFunc func(request interface{}) (shard int, response interface{})
 
 // WithClusterFunk returns server options for Clusterfunk gRPC servers. This
@@ -38,7 +38,6 @@ type ShardConversionFunc func(request interface{}) (shard int, response interfac
 func WithClusterFunk(cluster funk.Cluster, shardFn ShardConversionFunc, clientProxy *ProxyConnections, metricsType string) []grpc.ServerOption {
 	m := metrics.NewSinkFromString(metricsType)
 	return []grpc.ServerOption{
-		grpc.StreamInterceptor(createClusterfunkStreamInterceptor(cluster.NodeID(), shardFn, clientProxy, m)),
 		grpc.UnaryInterceptor(createClusterfunkUnaryInterceptor(cluster.NodeID(), shardFn, clientProxy, m)),
 	}
 }
@@ -64,12 +63,5 @@ func createClusterfunkUnaryInterceptor(localID string, shardFn ShardConversionFu
 		ret, err = handler(ctx, req)
 		m.LogRequest(localID, localID, info.FullMethod)
 		return ret, err
-	}
-}
-
-func createClusterfunkStreamInterceptor(localID string, shardFn ShardConversionFunc, clientProxy *ProxyConnections, m metrics.Sink) grpc.StreamServerInterceptor {
-	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		// TODO: Handle later
-		return handler(srv, ss)
 	}
 }
