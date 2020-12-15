@@ -1,4 +1,5 @@
 package sharding
+
 //
 //Copyright 2019 Telenor Digital AS
 //
@@ -14,7 +15,10 @@ package sharding
 //See the License for the specific language governing permissions and
 //limitations under the License.
 //
-import "hash/crc64"
+import (
+	"fmt"
+	"hash/crc64"
+)
 
 // ShardFunc is a sharding function
 type ShardFunc func(interface{}) int
@@ -37,7 +41,9 @@ func NewIntSharder(max int64) ShardFunc {
 		case uint64:
 			return int(v % uint64(max))
 		default:
-			return 0
+			// A panic is probably the best solution here since the type must
+			// be a known integer type or it won't work.
+			panic(fmt.Sprintf("Don't know how to process the type %T", val))
 		}
 	}
 }
