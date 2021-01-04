@@ -78,7 +78,7 @@ func NewCluster(params Parameters, shardManager sharding.ShardMap) Cluster {
 		stateMutex:           &sync.RWMutex{},
 		currentShardMapIndex: 0,
 		unacknowledged:       newAckCollection(),
-		livenessChecker:      NewLivenessChecker(params.LivenessInterval, params.LivenessRetries),
+		livenessChecker:      NewLivenessChecker(params.LivenessRetries),
 		cfmetrics:            metrics.NewSinkFromString(params.Metrics),
 		leaderClientMutex:    &sync.Mutex{},
 	}

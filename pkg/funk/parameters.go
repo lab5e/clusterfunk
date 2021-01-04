@@ -45,7 +45,6 @@ type Parameters struct {
 	ZeroConf         bool                 `kong:"help='Zero-conf startup',default='true'"`
 	NonVoting        bool                 `kong:"help='Nonvoting node',default='false'"`
 	NonMember        bool                 `kong:"help='Non-member',default='false'"`
-	LivenessInterval time.Duration        `kong:"help='Liveness checker intervals',default='150ms'"`
 	LivenessRetries  int                  `kong:"help='Number of retries for liveness checks',default='3'"`
 	LivenessEndpoint string               `kong:"help='Liveness UDP endpoint'"`
 	AckTimeout       time.Duration        `kong:"help='Ack timeout for nodes in the cluster',default='500ms'"`

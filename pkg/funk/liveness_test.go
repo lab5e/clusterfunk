@@ -42,7 +42,7 @@ func TestLiveness(t *testing.T) {
 		defer localC.Stop()*/
 	time.Sleep(interval)
 
-	checker := NewLivenessChecker(interval, retries)
+	checker := NewLivenessChecker(retries)
 	checker.Add("A", ep1)
 	checker.Add("B", ep2)
 	checker.Add("C", ep3)
@@ -58,6 +58,7 @@ func TestLiveness(t *testing.T) {
 			timeout = true
 		}
 	}
+	time.Sleep(100 * time.Millisecond)
 	localA.Stop()
 	foundA := false
 	for !foundA {

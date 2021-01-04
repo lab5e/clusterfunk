@@ -113,14 +113,14 @@ type singleChecker struct {
 	maxErrors int
 }
 
-func newSingleChecker(id, endpoint string, deadCh chan<- string, aliveCh chan<- string, interval time.Duration, retries int) singleChecker {
+func newSingleChecker(id, endpoint string, deadCh chan<- string, aliveCh chan<- string, retries int) singleChecker {
 	ret := singleChecker{
 		deadCh:    deadCh,
 		aliveCh:   aliveCh,
 		stopCh:    make(chan struct{}),
 		maxErrors: retries,
 	}
-	go ret.checkerProc(id, endpoint, interval)
+	go ret.checkerProc(id, endpoint)
 	return ret
 }
 
@@ -139,9 +139,14 @@ func (c *singleChecker) getConnection(endpoint string, interval time.Duration) n
 	return nil
 }
 
-func (c *singleChecker) checkerProc(id, endpoint string, interval time.Duration) {
-	buffer := make([]byte, 2)
+const (
+	defaultWaitInterval = 10 * time.Millisecond
+	deadWaitInterval    = 10 * defaultWaitInterval
+)
 
+func (c *singleChecker) checkerProc(id, endpoint string) {
+	buffer := make([]byte, 2)
+	ema := newEMACalculator(float64(250 * time.Millisecond))
 	// The error counter counts up and down - when it reaches the limit (aka maxErrors)
 	// the client is set to either alive (with negative errors, ie success) or dead
 	// (ie errors is positive)
@@ -152,7 +157,7 @@ func (c *singleChecker) checkerProc(id, endpoint string, interval time.Duration)
 	// The waiting interval is bumped up and down depending on the state. If the
 	// client is alive it is set to the check interval and when it is dead the
 	// check interval is 10 times higher.
-	waitInterval := interval
+	waitInterval := defaultWaitInterval
 
 	for {
 		select {
@@ -164,13 +169,14 @@ func (c *singleChecker) checkerProc(id, endpoint string, interval time.Duration)
 		}
 		if alive && errors >= c.maxErrors {
 			alive = false
+			logrus.WithField("average", ema.Average()).Warning("Client is dead")
 			c.deadCh <- id
-			waitInterval = 10 * interval
+			waitInterval = deadWaitInterval
 		}
 		if !alive && errors <= 0 {
 			alive = true
 			c.aliveCh <- id
-			waitInterval = interval
+			waitInterval = defaultWaitInterval
 		}
 
 		if conn == nil {
@@ -184,7 +190,9 @@ func (c *singleChecker) checkerProc(id, endpoint string, interval time.Duration)
 
 		waitCh := time.After(waitInterval)
 
-		if err := conn.SetWriteDeadline(time.Now().Add(interval)); err != nil {
+		writeStart := time.Now()
+		readWriteDeadline := time.Now().Add(time.Duration(ema.Average()) * 5)
+		if err := conn.SetWriteDeadline(readWriteDeadline); err != nil {
 			logrus.WithError(err).Warning("Can't set deadline for liveness check socket")
 			conn.Close()
 			conn = nil
@@ -201,7 +209,8 @@ func (c *singleChecker) checkerProc(id, endpoint string, interval time.Duration)
 			time.Sleep(waitInterval)
 			continue
 		}
-		if err := conn.SetReadDeadline(time.Now().Add(interval)); err != nil {
+		// Set to 5x the average
+		if err := conn.SetReadDeadline(readWriteDeadline); err != nil {
 			logrus.WithError(err).Warning("Can't set deadline for liveness check socket")
 			conn.Close()
 			conn = nil
@@ -218,6 +227,7 @@ func (c *singleChecker) checkerProc(id, endpoint string, interval time.Duration)
 			time.Sleep(waitInterval)
 			continue
 		}
+		ema.Add(float64(time.Since(writeStart)))
 		errors--
 		if errors > c.maxErrors {
 			errors = c.maxErrors
@@ -244,13 +254,11 @@ type livenessChecker struct {
 	deadEvents  chan string
 	aliveEvents chan string
 	retries     int
-	interval    time.Duration
 }
 
 // NewLivenessChecker is a type that checks hosts for liveness
-func NewLivenessChecker(interval time.Duration, retries int) LivenessChecker {
+func NewLivenessChecker(retries int) LivenessChecker {
 	return &livenessChecker{
-		interval:    interval,
 		retries:     retries,
 		checkers:    make(map[string]singleChecker),
 		deadEvents:  make(chan string, 10),
@@ -259,7 +267,7 @@ func NewLivenessChecker(interval time.Duration, retries int) LivenessChecker {
 }
 
 func (l *livenessChecker) Add(id string, endpoint string) {
-	l.checkers[id] = newSingleChecker(id, endpoint, l.deadEvents, l.aliveEvents, l.interval, l.retries)
+	l.checkers[id] = newSingleChecker(id, endpoint, l.deadEvents, l.aliveEvents, l.retries)
 }
 
 func (l *livenessChecker) Remove(id string) {

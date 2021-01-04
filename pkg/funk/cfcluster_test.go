@@ -57,12 +57,11 @@ func TestCfCluster(t *testing.T) {
 			Endpoint:    netutils.RandomLocalEndpoint(),
 			JoinAddress: "",
 		},
-		AutoJoin:         true,
-		Name:             "testCluster",
-		ZeroConf:         true,
-		NodeID:           toolbox.RandomID(),
-		LivenessInterval: 150 * time.Millisecond,
-		AckTimeout:       1 * time.Second,
+		AutoJoin:   true,
+		Name:       "testCluster",
+		ZeroConf:   true,
+		NodeID:     toolbox.RandomID(),
+		AckTimeout: 1 * time.Second,
 	}
 	params1.Final()
 	clusterNode1 := NewCluster(params1, sm1)
