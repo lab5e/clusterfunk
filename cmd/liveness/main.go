@@ -18,7 +18,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"time"
 
 	"github.com/lab5e/gotoolbox/toolbox"
 
@@ -57,7 +56,7 @@ func main() {
 		}
 	}
 	if *server {
-		s := funk.NewLivenessChecker(10*time.Millisecond, 3)
+		s := funk.NewLivenessChecker(3)
 		for i, v := range eps {
 			s.Add(fmt.Sprintf("client%02d", i), v)
 		}

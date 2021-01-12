@@ -260,8 +260,8 @@ func (r *RaftNode) coalesceEvents() {
 		}
 		select {
 		case r.events <- lastEvent:
-		case <-time.After(1 * time.Second):
-			panic("Event listener is too slow")
+		case <-time.After(10 * time.Second):
+			panic("Event listener timed out after 10 seconds")
 
 		}
 	}

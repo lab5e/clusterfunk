@@ -140,8 +140,9 @@ func (c *singleChecker) getConnection(endpoint string, interval time.Duration) n
 }
 
 const (
-	defaultWaitInterval = 10 * time.Millisecond
+	defaultWaitInterval = 100 * time.Millisecond
 	deadWaitInterval    = 10 * defaultWaitInterval
+	minimumDeadline     = 10 * time.Millisecond
 )
 
 func (c *singleChecker) checkerProc(id, endpoint string) {
@@ -162,7 +163,7 @@ func (c *singleChecker) checkerProc(id, endpoint string) {
 	for {
 		select {
 		case <-c.stopCh:
-			logrus.Infof("Terminating leveness checker to %s", endpoint)
+			logrus.Infof("Terminating liveness checker to %s (stopping)", endpoint)
 			return
 		default:
 			// keep on running
@@ -191,7 +192,11 @@ func (c *singleChecker) checkerProc(id, endpoint string) {
 		waitCh := time.After(waitInterval)
 
 		writeStart := time.Now()
-		readWriteDeadline := time.Now().Add(time.Duration(ema.Average()) * 5)
+		deadline := time.Duration(ema.Average() * 5)
+		if deadline < minimumDeadline {
+			deadline = minimumDeadline
+		}
+		readWriteDeadline := time.Now().Add(deadline)
 		if err := conn.SetWriteDeadline(readWriteDeadline); err != nil {
 			logrus.WithError(err).Warning("Can't set deadline for liveness check socket")
 			conn.Close()
@@ -199,6 +204,7 @@ func (c *singleChecker) checkerProc(id, endpoint string) {
 			time.Sleep(waitInterval)
 			continue
 		}
+
 		_, err := conn.Write([]byte("Yo"))
 		if err != nil {
 			// Writes will usually succeed since UDP is a black hole but
@@ -209,7 +215,7 @@ func (c *singleChecker) checkerProc(id, endpoint string) {
 			time.Sleep(waitInterval)
 			continue
 		}
-		// Set to 5x the average
+
 		if err := conn.SetReadDeadline(readWriteDeadline); err != nil {
 			logrus.WithError(err).Warning("Can't set deadline for liveness check socket")
 			conn.Close()

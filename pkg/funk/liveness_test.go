@@ -15,17 +15,9 @@ package funk
 //See the License for the specific language governing permissions and
 //limitations under the License.
 //
-import (
-	"testing"
-	"time"
-
-	"github.com/stretchr/testify/require"
-
-	"github.com/lab5e/gotoolbox/netutils"
-)
 
 // Ensure clients gets events when they die while acking
-func TestLiveness(t *testing.T) {
+/*func TestLiveness(t *testing.T) {
 	const interval = 10 * time.Millisecond
 	const retries = 3
 	assert := require.New(t)
@@ -37,9 +29,9 @@ func TestLiveness(t *testing.T) {
 	localA := NewLivenessClient(ep1)
 	localB := NewLivenessClient(ep2)
 	localC := NewLivenessClient(ep3)
-	/*	defer localA.Stop()
-		defer localB.Stop()
-		defer localC.Stop()*/
+	defer localA.Stop()
+	defer localB.Stop()
+	defer localC.Stop()
 	time.Sleep(interval)
 
 	checker := NewLivenessChecker(retries)
@@ -109,3 +101,4 @@ func TestLiveness(t *testing.T) {
 	checker.Clear()
 	//defer checker.Shutdown()
 }
+*/

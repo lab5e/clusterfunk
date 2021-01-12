@@ -614,12 +614,14 @@ func (c *clusterfunkCluster) livenessEventLoop() {
 	for {
 		select {
 		case id := <-c.livenessChecker.AliveEvents():
-			// if node is a member of the cluster change the cluster size
-			c.raftNode.EnableNode(id)
+			logrus.WithField("id", id).Info("Node is presumed alive")
+			// TODO(stalehd): Enable node here
+			// c.raftNode.EnableNode(id)
 
 		case id := <-c.livenessChecker.DeadEvents():
-			// if node is a member of the cluster change the cluster size
-			c.raftNode.DisableNode(id)
+			logrus.WithField("id", id).Info("Node is presumed dead")
+			// TODO(stalehd): Disable node here
+			// c.raftNode.DisableNode(id)
 		}
 	}
 }

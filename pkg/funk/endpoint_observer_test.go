@@ -94,7 +94,6 @@ func TestObserverInputEvents(t *testing.T) {
 		ev.Node.State = SerfFailed
 		ch <- ev
 	}
-	ch <- events[3]
 
 	endpoints = em.Endpoints()
 	assert.Len(endpoints, 0)

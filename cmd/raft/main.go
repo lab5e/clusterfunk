@@ -55,7 +55,7 @@ func main() {
 
 	logrus.SetFormatter(&logrus.TextFormatter{FullTimestamp: true, TimestampFormat: "15:04:05.000"})
 
-	checker = funk.NewLivenessChecker(10*time.Millisecond, 3)
+	checker = funk.NewLivenessChecker(3)
 	go func(ev <-chan string) {
 		for id := range ev {
 			logrus.WithField("id", id).Info("Client died")
