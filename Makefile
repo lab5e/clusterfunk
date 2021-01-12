@@ -13,7 +13,7 @@ bins:
 	cd cmd/seed && go build -o ../../bin/seed
 
 test:
-	go test ./... --cover  -timeout 10s
+	go test ./... --cover  -timeout 30s
 
 
 generate:
