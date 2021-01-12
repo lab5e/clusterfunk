@@ -19,7 +19,7 @@ var emaTable [][]float64 = [][]float64{
 	[]float64{50.0, 58.333, 0.5},
 }*/
 
-var emaTable [][]float64 = [][]float64{
+var emaTable = [][]float64{
 	[]float64{100.0, 100.0, 0.0},
 	[]float64{100.0, 100.0, 0.0},
 	[]float64{100.0, 100.0, 0.0},
