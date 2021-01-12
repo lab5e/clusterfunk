@@ -15,6 +15,8 @@ bins:
 test:
 	go test ./... --cover  -timeout 30s
 
+tools:
+	cat tools.go | grep _ | awk -F'"' '{print $$2}' | xargs -tI % go install %
 
 generate:
 	go generate ./...
