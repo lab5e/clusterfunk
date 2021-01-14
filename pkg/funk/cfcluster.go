@@ -182,9 +182,9 @@ func (c *clusterfunkCluster) Start() error {
 			return err
 		}
 
-		if c.config.Serf.JoinAddress == "" {
+		if len(c.config.Serf.JoinAddress) == 0 {
 			if len(addrs) > 0 {
-				c.config.Serf.JoinAddress = addrs[0]
+				c.config.Serf.JoinAddress = addrs
 			}
 			if len(addrs) == 0 {
 				logrus.Debug("No Serf nodes found, bootstrapping cluster")

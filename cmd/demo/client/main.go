@@ -39,7 +39,7 @@ type parameters struct {
 	PrintSummary bool          `kong:"help='Print summary when finished',default='true'"`
 	ZeroConf     bool          `kong:"help='ZeroConf lookups for cluster',default='true'"`
 	Retry        bool          `kong:"help='Do a single retry for failed requests',default='true'"`
-	SeedNode     string        `kong:"help='Serf seed node to use',default=''"`
+	SeedNodes    []string      `kong:"help='Serf seed nodes to use',default=''"`
 }
 
 var config parameters
@@ -67,7 +67,7 @@ func main() {
 	// The endpoint monitor keeps the list of endpoints up to date by monitoring
 	// the Serf nodes in the cluster. When a new endpoint appears it will be picked
 	// up by the resolver and used by the client.
-	client, err := clientfunk.NewClusterClient(config.ClusterName, config.ZeroConf, config.SeedNode, "democlient")
+	client, err := clientfunk.NewClusterClient(config.ClusterName, config.ZeroConf, config.SeedNodes, "democlient")
 	if err != nil {
 		fmt.Printf("Unable to start cluster client monitor: %v\n", err)
 		return

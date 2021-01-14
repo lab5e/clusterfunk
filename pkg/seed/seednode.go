@@ -19,7 +19,7 @@ type parameters struct {
 	ZeroConf        bool                    `kong:"help='ZeroConf lookups for cluster',default='true'"`
 	NodeID          string                  `kong:"help='Node ID for seed node',default=''"`
 	SerfPort        int                     `kong:"help='Port to use for Serf',default='0'"`
-	SerfJoinAddress string                  `kong:"help='Join address for Serf', default=''"`
+	SerfJoinAddress []string                `kong:"help='Join address for Serf', default=''"`
 	Log             gotoolbox.LogParameters `kong:"embed,prefix='log-'"`
 	LiveView        bool                    `kong:"help='Display live view of nodes',default='false'"`
 	ShowAllNodes    bool                    `kong:"help='Show all nodes, not just nodes alive',default='false'"`

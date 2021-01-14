@@ -55,7 +55,7 @@ func TestCfCluster(t *testing.T) {
 		},
 		Serf: SerfParameters{
 			Endpoint:    netutils.RandomLocalEndpoint(),
-			JoinAddress: "",
+			JoinAddress: []string{},
 		},
 		AutoJoin:   true,
 		Name:       "testCluster",

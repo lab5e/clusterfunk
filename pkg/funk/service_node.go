@@ -32,9 +32,9 @@ func NewServiceNode(serviceName string, params ServiceParameters) (ServiceNode, 
 			return nil, err
 		}
 
-		if params.Serf.JoinAddress == "" {
+		if len(params.Serf.JoinAddress) == 0 {
 			if len(addrs) > 0 {
-				params.Serf.JoinAddress = addrs[0]
+				params.Serf.JoinAddress = addrs
 			}
 			if len(addrs) == 0 {
 				logrus.Debug("No serf nodes found via zeroconf, wont join")

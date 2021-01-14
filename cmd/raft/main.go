@@ -20,6 +20,7 @@ import (
 	"flag"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/lab5e/clusterfunk/pkg/funk"
@@ -39,7 +40,9 @@ func waitForExit() {
 
 func main() {
 	var config funk.Parameters
-	flag.StringVar(&config.Serf.JoinAddress, "join", "", "Join address for cluster")
+	ja := ""
+	flag.StringVar(&ja, "join", "", "Join address for cluster")
+	config.Serf.JoinAddress = strings.Split(ja, ",")
 	flag.BoolVar(&config.Raft.Bootstrap, "bootstrap", false, "Bootstrap a new cluster")
 	flag.BoolVar(&config.Raft.DiskStore, "disk", false, "Use disk store")
 	flag.BoolVar(&config.Verbose, "verbose", false, "Verbose logging")
@@ -97,7 +100,7 @@ func start(config funk.Parameters) error {
 	if config.ZeroConf {
 		registry = toolbox.NewZeroconfRegistry(config.Name)
 
-		if !config.Raft.Bootstrap && config.Serf.JoinAddress == "" {
+		if !config.Raft.Bootstrap && len(config.Serf.JoinAddress) == 0 {
 			var err error
 			addrs, err := registry.Resolve("serf", 1*time.Second)
 			if err != nil {
@@ -106,7 +109,7 @@ func start(config funk.Parameters) error {
 			if len(addrs) == 0 {
 				return errors.New("no serf instances found")
 			}
-			config.Serf.JoinAddress = addrs[0]
+			config.Serf.JoinAddress = addrs
 		}
 		if err := registry.Register("serf", config.NodeID, netutils.PortOfHostPort(config.Serf.Endpoint)); err != nil {
 			return err

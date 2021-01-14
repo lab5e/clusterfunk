@@ -100,9 +100,9 @@ func NewSerfNode() *SerfNode {
 
 // SerfParameters holds parameters for the Serf client
 type SerfParameters struct {
-	Endpoint    string `kong:"help='Endpoint for Serf',default=''"`
-	JoinAddress string `kong:"help='Join address and port for Serf cluster'"`
-	Verbose     bool   `kong:"help='Verbose logging for Serf'"`
+	Endpoint    string   `kong:"help='Endpoint for Serf',default=''"`
+	JoinAddress []string `kong:"help='Join address and port for Serf cluster'"`
+	Verbose     bool     `kong:"help='Verbose logging for Serf'"`
 }
 
 // Final populates empty fields with default values
@@ -170,8 +170,8 @@ func (s *SerfNode) Start(nodeID string, serviceName string, cfg SerfParameters) 
 		return err
 	}
 
-	if cfg.JoinAddress != "" {
-		_, err := s.se.Join([]string{cfg.JoinAddress}, true)
+	if len(cfg.JoinAddress) > 0 {
+		_, err := s.se.Join(cfg.JoinAddress, true)
 		if err != nil {
 			return err
 		}
