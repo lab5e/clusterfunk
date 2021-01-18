@@ -83,6 +83,16 @@ func Run() {
 			os.Exit(2)
 		}
 		defer zr.Shutdown()
+
+		// Check if there's other nodes we can join here.
+		logrus.Info("Looking for other nodes in the cluster")
+		nodes, err := zr.Resolve(funk.ZeroconfSerfKind, time.Second*1)
+		if err != nil {
+			logrus.WithError(err).Error("Could not do zeroconf lookup")
+			os.Exit(2)
+		}
+		logrus.WithField("address", nodes).Info("Joining existing Serf nodes")
+		serfConfig.JoinAddress = nodes
 	}
 
 	var serfNode *funk.SerfNode
