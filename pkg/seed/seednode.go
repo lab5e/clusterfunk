@@ -15,14 +15,15 @@ import (
 )
 
 type parameters struct {
-	ClusterName     string                  `kong:"help='Cluster name',default='clusterfunk'"`
-	ZeroConf        bool                    `kong:"help='ZeroConf lookups for cluster',default='true'"`
-	NodeID          string                  `kong:"help='Node ID for seed node',default=''"`
-	SerfPort        int                     `kong:"help='Port to use for Serf',default='0'"`
-	SerfJoinAddress []string                `kong:"help='Join address for Serf', default=''"`
-	Log             gotoolbox.LogParameters `kong:"embed,prefix='log-'"`
-	LiveView        bool                    `kong:"help='Display live view of nodes',default='false'"`
-	ShowAllNodes    bool                    `kong:"help='Show all nodes, not just nodes alive',default='false'"`
+	ClusterName      string                  `kong:"help='Cluster name',default='clusterfunk'"`
+	ZeroConf         bool                    `kong:"help='ZeroConf lookups for cluster',default='true'"`
+	NodeID           string                  `kong:"help='Node ID for seed node',default=''"`
+	SerfPort         int                     `kong:"help='Port to use for Serf',default='0'"`
+	SerfJoinAddress  []string                `kong:"help='Join address for Serf', default=''"`
+	Log              gotoolbox.LogParameters `kong:"embed,prefix='log-'"`
+	LiveView         bool                    `kong:"help='Display live view of nodes',default='false'"`
+	ShowAllNodes     bool                    `kong:"help='Show all nodes, not just nodes alive',default='false'"`
+	SerfSnapshotPath string                  `kong:"help='Serf snapshot path (for persistence)'"`
 }
 
 // Run is a ready-to run (just call it from main()) implementation of
@@ -61,9 +62,10 @@ func Run() {
 		os.Exit(2)
 	}
 	serfConfig := funk.SerfParameters{
-		Endpoint:    fmt.Sprintf("%s:%d", publicIP, config.SerfPort),
-		Verbose:     (logrus.GetLevel() >= logrus.DebugLevel),
-		JoinAddress: config.SerfJoinAddress,
+		Endpoint:     fmt.Sprintf("%s:%d", publicIP, config.SerfPort),
+		Verbose:      (logrus.GetLevel() >= logrus.DebugLevel),
+		JoinAddress:  config.SerfJoinAddress,
+		SnapshotPath: config.SerfSnapshotPath,
 	}
 	serfConfig.Final()
 
