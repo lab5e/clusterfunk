@@ -70,7 +70,6 @@ message GetStatusResponse {
   string local_state = 6;
   string cluster_name = 7;
   int32 shard_count = 8;
-  int32 shard_weight = 9;
   Error error = 10;
   int64 created = 11;
 };
@@ -155,7 +154,6 @@ message ListShardsRequest {};
 message ShardInfo {
   string node_id = 1;
   int32 shard_count = 2;
-  int32 shard_weight = 3;
 };
 
 // ListShardsResponse
@@ -164,7 +162,6 @@ message ListShardsResponse {
   Error error = 2;
   repeated ShardInfo shards = 3;
   int32 total_shards = 4;
-  int32 total_weight = 5;
 };
 
 message StepDownRequest {};

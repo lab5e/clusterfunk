@@ -37,7 +37,7 @@ func (c *StatusCommand) Run(args RunContext) error {
 	fmt.Printf("Role:         %s\n", res.LocalRole)
 	fmt.Printf("Leader ID:    %s\n", res.LeaderNodeId)
 	fmt.Printf("Nodes:        %d Raft, %d Serf\n", res.RaftNodeCount, res.SerfNodeCount)
-	fmt.Printf("Shards:       %d (total weight: %d)\n", res.ShardCount, res.ShardWeight)
+	fmt.Printf("Shards:       %d\n", res.ShardCount)
 
 	return nil
 }

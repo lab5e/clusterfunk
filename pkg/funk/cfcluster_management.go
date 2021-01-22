@@ -144,7 +144,6 @@ func (c *clusterfunkCluster) GetStatus(ctx context.Context, req *managepb.GetSta
 			ret.SerfNodeCount = int32(c.serfNode.Size())
 			ret.LeaderNodeId = c.NodeID()
 			ret.ShardCount = int32(c.shardManager.ShardCount())
-			ret.ShardWeight = int32(c.shardManager.TotalWeight())
 		} else {
 			if c.State() != Voting {
 				leader, err := c.leaderManagementClient()
@@ -159,7 +158,6 @@ func (c *clusterfunkCluster) GetStatus(ctx context.Context, req *managepb.GetSta
 				ret.SerfNodeCount = leaderRet.SerfNodeCount
 				ret.LeaderNodeId = leaderRet.LocalNodeId
 				ret.ShardCount = leaderRet.ShardCount
-				ret.ShardWeight = leaderRet.ShardWeight
 			}
 		}
 	}
@@ -360,18 +358,15 @@ func (c *clusterfunkCluster) ListShards(ctx context.Context, req *managepb.ListS
 	}
 	shards := c.shardManager.Shards()
 	ret.TotalShards = int32(len(shards))
-	ret.TotalWeight = int32(c.shardManager.TotalWeight())
 	for _, v := range shards {
 		i := items[v.NodeID()]
 		if i == nil {
 			i = &managepb.ShardInfo{
-				NodeId:      v.NodeID(),
-				ShardCount:  0,
-				ShardWeight: 0,
+				NodeId:     v.NodeID(),
+				ShardCount: 0,
 			}
 		}
 		i.ShardCount++
-		i.ShardWeight += int32(v.Weight())
 		items[v.NodeID()] = i
 	}
 

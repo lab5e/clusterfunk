@@ -1,23 +1,9 @@
 package sharding
 
-//
-//Copyright 2019 Telenor Digital AS
-//
-//Licensed under the Apache License, Version 2.0 (the "License");
-//you may not use this file except in compliance with the License.
-//You may obtain a copy of the License at
-//
-//http://www.apache.org/licenses/LICENSE-2.0
-//
-//Unless required by applicable law or agreed to in writing, software
-//distributed under the License is distributed on an "AS IS" BASIS,
-//WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//See the License for the specific language governing permissions and
-//limitations under the License.
-//
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"sync"
 
 	"github.com/lab5e/clusterfunk/pkg/funk/sharding/shardpb"
@@ -25,56 +11,37 @@ import (
 )
 
 type nodeData struct {
-	NodeID       string
-	TotalWeights int
-	Shards       []Shard
-	WorkerID     int
+	NodeID   string
+	Shards   []Shard
+	WorkerID int
 }
 
 func newNodeData(nodeID string) *nodeData {
-	return &nodeData{NodeID: nodeID, TotalWeights: 0, Shards: make([]Shard, 0)}
+	return &nodeData{NodeID: nodeID, Shards: make([]Shard, 0)}
 }
 
-func (nd *nodeData) checkTotalWeight() {
-	tot := 0
-	for _, n := range nd.Shards {
-		tot += n.Weight()
-	}
-}
 func (nd *nodeData) AddShard(shard Shard) {
 	shard.SetNodeID(nd.NodeID)
-	nd.TotalWeights += shard.Weight()
 	nd.Shards = append(nd.Shards, shard)
-	nd.checkTotalWeight()
 }
 
-func (nd *nodeData) RemoveShard(preferredWeight int) Shard {
-	for i, v := range nd.Shards {
-		if v.Weight() <= preferredWeight {
-			nd.Shards = append(nd.Shards[:i], nd.Shards[i+1:]...)
-			nd.TotalWeights -= v.Weight()
-			nd.checkTotalWeight()
-			return v
-		}
+func (nd *nodeData) RemoveShard() Shard {
+	// Remove a random shard from the list. Rather than removing shards
+	// sequentially a random pick ensures that sequential keys will be
+	// distributed roughly evenly even when theres more shards than keys.
+	if len(nd.Shards) < 1 {
+		panic("No more shards to remove")
 	}
-	if len(nd.Shards) == 0 {
-		panic("no shards remaining")
-	}
-	// This will cause a panic if there's no shards left. That's OK.
-	// Future me might disagree.
-	ret := nd.Shards[0]
-	if len(nd.Shards) >= 1 {
-		nd.Shards = nd.Shards[1:]
-	}
-	nd.TotalWeights -= ret.Weight()
-	nd.checkTotalWeight()
-	return ret
+	index := rand.Intn(len(nd.Shards))
+	shard := nd.Shards[index]
+	nd.Shards = append(nd.Shards[:index], nd.Shards[index+1:]...)
+	return shard
 }
 
-type weightedShardMap struct {
+// A simple shard map implementation that
+type simpleShardMap struct {
 	shards          []Shard
 	mutex           *sync.RWMutex
-	totalWeight     int
 	nodes           map[string]*nodeData
 	maxWorkerID     int
 	workerIDCounter int
@@ -82,17 +49,16 @@ type weightedShardMap struct {
 
 // NewShardMap creates a new shard mapper instance.
 func NewShardMap() ShardMap {
-	return &weightedShardMap{
+	return &simpleShardMap{
 		shards:          make([]Shard, 0),
 		mutex:           &sync.RWMutex{},
-		totalWeight:     0,
 		nodes:           make(map[string]*nodeData),
 		workerIDCounter: 1,
 		maxWorkerID:     16383, // TODO: User-supplied parameter later on
 	}
 }
 
-func (sm *weightedShardMap) Init(maxShards int, weights []int) error {
+func (sm *simpleShardMap) Init(maxShards int) error {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 	if maxShards < 1 {
@@ -102,26 +68,14 @@ func (sm *weightedShardMap) Init(maxShards int, weights []int) error {
 		return errors.New("shards already set")
 	}
 
-	if weights != nil && len(weights) != maxShards {
-		return errors.New("maxShards and len(weights) must be the same")
-	}
-
 	sm.shards = make([]Shard, maxShards)
 	for i := range sm.shards {
-		weight := 1
-		if weights != nil {
-			weight = weights[i]
-		}
-		sm.totalWeight += weight
-		sm.shards[i] = NewShard(i, weight)
-		if weight == 0 {
-			return fmt.Errorf("can't use weight = 0 for shard %d", i)
-		}
+		sm.shards[i] = NewShard(i)
 	}
 	return nil
 }
 
-func (sm *weightedShardMap) UpdateNodes(nodeID ...string) {
+func (sm *simpleShardMap) UpdateNodes(nodeID ...string) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
@@ -156,12 +110,12 @@ func (sm *weightedShardMap) UpdateNodes(nodeID ...string) {
 		sm.removeNode(v)
 	}
 }
-func (sm *weightedShardMap) nextWorkerID() int {
+func (sm *simpleShardMap) nextWorkerID() int {
 	sm.workerIDCounter++
 	return sm.workerIDCounter % sm.maxWorkerID
 }
 
-func (sm *weightedShardMap) addNode(nodeID string) {
+func (sm *simpleShardMap) addNode(nodeID string) {
 	newNode := newNodeData(nodeID)
 	newNode.WorkerID = sm.nextWorkerID()
 	// Invariant: First node
@@ -174,11 +128,11 @@ func (sm *weightedShardMap) addNode(nodeID string) {
 	}
 
 	//Invariant: Node # 2 or later
-	targetCount := sm.totalWeight / (len(sm.nodes) + 1)
+	targetCount := len(sm.shards) / (len(sm.nodes) + 1)
 
 	for k, v := range sm.nodes {
-		for v.TotalWeights > targetCount && v.TotalWeights > 0 {
-			shardToMove := v.RemoveShard(targetCount - v.TotalWeights)
+		for len(v.Shards) > targetCount {
+			shardToMove := v.RemoveShard()
 			newNode.AddShard(shardToMove)
 		}
 		sm.nodes[k] = v
@@ -186,7 +140,7 @@ func (sm *weightedShardMap) addNode(nodeID string) {
 	sm.nodes[nodeID] = newNode
 }
 
-func (sm *weightedShardMap) removeNode(nodeID string) {
+func (sm *simpleShardMap) removeNode(nodeID string) {
 	nodeToRemove, exists := sm.nodes[nodeID]
 	if !exists {
 		panic(fmt.Sprintf("Unknown node ID: %s", nodeID))
@@ -201,18 +155,24 @@ func (sm *weightedShardMap) removeNode(nodeID string) {
 		return
 	}
 
-	targetCount := sm.totalWeight / len(sm.nodes)
+	targetCount := len(sm.shards) / len(sm.nodes)
 	for k, v := range sm.nodes {
-		//		fmt.Printf("Removing node %s: Node %s w=%d target=%d\n", nodeID, k, v.TotalWeights, targetCount)
-		for v.TotalWeights <= targetCount && nodeToRemove.TotalWeights > 0 {
-			shardToMove := nodeToRemove.RemoveShard(targetCount - v.TotalWeights)
+		for len(v.Shards) < targetCount {
+			shardToMove := nodeToRemove.RemoveShard()
 			v.AddShard(shardToMove)
 		}
 		sm.nodes[k] = v
 	}
+	for len(nodeToRemove.Shards) > 0 {
+		shardToMove := nodeToRemove.RemoveShard()
+		for k := range sm.nodes {
+			sm.nodes[k].AddShard(shardToMove)
+			break
+		}
+	}
 }
 
-func (sm *weightedShardMap) MapToNode(shardID int) Shard {
+func (sm *simpleShardMap) MapToNode(shardID int) Shard {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 	if shardID > len(sm.shards) || shardID < 0 {
@@ -226,7 +186,7 @@ func (sm *weightedShardMap) MapToNode(shardID int) Shard {
 	return sm.shards[shardID]
 }
 
-func (sm *weightedShardMap) Shards() []Shard {
+func (sm *simpleShardMap) Shards() []Shard {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 	ret := make([]Shard, len(sm.shards))
@@ -234,19 +194,13 @@ func (sm *weightedShardMap) Shards() []Shard {
 	return ret
 }
 
-func (sm *weightedShardMap) TotalWeight() int {
-	sm.mutex.RLock()
-	defer sm.mutex.RUnlock()
-	return sm.totalWeight
-}
-
-func (sm *weightedShardMap) ShardCount() int {
+func (sm *simpleShardMap) ShardCount() int {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 	return len(sm.shards)
 }
 
-func (sm *weightedShardMap) NodeList() []string {
+func (sm *simpleShardMap) NodeList() []string {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 
@@ -257,7 +211,7 @@ func (sm *weightedShardMap) NodeList() []string {
 	return ret
 }
 
-func (sm *weightedShardMap) MarshalBinary() ([]byte, error) {
+func (sm *simpleShardMap) MarshalBinary() ([]byte, error) {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 
@@ -281,7 +235,6 @@ func (sm *weightedShardMap) MarshalBinary() ([]byte, error) {
 	for _, shard := range sm.shards {
 		msg.Shards = append(msg.Shards, &shardpb.WireShard{
 			Id:     int32(shard.ID()),
-			Weight: int32(shard.Weight()),
 			NodeId: nodeMap[shard.NodeID()],
 		})
 	}
@@ -293,7 +246,7 @@ func (sm *weightedShardMap) MarshalBinary() ([]byte, error) {
 	return buf, nil
 }
 
-func (sm *weightedShardMap) UnmarshalBinary(buf []byte) error {
+func (sm *simpleShardMap) UnmarshalBinary(buf []byte) error {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
@@ -302,7 +255,6 @@ func (sm *weightedShardMap) UnmarshalBinary(buf []byte) error {
 		return err
 	}
 	maxWorkerID := -1
-	sm.totalWeight = 0
 	sm.nodes = make(map[string]*nodeData)
 	sm.shards = make([]Shard, 0)
 
@@ -317,16 +269,15 @@ func (sm *weightedShardMap) UnmarshalBinary(buf []byte) error {
 		sm.nodes[v.NodeName] = newNode
 	}
 	for _, v := range msg.Shards {
-		newShard := NewShard(int(v.Id), int(v.Weight))
+		newShard := NewShard(int(v.Id))
 		sm.nodes[nodeMap[v.NodeId]].AddShard(newShard)
-		sm.totalWeight += int(v.Weight)
 		sm.shards = append(sm.shards, newShard)
 	}
 	sm.workerIDCounter = maxWorkerID
 	return nil
 }
 
-func (sm *weightedShardMap) ShardCountForNode(nodeid string) int {
+func (sm *simpleShardMap) ShardCountForNode(nodeid string) int {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 
@@ -337,7 +288,7 @@ func (sm *weightedShardMap) ShardCountForNode(nodeid string) int {
 	return len(node.Shards)
 }
 
-func (sm *weightedShardMap) WorkerID(nodeID string) int {
+func (sm *simpleShardMap) WorkerID(nodeID string) int {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 
@@ -348,21 +299,21 @@ func (sm *weightedShardMap) WorkerID(nodeID string) int {
 	return node.WorkerID
 }
 
-func (sm *weightedShardMap) DeletedShards(nodeID string, oldMap ShardMap) []Shard {
+func (sm *simpleShardMap) DeletedShards(nodeID string, oldMap ShardMap) []Shard {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 
 	return sm.notInSet(nodeID, sm.shards, oldMap.Shards())
 }
 
-func (sm *weightedShardMap) NewShards(nodeID string, oldMap ShardMap) []Shard {
+func (sm *simpleShardMap) NewShards(nodeID string, oldMap ShardMap) []Shard {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 	return sm.notInSet(nodeID, oldMap.Shards(), sm.shards)
 }
 
 // Return the shards in set2 but not in set1
-func (sm *weightedShardMap) notInSet(nodeID string, set1 []Shard, set2 []Shard) []Shard {
+func (sm *simpleShardMap) notInSet(nodeID string, set1 []Shard, set2 []Shard) []Shard {
 	existing := make(map[int]int)
 	for _, v := range set1 {
 		if v.NodeID() == nodeID {

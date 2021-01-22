@@ -52,7 +52,7 @@ func main() {
 	flag.Parse()
 
 	shards := sharding.NewShardMap()
-	if err := shards.Init(numShards, nil); err != nil {
+	if err := shards.Init(numShards); err != nil {
 		panic(err)
 	}
 

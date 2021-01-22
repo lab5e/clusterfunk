@@ -1,20 +1,5 @@
 package sharding
 
-//
-//Copyright 2019 Telenor Digital AS
-//
-//Licensed under the Apache License, Version 2.0 (the "License");
-//you may not use this file except in compliance with the License.
-//You may obtain a copy of the License at
-//
-//http://www.apache.org/licenses/LICENSE-2.0
-//
-//Unless required by applicable law or agreed to in writing, software
-//distributed under the License is distributed on an "AS IS" BASIS,
-//WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//See the License for the specific language governing permissions and
-//limitations under the License.
-//
 import (
 	"fmt"
 	"math/rand"
@@ -26,7 +11,7 @@ import (
 func TestNodeUpdate(t *testing.T) {
 	assert := require.New(t)
 	sm := NewShardMap()
-	assert.NoError(sm.Init(10000, nil))
+	assert.NoError(sm.Init(10000))
 
 	sm.UpdateNodes("A")
 	assert.Len(sm.NodeList(), 1)
@@ -54,74 +39,41 @@ func TestNodeUpdate(t *testing.T) {
 
 // TestNodeData is an internal test
 func TestNodeData(t *testing.T) {
+	assert := require.New(t)
 	nd := newNodeData("node1")
-	nd.AddShard(NewShard(1, 1))
-	nd.AddShard(NewShard(2, 2))
-	nd.AddShard(NewShard(3, 3))
-	nd.AddShard(NewShard(4, 4))
+	nd.AddShard(NewShard(1))
+	nd.AddShard(NewShard(2))
+	nd.AddShard(NewShard(3))
+	nd.AddShard(NewShard(4))
 
-	if nd.TotalWeights != 10 {
-		t.Fatal("Expected w=10")
-	}
-	s1 := nd.RemoveShard(1)
-	if s1.Weight() != 1 {
-		t.Fatal("expected weight 1")
-	}
-	if nd.TotalWeights != 9 {
-		t.Fatal("Expected w=9")
-	}
-	s2 := nd.RemoveShard(2)
-	if s2.Weight() != 2 {
-		t.Fatalf("expected weight 2, got %+v", s2)
-	}
-	if nd.TotalWeights != 7 {
-		t.Fatal("Expected w=7")
-	}
-	s3 := nd.RemoveShard(3)
-	if s3.Weight() != 3 {
-		t.Fatal("expected weight 3")
-	}
-	if nd.TotalWeights != 4 {
-		t.Fatal("Expected w=4")
-	}
-	s4 := nd.RemoveShard(4)
-	if s4.Weight() != 4 {
-		t.Fatal("expected weight 4")
-	}
-	if nd.TotalWeights != 0 {
-		t.Fatal("Expected w=0")
-	}
+	shardList := []int{1, 2, 3, 4}
+	assert.Contains(shardList, nd.RemoveShard().ID())
+	assert.Contains(shardList, nd.RemoveShard().ID())
+	assert.Contains(shardList, nd.RemoveShard().ID())
+	assert.Contains(shardList, nd.RemoveShard().ID())
 
 	defer func() {
 		// nolint
 		recover()
 	}()
-	nd.RemoveShard(1)
+	nd.RemoveShard()
 	t.Fatal("no panic when zero shards left")
 }
 
-// TestWeightedShardManager tests the (default) shard manager
-func TestWeightedShardManager(t *testing.T) {
+// TestSimpleShardManager tests the (default) shard manager
+func TestSimpleShardManager(t *testing.T) {
 	sm := NewShardMap()
 
 	const maxShards = 1000
-	weights := make([]int, maxShards)
-	for i := range weights {
-		weights[i] = int(rand.Int31n(100)) + 1
-	}
-	testShardManager(t, sm, maxShards, weights)
+	testShardManager(t, sm, maxShards)
 }
 
 // Benchmark the performance on add and remove node
 func BenchmarkWeightedShardManager(b *testing.B) {
 	sm := NewShardMap()
-	weights := make([]int, benchmarkShardCount)
-	for i := range weights {
-		weights[i] = int(rand.Int31n(100)) + 1
-	}
 
 	// nolint - don't care about error returns here
-	sm.Init(benchmarkShardCount, weights)
+	sm.Init(benchmarkShardCount)
 
 	var nodes []string
 	for i := 0; i < benchmarkNodeCount; i++ {
@@ -141,12 +93,8 @@ func BenchmarkWeightedShardManager(b *testing.B) {
 // Benchmark lookups on node
 func BenchmarkMapToNode(b *testing.B) {
 	sm := NewShardMap()
-	weights := make([]int, benchmarkShardCount)
-	for i := range weights {
-		weights[i] = int(rand.Int31n(100)) + 1
-	}
 	// nolint - won't check error return
-	sm.Init(benchmarkShardCount, weights)
+	sm.Init(benchmarkShardCount)
 
 	var nodes []string
 	for i := 0; i < benchmarkNodeCount; i++ {
@@ -162,40 +110,19 @@ func BenchmarkMapToNode(b *testing.B) {
 
 // Benchmark init function
 func BenchmarkShardInit(b *testing.B) {
-	weights := make([]int, benchmarkShardCount)
-	for i := range weights {
-		weights[i] = int(rand.Int31n(100)) + 1
-	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		sm := NewShardMap()
 		// nolint - won't check for errors
-		sm.Init(benchmarkShardCount, weights)
-	}
-}
-
-// Benchmark shard weight total (it should be *really* quick)
-func BenchmarkShardWeight(b *testing.B) {
-	weights := make([]int, benchmarkShardCount)
-	for i := range weights {
-		weights[i] = int(rand.Int31n(100)) + 1
-	}
-	sm := NewShardMap()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		sm.TotalWeight()
+		sm.Init(benchmarkShardCount)
 	}
 }
 
 func TestMarshalUnmarshalBinary(t *testing.T) {
 	assert := require.New(t)
-	weights := make([]int, benchmarkShardCount)
-	for i := range weights {
-		weights[i] = int(rand.Int31n(100)) + 1
-	}
 	sm := NewShardMap()
 
-	assert.NoError(sm.Init(benchmarkShardCount, weights))
+	assert.NoError(sm.Init(benchmarkShardCount))
 
 	var nodes []string
 	for i := 0; i < benchmarkNodeCount; i++ {
@@ -209,15 +136,12 @@ func TestMarshalUnmarshalBinary(t *testing.T) {
 	newManager := NewShardMap()
 	assert.NoError(newManager.UnmarshalBinary(buf))
 
-	assert.Equal(sm.TotalWeight(), newManager.TotalWeight(), "Total weight for both should be the same")
-
 	assert.Equal(len(newManager.Shards()), len(sm.Shards()), "Number of shards should be the same")
 
 	for i := 0; i < benchmarkShardCount; i++ {
 		old := sm.MapToNode(i)
 		new := newManager.MapToNode(i)
 		assert.Equalf(new.NodeID(), old.NodeID(), "Shard %d is in a different place", i)
-		assert.Equalf(new.Weight(), old.Weight(), "Shard %d has different weight", i)
 		assert.Equalf(new.ID(), old.ID(), "Shard %d has different ID", i)
 	}
 }
@@ -226,11 +150,11 @@ func TestNewAndOldSet(t *testing.T) {
 	assert := require.New(t)
 
 	oldSM := NewShardMap()
-	assert.NoError(oldSM.Init(10, nil))
+	assert.NoError(oldSM.Init(10))
 	oldSM.UpdateNodes("node1")
 
 	newSM := NewShardMap()
-	assert.NoError(newSM.Init(10, nil))
+	assert.NoError(newSM.Init(10))
 	newSM.UpdateNodes("node1", "node2")
 
 	added := newSM.NewShards("node1", oldSM)
@@ -240,13 +164,9 @@ func TestNewAndOldSet(t *testing.T) {
 
 }
 func BenchmarkMarshalManager(b *testing.B) {
-	weights := make([]int, benchmarkShardCount)
-	for i := range weights {
-		weights[i] = int(rand.Int31n(100)) + 1
-	}
 	sm := NewShardMap()
 	// nolint - wont't check error return
-	sm.Init(benchmarkShardCount, weights)
+	sm.Init(benchmarkShardCount)
 	var nodes []string
 	for i := 0; i < benchmarkNodeCount; i++ {
 		nodes = append(nodes, fmt.Sprintf("Node%04d", i))
@@ -260,13 +180,9 @@ func BenchmarkMarshalManager(b *testing.B) {
 }
 
 func BenchmarkUnmarshalManager(b *testing.B) {
-	weights := make([]int, benchmarkShardCount)
-	for i := range weights {
-		weights[i] = int(rand.Int31n(100)) + 1
-	}
 	sm := NewShardMap()
 	// nolint - won't check error returns
-	sm.Init(benchmarkShardCount, weights)
+	sm.Init(benchmarkShardCount)
 	nodes := []string{}
 	for i := 0; i < benchmarkNodeCount; i++ {
 		nodes = append(nodes, fmt.Sprintf("Node%04d", i))

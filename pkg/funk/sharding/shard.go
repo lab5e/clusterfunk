@@ -1,46 +1,26 @@
 package sharding
-//
-//Copyright 2019 Telenor Digital AS
-//
-//Licensed under the Apache License, Version 2.0 (the "License");
-//you may not use this file except in compliance with the License.
-//You may obtain a copy of the License at
-//
-//http://www.apache.org/licenses/LICENSE-2.0
-//
-//Unless required by applicable law or agreed to in writing, software
-//distributed under the License is distributed on an "AS IS" BASIS,
-//WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//See the License for the specific language governing permissions and
-//limitations under the License.
-//
-type weightedShard struct {
+
+type simpleShard struct {
 	id     int
-	weight int
 	nodeID string
 }
 
 // NewShard creates a new shard with a weight
-func NewShard(id, weight int) Shard {
-	return &weightedShard{
+func NewShard(id int) Shard {
+	return &simpleShard{
 		id:     id,
-		weight: weight,
 		nodeID: "",
 	}
 }
 
-func (w *weightedShard) ID() int {
+func (w *simpleShard) ID() int {
 	return w.id
 }
 
-func (w *weightedShard) Weight() int {
-	return w.weight
-}
-
-func (w *weightedShard) NodeID() string {
+func (w *simpleShard) NodeID() string {
 	return w.nodeID
 }
 
-func (w *weightedShard) SetNodeID(nodeID string) {
+func (w *simpleShard) SetNodeID(nodeID string) {
 	w.nodeID = nodeID
 }

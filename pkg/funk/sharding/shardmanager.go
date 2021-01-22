@@ -1,20 +1,5 @@
 package sharding
 
-//
-//Copyright 2019 Telenor Digital AS
-//
-//Licensed under the Apache License, Version 2.0 (the "License");
-//you may not use this file except in compliance with the License.
-//You may obtain a copy of the License at
-//
-//http://www.apache.org/licenses/LICENSE-2.0
-//
-//Unless required by applicable law or agreed to in writing, software
-//distributed under the License is distributed on an "AS IS" BASIS,
-//WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//See the License for the specific language governing permissions and
-//limitations under the License.
-//
 import "encoding"
 
 // Shard represents a partition that a single node is responsible for.
@@ -22,13 +7,6 @@ type Shard interface {
 	// ID is the shard ID. The shard ID is calculated through a shard function
 	// which will map an identifier to a particular shard.
 	ID() int
-
-	// Weight represents the relative work for the shard. Some shards might
-	// require more work than others, depending on the work distribution.
-	// Initially this can be set to 1 for all shards but if you have hotspots
-	// with higher resource requirements (like more CPU or memory) you can
-	// increase the weight of a shard to balance the load across the cluster.
-	Weight() int
 
 	// NodeID returns the node responsible for the shard.
 	NodeID() string
@@ -43,11 +21,8 @@ type Shard interface {
 type ShardMap interface {
 	// Init reinitializes the (shard) manager. This can be called one and only
 	// once. Performance critical since this is part of the node
-	// onboarding process. The weights parameter may be set to nil. In that
-	// case the shards gets a weight of 1. If the weights parameter is specfied
-	// the lenght of the weights parameter must match the maxShards parameter.
-	// Shard IDs are assigned from 0...maxShards-1
-	Init(maxShards int, weights []int) error
+	// onboarding process. Shard IDs are assigned from 0...maxShards-1
+	Init(maxShards int) error
 
 	// UpdateNodes syncs the nodes internally in the cluster and reshards if
 	// necessary.
@@ -62,12 +37,6 @@ type ShardMap interface {
 	// Shards returns a copy of all of the shards. Not performance critical. This
 	// is typically used for diagnostics.
 	Shards() []Shard
-
-	// TotalWeight is the total weight of all shards. Not performance critical
-	// directly but it will be used when calculating the distribution of shards
-	// so the manager should cache this value and update when a shard changes
-	// its weight.
-	TotalWeight() int
 
 	// ShardCount returns the number of shards
 	ShardCount() int

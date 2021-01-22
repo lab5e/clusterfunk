@@ -45,7 +45,7 @@ func waitForClusterEvent(ev <-chan Event, state NodeState) bool {
 func TestCfCluster(t *testing.T) {
 	assert := require.New(t)
 	sm1 := sharding.NewShardMap()
-	assert.NoError(sm1.Init(1000, nil))
+	assert.NoError(sm1.Init(1000))
 
 	params1 := Parameters{
 		Raft: RaftParameters{

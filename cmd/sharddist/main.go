@@ -70,7 +70,7 @@ func main() {
 	for i := range weights {
 		weights[i] = 1
 	}
-	sm.Init(len(weights), weights)
+	sm.Init(maxShards)
 	sm.UpdateNodes("A")
 	dumpImage("a_01node.png", sm)
 	sm.UpdateNodes("A", "B")

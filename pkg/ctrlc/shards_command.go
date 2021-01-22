@@ -33,13 +33,12 @@ func (c *ShardsCommand) Run(args RunContext) error {
 		return errStd
 	}
 
-	fmt.Println("Node ID              Shards             Weight")
+	fmt.Println("Node ID              Shards")
 	for _, v := range res.Shards {
 		shardPct := float32(v.ShardCount) / float32(res.TotalShards) * 100.0
-		weightPct := float32(v.ShardWeight) / float32(res.TotalWeight) * 100.0
-		fmt.Printf("%-20s %10d (%3.1f%%) %10d (%3.1f%%)\n", v.NodeId, v.ShardCount, shardPct, v.ShardWeight, weightPct)
+		fmt.Printf("%-20s %10d (%3.1f%%)\n", v.NodeId, v.ShardCount, shardPct)
 	}
-	fmt.Printf("\nReporting node: %s    Total shards: %d    Total weight: %d\n", res.NodeId, res.TotalShards, res.TotalWeight)
+	fmt.Printf("\nReporting node: %s    Total shards: %d\n", res.NodeId, res.TotalShards)
 
 	return nil
 }

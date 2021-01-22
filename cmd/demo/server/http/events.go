@@ -48,7 +48,7 @@ func newShardMap(shardMapper sharding.ShardMap) shardMap {
 	m := make(map[string]int)
 	for _, v := range shardMapper.Shards() {
 		n := m[v.NodeID()]
-		n += v.Weight()
+		n++
 		m[v.NodeID()] = n
 	}
 	return shardMap{
