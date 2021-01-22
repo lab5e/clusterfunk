@@ -38,3 +38,5 @@ go get -u github.com/mgechev/revive
 # go get works as well but the author doesn't recommend it.
 brew install golangci/tap/golangci-lint
 ```
+
+Temp

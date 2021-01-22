@@ -34,3 +34,4 @@ A typical cluster of Raft nodes should not exceed 10-15 nodes. This is a limitat
 * [Sharding](sharding.md)
 * [Production services](production.md)
 * [Notes on networking](networking.md)
+* [Notes on shard distributions](shard_distribution.md)

@@ -11,6 +11,7 @@ bins:
 	cd cmd/demo/client && go build -o ../../../bin/client
 	cd cmd/raft && go build -o ../../bin/raft
 	cd cmd/seed && go build -o ../../bin/seed
+	cd cmd/sharddist && go build -o ../../bin/sharddist
 
 test:
 	go test ./... --cover  -timeout 30s
