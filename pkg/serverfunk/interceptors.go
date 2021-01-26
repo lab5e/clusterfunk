@@ -1,20 +1,5 @@
 package serverfunk
 
-//
-//Copyright 2019 Telenor Digital AS
-//
-//Licensed under the Apache License, Version 2.0 (the "License");
-//you may not use this file except in compliance with the License.
-//You may obtain a copy of the License at
-//
-//http://www.apache.org/licenses/LICENSE-2.0
-//
-//Unless required by applicable law or agreed to in writing, software
-//distributed under the License is distributed on an "AS IS" BASIS,
-//WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//See the License for the specific language governing permissions and
-//limitations under the License.
-//
 import (
 	"context"
 
@@ -42,7 +27,7 @@ type ShardConversionFunc func(request interface{}) (shard int, response interfac
 // Parameters struct from the funk package.
 // Streams are not proxied.
 func WithClusterFunk(cluster funk.Cluster, shardFn ShardConversionFunc, clientProxy *ProxyConnections, metricsType string) []grpc.ServerOption {
-	m := metrics.NewSinkFromString(metricsType)
+	m := metrics.NewSinkFromString(metricsType, cluster.NodeID())
 	return []grpc.ServerOption{
 		grpc.UnaryInterceptor(createClusterfunkUnaryInterceptor(cluster.NodeID(), shardFn, clientProxy, m)),
 	}
@@ -64,12 +49,12 @@ func createClusterfunkUnaryInterceptor(localID string, shardFn ShardConversionFu
 					outCtx = metadata.NewOutgoingContext(ctx, md)
 				}
 				err := client.Invoke(outCtx, info.FullMethod, req, ret)
-				m.LogRequest(localID, nodeID, info.FullMethod)
+				m.LogRequest(nodeID, info.FullMethod)
 				return ret, err
 			}
 		}
 		ret, err := handler(ctx, req)
-		m.LogRequest(localID, localID, info.FullMethod)
+		m.LogRequest(localID, info.FullMethod)
 		return ret, err
 	}
 }

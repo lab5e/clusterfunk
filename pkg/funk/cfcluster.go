@@ -1,20 +1,5 @@
 package funk
 
-//
-//Copyright 2019 Telenor Digital AS
-//
-//Licensed under the Apache License, Version 2.0 (the "License");
-//you may not use this file except in compliance with the License.
-//You may obtain a copy of the License at
-//
-//http://www.apache.org/licenses/LICENSE-2.0
-//
-//Unless required by applicable law or agreed to in writing, software
-//distributed under the License is distributed on an "AS IS" BASIS,
-//WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//See the License for the specific language governing permissions and
-//limitations under the License.
-//
 import (
 	"context"
 	"errors"
@@ -64,7 +49,11 @@ type clusterfunkCluster struct {
 }
 
 // NewCluster returns a new cluster (client)
-func NewCluster(params Parameters, shardManager sharding.ShardMap) Cluster {
+func NewCluster(params Parameters, shardManager sharding.ShardMap) (Cluster, error) {
+	params.Final()
+	if params.Name == "" {
+		return nil, errors.New("cluster name not specified")
+	}
 	ret := &clusterfunkCluster{
 		name:                 params.Name,
 		shardManager:         shardManager,
@@ -79,10 +68,10 @@ func NewCluster(params Parameters, shardManager sharding.ShardMap) Cluster {
 		currentShardMapIndex: 0,
 		unacknowledged:       newAckCollection(),
 		livenessChecker:      NewLivenessChecker(params.LivenessRetries),
-		cfmetrics:            metrics.NewSinkFromString(params.Metrics),
+		cfmetrics:            metrics.NewSinkFromString(params.Metrics, params.NodeID),
 		leaderClientMutex:    &sync.Mutex{},
 	}
-	return ret
+	return ret, nil
 }
 
 func (c *clusterfunkCluster) Nodes() []string {
@@ -158,11 +147,6 @@ func (c *clusterfunkCluster) Events() <-chan Event {
 }
 
 func (c *clusterfunkCluster) Start() error {
-	c.config.Final()
-	if c.config.Name == "" {
-		return errors.New("cluster name not specified")
-	}
-
 	c.setState(Starting)
 
 	// Launch node management endpoint
@@ -264,7 +248,7 @@ func (c *clusterfunkCluster) raftEventLoop(ch <-chan RaftEventType) {
 		case RaftClusterSizeChanged:
 			c.clearLeaderManagementClient()
 			toolbox.TimeCall(func() { c.handleClusterSizeChanged(c.raftNode.Nodes.List()) }, "ClusterSizeChanged")
-			c.cfmetrics.SetClusterSize(c.raftNode.LocalNodeID(), c.raftNode.Nodes.Size())
+			c.cfmetrics.SetClusterSize(c.raftNode.Nodes.Size())
 
 		case RaftLeaderLost:
 			c.livenessChecker.Clear()
@@ -395,8 +379,8 @@ func (c *clusterfunkCluster) handleClusterSizeChanged(nodeList []string) {
 	c.unacknowledged.StartAck(nodeList, index, c.config.AckTimeout)
 
 	go c.checkAckStatus()
-	c.cfmetrics.SetShardCount(c.raftNode.LocalNodeID(), c.shardManager.ShardCountForNode(c.raftNode.LocalNodeID()))
-	c.cfmetrics.SetShardIndex(c.raftNode.LocalNodeID(), index)
+	c.cfmetrics.SetShardCount(c.shardManager.ShardCountForNode(c.raftNode.LocalNodeID()))
+	c.cfmetrics.SetShardIndex(index)
 
 	logrus.WithFields(logrus.Fields{"index": index}).Debugf("Shard map index")
 
@@ -473,8 +457,8 @@ func (c *clusterfunkCluster) processProposedShardMap(msg *LogMessage) {
 	// Ack it. If the leader doesn't recognize it we can ignore the response.
 	c.ackShardMap(uint64(msg.Index), msg.AckEndpoint)
 
-	c.cfmetrics.SetShardCount(c.raftNode.LocalNodeID(), c.shardManager.ShardCountForNode(c.raftNode.LocalNodeID()))
-	c.cfmetrics.SetShardIndex(c.raftNode.LocalNodeID(), uint64(msg.Index))
+	c.cfmetrics.SetShardCount(c.shardManager.ShardCountForNode(c.raftNode.LocalNodeID()))
+	c.cfmetrics.SetShardIndex(uint64(msg.Index))
 }
 
 // processShardMapCommitMessage processes the commit message from the leader.
