@@ -68,9 +68,9 @@ func NewCluster(params Parameters, shardManager sharding.ShardMap) (Cluster, err
 		currentShardMapIndex: 0,
 		unacknowledged:       newAckCollection(),
 		livenessChecker:      NewLivenessChecker(params.LivenessRetries),
-		cfmetrics:            metrics.NewSinkFromString(params.Metrics, params.NodeID),
 		leaderClientMutex:    &sync.Mutex{},
 	}
+	ret.cfmetrics = metrics.NewSinkFromString(params.Metrics, ret)
 	return ret, nil
 }
 

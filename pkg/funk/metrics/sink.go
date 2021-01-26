@@ -1,5 +1,13 @@
 package metrics
 
+import "time"
+
+// ClusterInfo is the interface to expose cluster info
+type ClusterInfo interface {
+	Created() time.Time
+	NodeID() string
+}
+
 // Sink is the metrics sink for the cluster. Implement this interface to write
 // to other kinds of systems.
 type Sink interface {
@@ -16,10 +24,10 @@ const (
 )
 
 // NewSinkFromString returns a named sink
-func NewSinkFromString(name string, nodeid string) Sink {
+func NewSinkFromString(name string, cluster ClusterInfo) Sink {
 	switch name {
 	case "prometheus":
-		return NewPrometheusSink(nodeid)
+		return NewPrometheusSink(cluster)
 	default:
 		return NewBlackHoleSink()
 	}

@@ -27,7 +27,7 @@ type ShardConversionFunc func(request interface{}) (shard int, response interfac
 // Parameters struct from the funk package.
 // Streams are not proxied.
 func WithClusterFunk(cluster funk.Cluster, shardFn ShardConversionFunc, clientProxy *ProxyConnections, metricsType string) []grpc.ServerOption {
-	m := metrics.NewSinkFromString(metricsType, cluster.NodeID())
+	m := metrics.NewSinkFromString(metricsType, cluster)
 	return []grpc.ServerOption{
 		grpc.UnaryInterceptor(createClusterfunkUnaryInterceptor(cluster.NodeID(), shardFn, clientProxy, m)),
 	}

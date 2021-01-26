@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -15,13 +16,14 @@ type prometheusSink struct {
 	shardCount  *prometheus.GaugeVec
 	logIndex    *prometheus.GaugeVec
 	requests    *prometheus.CounterVec
+	uptime      prometheus.GaugeFunc
 }
 
 var promMetrics *prometheusSink
 
 // NewPrometheusSink creates a metrics sink for Prometheus. All sinks created
 // by this function will write to the same sinks.
-func NewPrometheusSink(nodeid string) Sink {
+func NewPrometheusSink(cluster ClusterInfo) Sink {
 	// This registers the metrics for the first time but not for subsequent
 	// calls. Since this is a one-time operation it will also work for unit
 	// tests but the registration might be stale or incorrect.
@@ -37,7 +39,7 @@ func NewPrometheusSink(nodeid string) Sink {
 					Name:      "clusterSize",
 					Help:      "Cluster size",
 					ConstLabels: prometheus.Labels{
-						"node": nodeid,
+						"node": cluster.NodeID(),
 					},
 				},
 				[]string{}),
@@ -49,7 +51,7 @@ func NewPrometheusSink(nodeid string) Sink {
 					Name:      "shardCount",
 					Help:      "Number of shards handled by the local node",
 					ConstLabels: prometheus.Labels{
-						"node": nodeid,
+						"node": cluster.NodeID(),
 					},
 				},
 				[]string{}),
@@ -61,7 +63,7 @@ func NewPrometheusSink(nodeid string) Sink {
 					Name:      "logIndex",
 					Help:      "Replicated log index",
 					ConstLabels: prometheus.Labels{
-						"node": nodeid,
+						"node": cluster.NodeID(),
 					},
 				},
 				[]string{}),
@@ -74,15 +76,27 @@ func NewPrometheusSink(nodeid string) Sink {
 					Name:      "requests",
 					Help:      "Requests handled by node",
 					ConstLabels: prometheus.Labels{
-						"node": nodeid,
+						"node": cluster.NodeID(),
 					},
 				},
 				[]string{"destination", "method"}),
+			uptime: prometheus.NewGaugeFunc(
+				prometheus.GaugeOpts{
+					Namespace: "cf",
+					Subsystem: "cluster",
+					Name:      "uptime",
+					Help:      "Cluster uptime, in nanoseconds",
+				},
+				func() float64 {
+					return float64(time.Since(cluster.Created()))
+				},
+			),
 		}
 		prometheus.MustRegister(promMetrics.clusterSize)
 		prometheus.MustRegister(promMetrics.shardCount)
 		prometheus.MustRegister(promMetrics.logIndex)
 		prometheus.MustRegister(promMetrics.requests)
+		prometheus.MustRegister(promMetrics.uptime)
 	})
 	return promMetrics
 }
