@@ -13,7 +13,7 @@ var oneTimeRegister sync.Once
 type prometheusSink struct {
 	clusterSize *prometheus.GaugeVec
 	shardCount  *prometheus.GaugeVec
-	shardIndex  *prometheus.GaugeVec
+	logIndex    *prometheus.GaugeVec
 	requests    *prometheus.CounterVec
 }
 
@@ -54,12 +54,12 @@ func NewPrometheusSink(nodeid string) Sink {
 				},
 				[]string{}),
 			// shardIndex is the current version of the shard index
-			shardIndex: prometheus.NewGaugeVec(
+			logIndex: prometheus.NewGaugeVec(
 				prometheus.GaugeOpts{
 					Namespace: "cf",
 					Subsystem: "cluster",
-					Name:      "shardIndex",
-					Help:      "Current shard map version",
+					Name:      "logIndex",
+					Help:      "Replicated log index",
 					ConstLabels: prometheus.Labels{
 						"node": nodeid,
 					},
@@ -81,7 +81,7 @@ func NewPrometheusSink(nodeid string) Sink {
 		}
 		prometheus.MustRegister(promMetrics.clusterSize)
 		prometheus.MustRegister(promMetrics.shardCount)
-		prometheus.MustRegister(promMetrics.shardIndex)
+		prometheus.MustRegister(promMetrics.logIndex)
 		prometheus.MustRegister(promMetrics.requests)
 	})
 	return promMetrics
@@ -95,8 +95,8 @@ func (p *prometheusSink) SetShardCount(shards int) {
 	p.shardCount.With(prometheus.Labels{}).Set(float64(shards))
 }
 
-func (p *prometheusSink) SetShardIndex(index uint64) {
-	p.shardIndex.With(prometheus.Labels{}).Set(float64(index))
+func (p *prometheusSink) SetLogIndex(index uint64) {
+	p.logIndex.With(prometheus.Labels{}).Set(float64(index))
 }
 
 func (p *prometheusSink) LogRequest(destination, method string) {

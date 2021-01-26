@@ -380,7 +380,7 @@ func (c *clusterfunkCluster) handleClusterSizeChanged(nodeList []string) {
 
 	go c.checkAckStatus()
 	c.cfmetrics.SetShardCount(c.shardManager.ShardCountForNode(c.raftNode.LocalNodeID()))
-	c.cfmetrics.SetShardIndex(index)
+	c.cfmetrics.SetLogIndex(index)
 
 	logrus.WithFields(logrus.Fields{"index": index}).Debugf("Shard map index")
 
@@ -458,7 +458,7 @@ func (c *clusterfunkCluster) processProposedShardMap(msg *LogMessage) {
 	c.ackShardMap(uint64(msg.Index), msg.AckEndpoint)
 
 	c.cfmetrics.SetShardCount(c.shardManager.ShardCountForNode(c.raftNode.LocalNodeID()))
-	c.cfmetrics.SetShardIndex(uint64(msg.Index))
+	c.cfmetrics.SetLogIndex(uint64(msg.Index))
 }
 
 // processShardMapCommitMessage processes the commit message from the leader.

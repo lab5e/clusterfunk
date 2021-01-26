@@ -16,7 +16,7 @@ func (b *blackHoleSink) SetShardCount(shards int) {
 	// do nothing
 }
 
-func (b *blackHoleSink) SetShardIndex(index uint64) {
+func (b *blackHoleSink) SetLogIndex(index uint64) {
 	// do nothing
 }
 

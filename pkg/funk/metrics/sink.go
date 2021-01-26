@@ -5,7 +5,7 @@ package metrics
 type Sink interface {
 	SetClusterSize(size int)
 	SetShardCount(shards int)
-	SetShardIndex(index uint64)
+	SetLogIndex(index uint64)
 	LogRequest(destination, method string)
 }
 
