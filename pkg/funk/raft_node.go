@@ -96,7 +96,7 @@ func NewRaftNode() *RaftNode {
 type RaftParameters struct {
 	Endpoint  string `kong:"help='Endpoint for Raft',default=''"`
 	DiskStore string `kong:"help='Disk-based store',default=''"`
-	Bootstrap bool   `kong:"help='Bootstrap a new Raft cluster',default='false'"`
+	Bootstrap bool   `kong:"help='Bootstrap a new Raft cluster',default='true'"`
 	Verbose   bool   `kong:"help='Verbose Raft logging',default='false'"`
 	DebugLog  bool   `kong:"help='Show debug log messages for Raft',default='false'"`
 }
