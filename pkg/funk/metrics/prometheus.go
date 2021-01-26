@@ -38,19 +38,19 @@ func NewPrometheusSink(cluster ClusterInfo) Sink {
 				prometheus.GaugeOpts{
 					Namespace: "cf",
 					Subsystem: "cluster",
-					Name:      "clusterSize",
+					Name:      "cluster_size",
 					Help:      "Cluster size",
 					ConstLabels: prometheus.Labels{
 						"node": cluster.NodeID(),
 					},
 				},
-				[]string{"state"}),
+				[]string{}),
 			// shardCount reports the number of shards assigned to the node.
 			shardCount: prometheus.NewGaugeVec(
 				prometheus.GaugeOpts{
 					Namespace: "cf",
 					Subsystem: "cluster",
-					Name:      "shardCount",
+					Name:      "shard_count",
 					Help:      "Number of shards handled by the local node",
 					ConstLabels: prometheus.Labels{
 						"node": cluster.NodeID(),
@@ -62,13 +62,13 @@ func NewPrometheusSink(cluster ClusterInfo) Sink {
 				prometheus.GaugeOpts{
 					Namespace: "cf",
 					Subsystem: "cluster",
-					Name:      "logIndex",
+					Name:      "log_index",
 					Help:      "Replicated log index",
 					ConstLabels: prometheus.Labels{
 						"node": cluster.NodeID(),
 					},
 				},
-				[]string{"state"}),
+				[]string{}),
 			// requests show the number of requests handled by the gRPC interceptor.
 
 			requests: prometheus.NewCounterVec(
@@ -104,9 +104,7 @@ func NewPrometheusSink(cluster ClusterInfo) Sink {
 }
 
 func (p *prometheusSink) SetClusterSize(size int) {
-	p.clusterSize.With(prometheus.Labels{
-		"state": p.cluster.StateString(),
-	}).Set(float64(size))
+	p.clusterSize.With(prometheus.Labels{}).Set(float64(size))
 }
 
 func (p *prometheusSink) SetShardCount(shards int) {
@@ -114,9 +112,7 @@ func (p *prometheusSink) SetShardCount(shards int) {
 }
 
 func (p *prometheusSink) SetLogIndex(index uint64) {
-	p.logIndex.With(prometheus.Labels{
-		"state": p.cluster.StateString(),
-	}).Set(float64(index))
+	p.logIndex.With(prometheus.Labels{}).Set(float64(index))
 }
 
 func (p *prometheusSink) LogRequest(destination, method string) {

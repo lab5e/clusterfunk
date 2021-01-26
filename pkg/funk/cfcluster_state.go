@@ -42,10 +42,6 @@ func (c *clusterfunkCluster) State() NodeState {
 	return c.state
 }
 
-func (c *clusterfunkCluster) StateString() string {
-	return c.State().String()
-}
-
 func (c *clusterfunkCluster) Role() NodeRole {
 	c.stateMutex.RLock()
 	defer c.stateMutex.RUnlock()

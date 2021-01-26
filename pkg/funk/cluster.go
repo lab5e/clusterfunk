@@ -106,9 +106,6 @@ type Cluster interface {
 	// State is the current cluster state
 	State() NodeState
 
-	// StateString is the State field as a string
-	StateString() string
-
 	// Events returns an event channel for the cluster. The channel will
 	// be closed when the cluster is stopped. Events are for information only
 	Events() <-chan Event
