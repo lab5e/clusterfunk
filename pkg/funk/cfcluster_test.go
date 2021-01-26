@@ -34,9 +34,8 @@ func TestCfCluster(t *testing.T) {
 
 	params1 := Parameters{
 		Raft: RaftParameters{
-			RaftEndpoint: netutils.RandomLocalEndpoint(),
-			DiskStore:    false,
-			Bootstrap:    true,
+			Endpoint:  netutils.RandomLocalEndpoint(),
+			Bootstrap: true,
 		},
 		Serf: SerfParameters{
 			Endpoint:    netutils.RandomLocalEndpoint(),

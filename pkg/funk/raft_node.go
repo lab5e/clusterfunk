@@ -1,20 +1,5 @@
 package funk
 
-//
-//Copyright 2019 Telenor Digital AS
-//
-//Licensed under the Apache License, Version 2.0 (the "License");
-//you may not use this file except in compliance with the License.
-//You may obtain a copy of the License at
-//
-//http://www.apache.org/licenses/LICENSE-2.0
-//
-//Unless required by applicable law or agreed to in writing, software
-//distributed under the License is distributed on an "AS IS" BASIS,
-//WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//See the License for the specific language governing permissions and
-//limitations under the License.
-//
 import (
 	"errors"
 	"fmt"
@@ -109,11 +94,11 @@ func NewRaftNode() *RaftNode {
 
 // RaftParameters is the configuration for the Raft cluster
 type RaftParameters struct {
-	RaftEndpoint string `kong:"help='Endpoint for Raft',default=''"`
-	DiskStore    bool   `kong:"help='Disk-based store',default='false'"`
-	Bootstrap    bool   `kong:"help='Bootstrap a new Raft cluster',default='false'"`
-	Verbose      bool   `kong:"help='Verbose Raft logging',default='false'"`
-	DebugLog     bool   `kong:"help='Show debug log messages for Raft',default='false'"`
+	Endpoint  string `kong:"help='Endpoint for Raft',default=''"`
+	DiskStore string `kong:"help='Disk-based store',default=''"`
+	Bootstrap bool   `kong:"help='Bootstrap a new Raft cluster',default='false'"`
+	Verbose   bool   `kong:"help='Verbose Raft logging',default='false'"`
+	DebugLog  bool   `kong:"help='Show debug log messages for Raft',default='false'"`
 }
 
 // Start launches the node. The return value is set to true if the cluster
@@ -128,7 +113,6 @@ func (r *RaftNode) Start(nodeID string, cfg RaftParameters) (bool, error) {
 
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(nodeID)
-
 	if cfg.Verbose {
 		config.LogLevel = "INFO"
 		if cfg.DebugLog {
@@ -138,7 +122,7 @@ func (r *RaftNode) Start(nodeID string, cfg RaftParameters) (bool, error) {
 		config.LogOutput = newMutedLogger().Writer()
 	}
 
-	addr, err := net.ResolveTCPAddr("tcp", cfg.RaftEndpoint)
+	addr, err := net.ResolveTCPAddr("tcp", cfg.Endpoint)
 	if err != nil {
 		return false, err
 	}
@@ -176,13 +160,12 @@ func (r *RaftNode) Start(nodeID string, cfg RaftParameters) (bool, error) {
 		return false, err
 	}
 	r.raftEndpoint = string(transport.LocalAddr())
-
 	var logStore raft.LogStore
 	var stableStore raft.StableStore
 	var snapshotStore raft.SnapshotStore
 
-	if cfg.DiskStore {
-		raftdir := fmt.Sprintf("./%s", nodeID)
+	if cfg.DiskStore != "" {
+		raftdir := fmt.Sprintf("%s/%s", cfg.DiskStore, nodeID)
 		logrus.WithField("dbdir", raftdir).Info("Using boltDB and snapshot store")
 		if err := os.MkdirAll(raftdir, os.ModePerm); err != nil {
 			logrus.WithError(err).WithField("dbdir", raftdir).Error("Unable to create store dir")

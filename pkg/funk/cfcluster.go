@@ -178,7 +178,7 @@ func (c *clusterfunkCluster) Start() error {
 			}
 			if len(addrs) == 0 {
 				logrus.Debug("No Serf nodes found, bootstrapping cluster")
-				c.config.Raft.Bootstrap = true
+				//c.config.Raft.Bootstrap = true
 			}
 		}
 		if c.config.Raft.Bootstrap && len(addrs) > 0 {

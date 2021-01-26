@@ -1,20 +1,5 @@
 package funk
 
-//
-//Copyright 2019 Telenor Digital AS
-//
-//Licensed under the Apache License, Version 2.0 (the "License");
-//you may not use this file except in compliance with the License.
-//You may obtain a copy of the License at
-//
-//http://www.apache.org/licenses/LICENSE-2.0
-//
-//Unless required by applicable law or agreed to in writing, software
-//distributed under the License is distributed on an "AS IS" BASIS,
-//WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//See the License for the specific language governing permissions and
-//limitations under the License.
-//
 import (
 	"testing"
 
@@ -35,9 +20,9 @@ func TestRaftCluster(t *testing.T) {
 	id1 := "node1"
 	id2 := "node2"
 	id3 := "node3"
-	params1 := RaftParameters{Bootstrap: true, DiskStore: false, RaftEndpoint: netutils.RandomLocalEndpoint()}
-	params2 := RaftParameters{Bootstrap: false, DiskStore: false, RaftEndpoint: netutils.RandomLocalEndpoint()}
-	params3 := RaftParameters{Bootstrap: false, DiskStore: false, RaftEndpoint: netutils.RandomLocalEndpoint()}
+	params1 := RaftParameters{Bootstrap: true, Endpoint: netutils.RandomLocalEndpoint()}
+	params2 := RaftParameters{Bootstrap: false, Endpoint: netutils.RandomLocalEndpoint()}
+	params3 := RaftParameters{Bootstrap: false, Endpoint: netutils.RandomLocalEndpoint()}
 
 	// Make a three-node cluster
 	node1 := NewRaftNode()
@@ -73,19 +58,19 @@ func TestRaftCluster(t *testing.T) {
 	assert.False(bs, "2nd node should not bootstrap")
 	assert.NoError(err, "2nd node should launch")
 
-	assert.NoError(node1.AddClusterNode(id2, params2.RaftEndpoint), "Node 2 should join successfully")
+	assert.NoError(node1.AddClusterNode(id2, params2.Endpoint), "Node 2 should join successfully")
 
 	evts2 := node2.Events()
 	waitForEvent(RaftBecameFollower, evts2)
 	assert.Equal(node2.LocalNodeID(), id2)
-	assert.Equal(node2.Endpoint(), params2.RaftEndpoint)
+	assert.Equal(node2.Endpoint(), params2.Endpoint)
 
 	node3 := NewRaftNode()
 	evts3 := node3.Events()
 	bs, err = node3.Start(id3, params3)
 	assert.False(bs, "3rd node should not bootstrap")
 	assert.NoError(err)
-	assert.NoError(node1.AddClusterNode(id3, params3.RaftEndpoint))
+	assert.NoError(node1.AddClusterNode(id3, params3.Endpoint))
 
 	waitForEvent(RaftBecameFollower, evts3)
 
@@ -111,8 +96,8 @@ func TestRaftCluster(t *testing.T) {
 	assert.Len(msgs, 1)
 
 	// Removing and adding node should work
-	assert.NoError(node1.RemoveClusterNode(id2, params2.RaftEndpoint))
-	assert.NoError(node1.AddClusterNode(id2, params2.RaftEndpoint))
+	assert.NoError(node1.RemoveClusterNode(id2, params2.Endpoint))
+	assert.NoError(node1.AddClusterNode(id2, params2.Endpoint))
 
 	assert.NoError(node1.Stop(true))
 
