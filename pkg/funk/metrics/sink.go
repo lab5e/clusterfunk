@@ -6,6 +6,7 @@ import "time"
 type ClusterInfo interface {
 	Created() time.Time
 	NodeID() string
+	StateString() string
 }
 
 // Sink is the metrics sink for the cluster. Implement this interface to write

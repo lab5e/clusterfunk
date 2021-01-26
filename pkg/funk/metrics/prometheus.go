@@ -17,6 +17,7 @@ type prometheusSink struct {
 	logIndex    *prometheus.GaugeVec
 	requests    *prometheus.CounterVec
 	uptime      prometheus.GaugeFunc
+	cluster     ClusterInfo
 }
 
 var promMetrics *prometheusSink
@@ -31,6 +32,7 @@ func NewPrometheusSink(cluster ClusterInfo) Sink {
 	// the package namespace with symbols.
 	oneTimeRegister.Do(func() {
 		promMetrics = &prometheusSink{
+			cluster: cluster,
 			// clusterSize reports the cluster size as seen by the node.
 			clusterSize: prometheus.NewGaugeVec(
 				prometheus.GaugeOpts{
@@ -42,7 +44,7 @@ func NewPrometheusSink(cluster ClusterInfo) Sink {
 						"node": cluster.NodeID(),
 					},
 				},
-				[]string{}),
+				[]string{"state"}),
 			// shardCount reports the number of shards assigned to the node.
 			shardCount: prometheus.NewGaugeVec(
 				prometheus.GaugeOpts{
@@ -66,7 +68,7 @@ func NewPrometheusSink(cluster ClusterInfo) Sink {
 						"node": cluster.NodeID(),
 					},
 				},
-				[]string{}),
+				[]string{"state"}),
 			// requests show the number of requests handled by the gRPC interceptor.
 
 			requests: prometheus.NewCounterVec(
@@ -102,7 +104,9 @@ func NewPrometheusSink(cluster ClusterInfo) Sink {
 }
 
 func (p *prometheusSink) SetClusterSize(size int) {
-	p.clusterSize.With(prometheus.Labels{}).Set(float64(size))
+	p.clusterSize.With(prometheus.Labels{
+		"state": p.cluster.StateString(),
+	}).Set(float64(size))
 }
 
 func (p *prometheusSink) SetShardCount(shards int) {
@@ -110,7 +114,9 @@ func (p *prometheusSink) SetShardCount(shards int) {
 }
 
 func (p *prometheusSink) SetLogIndex(index uint64) {
-	p.logIndex.With(prometheus.Labels{}).Set(float64(index))
+	p.logIndex.With(prometheus.Labels{
+		"state": p.cluster.StateString(),
+	}).Set(float64(index))
 }
 
 func (p *prometheusSink) LogRequest(destination, method string) {
