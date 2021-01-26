@@ -1,20 +1,9 @@
 package funk
-//
-//Copyright 2019 Telenor Digital AS
-//
-//Licensed under the Apache License, Version 2.0 (the "License");
-//you may not use this file except in compliance with the License.
-//You may obtain a copy of the License at
-//
-//http://www.apache.org/licenses/LICENSE-2.0
-//
-//Unless required by applicable law or agreed to in writing, software
-//distributed under the License is distributed on an "AS IS" BASIS,
-//WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//See the License for the specific language governing permissions and
-//limitations under the License.
-//
-import "errors"
+
+import (
+	"encoding/binary"
+	"errors"
+)
 
 // LogMessageType is the log message type we're writing at the start of every log message
 type LogMessageType byte
@@ -24,12 +13,19 @@ const (
 	// to the followers. The payload for this message is a marshalled ShardManager
 	// instance.
 	ProposedShardMap LogMessageType = 1
+
 	// ShardMapCommitted is a  message that will synchronize the
 	// shard map distributed in the previous message.
 	ShardMapCommitted LogMessageType = 2
+
+	// Bootstrap is a message that the leader appends to the log when the
+	// cluster is first bootstrapped. The message holds the (local) time stamp
+	// for the leader and indicates that the cluster was restarted. A replicated
+	// log might contain more than one ClusterBootstrap message.
+	Bootstrap LogMessageType = 3
 )
 
-// LogMessage is log messages sent by the leader. There's only two types at this time.
+// LogMessage is log messages sent by the leader.
 // The payload is a byte array that can be unmarshalled into another type of message.
 type LogMessage struct {
 	MessageType LogMessageType
@@ -69,4 +65,25 @@ func (m *LogMessage) UnmarshalBinary(buf []byte) error {
 	m.Data = make([]byte, 0)
 	m.Data = append(m.Data, buf[2+strLen:]...)
 	return nil
+}
+
+// NewBootstrapMessage creates a new cluster bootstrap message
+func NewBootstrapMessage(time int64) LogMessage {
+	buf := make([]byte, 8)
+	binary.LittleEndian.PutUint64(buf, uint64(time))
+	return LogMessage{
+		MessageType: Bootstrap,
+		AckEndpoint: "",
+		Index:       0,
+		Data:        buf,
+	}
+}
+
+// GetBootstrapTime reads the cluster bootstrap time from the log message. If the
+// message can't be decoded it will return -1
+func GetBootstrapTime(m LogMessage) int64 {
+	if m.MessageType != Bootstrap {
+		return -1
+	}
+	return int64(binary.LittleEndian.Uint64(m.Data))
 }

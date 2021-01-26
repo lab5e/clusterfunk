@@ -87,11 +87,6 @@ func (n NodeRole) String() string {
 const (
 	// SerfStatusKey is the key for the serf status
 	SerfStatusKey = "serf.status"
-
-	// clusterCreated is the key for the created tag. It's set by the node
-	// that bootstraps the cluster. Technically it's writable by all nodes in
-	// the cluster but...
-	clusterCreated = "cf.created"
 )
 
 // Event is the interface for cluster events that are triggered. The events are

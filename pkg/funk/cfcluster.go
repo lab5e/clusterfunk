@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/lab5e/clusterfunk/pkg/funk/managepb"
@@ -46,6 +46,8 @@ type clusterfunkCluster struct {
 	leaderClientMutex    *sync.Mutex // Mutex for the gRPC client pointing to the leader node
 	leaderClientConn     *grpc.ClientConn
 	leaderClient         managepb.ClusterManagementClient
+	created              *int64
+	writeBootstrap       *int64
 }
 
 // NewCluster returns a new cluster (client)
@@ -69,8 +71,12 @@ func NewCluster(params Parameters, shardManager sharding.ShardMap) (Cluster, err
 		unacknowledged:       newAckCollection(),
 		livenessChecker:      NewLivenessChecker(params.LivenessRetries),
 		leaderClientMutex:    &sync.Mutex{},
+		created:              new(int64),
+		writeBootstrap:       new(int64),
 	}
 	ret.cfmetrics = metrics.NewSinkFromString(params.Metrics, ret)
+	atomic.StoreInt64(ret.created, time.Now().UnixNano())
+	atomic.StoreInt64(ret.writeBootstrap, 0)
 	return ret, nil
 }
 
@@ -226,8 +232,9 @@ func (c *clusterfunkCluster) Start() error {
 	}
 	if bootstrap {
 		t := time.Now()
-		logrus.Infof("Bootstrapping cluster at %v", t)
-		c.serfNode.SetTag(clusterCreated, fmt.Sprintf("%d", t.UnixNano()))
+		logrus.Infof("Bootstrapping cluster at %v. Will write bootstrap event when I'm the leader", t)
+		atomic.StoreInt64(c.writeBootstrap, 1)
+		// Write event when the node becomes the leader
 	}
 	// TODO: Start Serf node when Raft node has joined the cluster, not before
 	// if the autojoin parameter is set to false. Raft nodes that haven't joined
@@ -275,6 +282,19 @@ func (c *clusterfunkCluster) raftEventLoop(ch <-chan RaftEventType) {
 func (c *clusterfunkCluster) handleLeaderEvent() {
 	c.setRole(Leader)
 	c.setCurrentShardMapIndex(0)
+	// Write bootstrap log entry if this node has bootstrapped the cluster
+	if atomic.SwapInt64(c.writeBootstrap, 0) == 1 {
+		logrus.Debug("Writing bootstrap event log")
+		m := NewBootstrapMessage(time.Now().UnixNano())
+		buf, err := m.MarshalBinary()
+		if err != nil {
+			logrus.WithError(err).Warning("Could not marshal the bootstrap message for the replicated log")
+		} else {
+			if _, err := c.raftNode.AppendLogEntry(buf); err != nil {
+				logrus.WithError(err).Warning("Could not write bootstrap message to the replicated log. Creation time might be incorrect.")
+			}
+		}
+	}
 	// When assuming leadership the node list built by events won't be up to date
 	// with the list.  This forces an update of the node list.
 	c.raftNode.RefreshNodes()
@@ -422,6 +442,14 @@ func (c *clusterfunkCluster) handleReceiveLog() {
 			// quick sanity check on the node list to make sure this node
 			// is a member (we really should)
 			c.processShardMapCommitMessage(&msg)
+
+		case Bootstrap:
+			// Update bootstrap time
+			atomic.StoreInt64(c.created, GetBootstrapTime(msg))
+			logrus.WithFields(logrus.Fields{
+				"index": msg.Index,
+				"time":  atomic.LoadInt64(c.created),
+			}).Info("Found bootstrap message")
 
 		default:
 			logrus.WithField("logType", msg.MessageType).Error("Unknown log type in replication log")
@@ -620,13 +648,5 @@ func (c *clusterfunkCluster) updateLivenessChecks() {
 }
 
 func (c *clusterfunkCluster) Created() time.Time {
-	created := c.serfNode.GetClusterTag(clusterCreated)
-	ct, err := strconv.ParseInt(created, 10, 63)
-	if err != nil {
-		logrus.WithError(err).
-			WithField("createTime", created).
-			Error("Could not read cluster create time from Serf")
-		return time.Now()
-	}
-	return time.Unix(0, ct)
+	return time.Unix(0, atomic.LoadInt64(c.created))
 }
