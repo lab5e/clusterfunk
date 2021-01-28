@@ -27,10 +27,17 @@ type ShardConversionFunc func(request interface{}) (shard int, response interfac
 // Parameters struct from the funk package.
 // Streams are not proxied.
 func WithClusterFunk(cluster funk.Cluster, shardFn ShardConversionFunc, clientProxy *ProxyConnections, metricsType string) []grpc.ServerOption {
-	m := metrics.NewSinkFromString(metricsType, cluster)
 	return []grpc.ServerOption{
-		grpc.UnaryInterceptor(createClusterfunkUnaryInterceptor(cluster.NodeID(), shardFn, clientProxy, m)),
+		grpc.UnaryInterceptor(UnaryInterceptor(cluster, shardFn, clientProxy, metricsType)),
 	}
+}
+
+// UnaryInterceptor returns the bare grpc.UnaryInterceptor used to route requests
+// to the various nodes. If you need more than one interceptor you have to chain
+// them and build the server option list manually.
+func UnaryInterceptor(cluster funk.Cluster, shardFn ShardConversionFunc, clientProxy *ProxyConnections, metricsType string) grpc.UnaryServerInterceptor {
+	m := metrics.NewSinkFromString(metricsType, cluster)
+	return createClusterfunkUnaryInterceptor(cluster.NodeID(), shardFn, clientProxy, m)
 }
 
 func createClusterfunkUnaryInterceptor(localID string, shardFn ShardConversionFunc, clientProxy *ProxyConnections, m metrics.Sink) grpc.UnaryServerInterceptor {
