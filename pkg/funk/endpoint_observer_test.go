@@ -200,7 +200,7 @@ func TestExistingEndpointObserver(t *testing.T) {
 
 	ch := make(chan NodeEvent)
 	em := NewEndpointObserver("local", ch, []Endpoint{
-		Endpoint{
+		{
 			Active:        true,
 			Cluster:       true,
 			Name:          "ep.existing",
