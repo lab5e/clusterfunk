@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"text/tabwriter"
 
 	"github.com/lab5e/clusterfunk/pkg/funk/managepb"
 )
@@ -32,14 +33,16 @@ func (c *ListNodesCommand) Run(args RunContext) error {
 		return errStd
 	}
 
-	fmt.Printf("  Node ID              Raft       Serf\n")
+	table := tabwriter.NewWriter(os.Stdout, 1, 3, 1, ' ', 0)
+	table.Write([]byte("\tNode ID\tRaft\tSerf\n"))
 	for _, v := range res.Nodes {
 		leader := ""
 		if v.Leader {
 			leader += "*"
 		}
-		fmt.Printf("%-2s%-20s %-10s %s\n", leader, v.NodeId, v.RaftState, v.SerfState)
+		table.Write([]byte(fmt.Sprintf("%s\t%s\t%s\t%s\n", leader, v.NodeId, v.RaftState, v.SerfState)))
 	}
+	table.Flush()
 	fmt.Printf("\nReporting node: %s   Leader node: %s\n", res.NodeId, res.LeaderId)
 	return nil
 }
