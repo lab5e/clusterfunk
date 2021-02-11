@@ -3,6 +3,8 @@ package ctrlc
 import (
 	"context"
 	"fmt"
+	"os"
+	"text/tabwriter"
 	"time"
 
 	"github.com/grandcat/zeroconf"
@@ -35,7 +37,8 @@ func (c *DiagnosticsCommand) Run(args RunContext) error {
 			<-ctx.Done()
 		}(entries)
 
-		fmt.Printf("%-60s %-20s %-6s %-16s %s\n", "Instance", "HostName", "Port", "IPv4", "IPv6")
+		table := tabwriter.NewWriter(os.Stdout, 1, 3, 1, ' ', 0)
+		table.Write([]byte("Instance\tHostName\tPort\tIPv4\tIPv6\n"))
 		for entry := range entries {
 			ipv4 := ""
 			ipv6 := ""
@@ -45,8 +48,9 @@ func (c *DiagnosticsCommand) Run(args RunContext) error {
 			if len(entry.AddrIPv6) > 0 {
 				ipv6 = entry.AddrIPv6[0].String()
 			}
-			fmt.Printf("%-60s %-20s %-6d %-16s %s\n", entry.ServiceInstanceName(), entry.HostName, entry.Port, ipv4, ipv6)
+			table.Write([]byte(fmt.Sprintf("%s\t%s\t%d\t%s\t%s\n", entry.ServiceInstanceName(), entry.HostName, entry.Port, ipv4, ipv6)))
 		}
+		table.Flush()
 	}
 
 	return nil
