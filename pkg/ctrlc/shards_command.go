@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"text/tabwriter"
 
 	"github.com/lab5e/clusterfunk/pkg/funk/managepb"
 )
@@ -33,11 +34,13 @@ func (c *ShardsCommand) Run(args RunContext) error {
 		return errStd
 	}
 
-	fmt.Println("Node ID              Shards")
+	table := tabwriter.NewWriter(os.Stdout, 1, 3, 1, ' ', 0)
+	table.Write([]byte("Node ID\tShards\tPercent\n"))
 	for _, v := range res.Shards {
 		shardPct := float32(v.ShardCount) / float32(res.TotalShards) * 100.0
-		fmt.Printf("%-20s %10d (%3.1f%%)\n", v.NodeId, v.ShardCount, shardPct)
+		table.Write([]byte(fmt.Sprintf("%s\n%d\t(%3.1f%%)\n", v.NodeId, v.ShardCount, shardPct)))
 	}
+	table.Flush()
 	fmt.Printf("\nReporting node: %s    Total shards: %d\n", res.NodeId, res.TotalShards)
 
 	return nil
