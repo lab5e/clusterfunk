@@ -27,7 +27,7 @@ type Client interface {
 
 // ClientParameters is the client configuration parameters
 type ClientParameters struct {
-	ClusterName   string   `kong:"help='Name of cluster', default='clusterfunk'"`
+	ClusterName   string   `kong:"help='Name of cluster',default='clusterfunk'"`
 	Name          string   `kong:"help='Client name',default='client'"`
 	ZeroConf      bool     `kong:"help='Enable/disable ZeroConf/mDNS for cluster lookups',default='true'"`
 	SerfJoinNodes []string `kong:"help='Serf nodes to join'"`
