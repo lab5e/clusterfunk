@@ -32,14 +32,12 @@ import (
 )
 
 type parameters struct {
-	Endpoints    string        `kong:"help='Comma-separated list of endpoints to use. Will use zeroconf to find the parameters'"`
-	ClusterName  string        `kong:"help='Cluster name',default='clusterfunk'"`
-	Repeats      int           `kong:"help='Number of times to repeat rpc call',default='50'"`
-	Sleep        time.Duration `kong:"help='Sleep between invocations',default='100ms'"`
-	PrintSummary bool          `kong:"help='Print summary when finished',default='true'"`
-	ZeroConf     bool          `kong:"help='ZeroConf lookups for cluster',default='true'"`
-	Retry        bool          `kong:"help='Do a single retry for failed requests',default='true'"`
-	SeedNodes    []string      `kong:"help='Serf seed nodes to use',default=''"`
+	Endpoints    string                      `kong:"help='Comma-separated list of endpoints to use. Will use zeroconf to find the parameters'"`
+	Repeats      int                         `kong:"help='Number of times to repeat rpc call',default='50'"`
+	Sleep        time.Duration               `kong:"help='Sleep between invocations',default='100ms'"`
+	PrintSummary bool                        `kong:"help='Print summary when finished',default='true'"`
+	Cluster      clientfunk.ClientParameters `kong:"embed,prefix='cluster-',help='Cluster parameters'"`
+	Retry        bool                        `kong:"help='Do a single retry for failed requests',default='true'"`
 }
 
 var config parameters
@@ -59,7 +57,6 @@ func main() {
 		k.FatalIfErrorf(err)
 		return
 	}
-
 	// Set up the progress bar and stat counters
 	progress := toolbox.ConsoleProgress{Max: config.Repeats}
 	stats := make(map[string]stats.StreamStats)
@@ -67,7 +64,7 @@ func main() {
 	// The endpoint monitor keeps the list of endpoints up to date by monitoring
 	// the Serf nodes in the cluster. When a new endpoint appears it will be picked
 	// up by the resolver and used by the client.
-	client, err := clientfunk.NewClusterClient(config.ClusterName, config.ZeroConf, config.SeedNodes, "democlient")
+	client, err := clientfunk.NewClusterClient(config.Cluster)
 	if err != nil {
 		fmt.Printf("Unable to start cluster client monitor: %v\n", err)
 		return

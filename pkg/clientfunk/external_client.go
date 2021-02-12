@@ -25,17 +25,25 @@ type Client interface {
 	Endpoints() []funk.Endpoint
 }
 
+// ClientParameters is the client configuration parameters
+type ClientParameters struct {
+	ClusterName   string   `kong:"help='Name of cluster', default='clusterfunk'"`
+	Name          string   `kong:"help='Client name',default='client'"`
+	ZeroConf      bool     `kong:"help='Enable/disable ZeroConf/mDNS for cluster lookups',default='true'"`
+	SerfJoinNodes []string `kong:"help='Serf nodes to join'"`
+}
+
 // NewClusterClient creates a new cluster client. clusterName is the name of the
 // cluster. If zeroConf is set to true mDNS/ZeroConf will be used to find a
 // serf node to attach to. If the zeroConf parameter is set to false the
 // seedNode parameter is used to attach to a Serf node.
-func NewClusterClient(clusterName string, zeroConf bool, seedNodes []string, name string) (Client, error) {
+func NewClusterClient(params ClientParameters) (Client, error) {
 	serfConfig := funk.SerfParameters{}
-	serfConfig.JoinAddress = seedNodes
+	serfConfig.JoinAddress = params.SerfJoinNodes
 	serfConfig.Final()
 	cc := &clusterClient{}
-	if zeroConf {
-		reg := toolbox.NewZeroconfRegistry(clusterName)
+	if params.ZeroConf {
+		reg := toolbox.NewZeroconfRegistry(params.ClusterName)
 		addrs, err := reg.Resolve(funk.ZeroconfSerfKind, 1*time.Second)
 		if err != nil {
 			return nil, err
@@ -46,8 +54,8 @@ func NewClusterClient(clusterName string, zeroConf bool, seedNodes []string, nam
 		serfConfig.JoinAddress = addrs
 	}
 	cc.serfNode = funk.NewSerfNode()
-	nodeID := fmt.Sprintf("client_%s", toolbox.RandomID())
-	cc.serfNode.SetTag(funk.SerfServiceName, name)
+	nodeID := fmt.Sprintf("%s_%s", params.Name, toolbox.RandomID())
+	cc.serfNode.SetTag(funk.SerfServiceName, params.Name)
 	if err := cc.serfNode.Start(nodeID, "", serfConfig); err != nil {
 		return nil, err
 	}
