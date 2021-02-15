@@ -15,22 +15,31 @@ type Client interface {
 	// provide some other interface out to the rest of the world it's nice to
 	// include it in the node metadata.
 	RegisterEndpoint(name string, listenAddress string) error
+
 	// WaitForEndpoint waits for an endpoint to become available.
 	WaitForEndpoint(name string)
+
 	// ServiceEndpoints lists all available service endpoints
 	ServiceEndpoints(name string) []funk.Endpoint
+
 	// ClusterEndpoitns lists all available cluster endpoints
 	ClusterEndpoints(name string) []funk.Endpoint
+
 	// Endpoints returns all of the available endpoints
 	Endpoints() []funk.Endpoint
+
+	// RefreshPeers refreshes the list of peers. This ensures you'll have a
+	// reasonable updated worldview.
+	RefreshPeers()
 }
 
 // ClientParameters is the client configuration parameters
 type ClientParameters struct {
-	ClusterName   string   `kong:"help='Name of cluster',default='clusterfunk'"`
-	Name          string   `kong:"help='Client name',default='client'"`
-	ZeroConf      bool     `kong:"help='Enable/disable ZeroConf/mDNS for cluster lookups',default='true'"`
-	SerfJoinNodes []string `kong:"help='Serf nodes to join'"`
+	ClusterName     string   `kong:"help='Name of cluster',default='clusterfunk'"`
+	Name            string   `kong:"help='Client name',default='client'"`
+	ZeroConf        bool     `kong:"help='Enable/disable ZeroConf/mDNS for cluster lookups',default='true'"`
+	SerfJoinAddress []string `kong:"help='Serf nodes to join'"`
+	Verbose         bool     `kong:"help='Verbose logging'"`
 }
 
 // NewClusterClient creates a new cluster client. clusterName is the name of the
@@ -39,7 +48,8 @@ type ClientParameters struct {
 // seedNode parameter is used to attach to a Serf node.
 func NewClusterClient(params ClientParameters) (Client, error) {
 	serfConfig := funk.SerfParameters{}
-	serfConfig.JoinAddress = params.SerfJoinNodes
+	serfConfig.JoinAddress = params.SerfJoinAddress
+	serfConfig.Verbose = params.Verbose
 	serfConfig.Final()
 	cc := &clusterClient{}
 	if params.ZeroConf {
@@ -59,9 +69,7 @@ func NewClusterClient(params ClientParameters) (Client, error) {
 	if err := cc.serfNode.Start(nodeID, "", serfConfig); err != nil {
 		return nil, err
 	}
-	time.Sleep(1 * time.Second)
 	cc.observer = funk.NewEndpointObserver(nodeID, cc.serfNode.Events(), cc.serfNode.Endpoints())
-
 	// Attach this to the resolverBuilder if required
 	resolverBuilder.registerObserver(cc.observer)
 	return cc, nil
@@ -75,6 +83,10 @@ type clusterClient struct {
 func (c *clusterClient) RegisterEndpoint(name, listenAddress string) error {
 	c.serfNode.SetTag(name, listenAddress)
 	return c.serfNode.PublishTags()
+}
+
+func (c *clusterClient) RefreshPeers() {
+	c.serfNode.LoadMembers()
 }
 
 func (c *clusterClient) WaitForEndpoint(name string) {
