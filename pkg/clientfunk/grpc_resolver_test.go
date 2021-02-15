@@ -48,9 +48,9 @@ func TestResolverBuilder(t *testing.T) {
 		delete(resolverBuilder.resolverEndpoints, k)
 	}
 	resolverBuilder.updateEndpoints([]funk.Endpoint{
-		funk.Endpoint{Name: "ep.1", ListenAddress: "example.com:1"},
-		funk.Endpoint{Name: "ep.2", ListenAddress: "example.com:1"},
-		funk.Endpoint{Name: "ep.3", ListenAddress: "example.com:1"},
+		{Name: "ep.1", ListenAddress: "example.com:1"},
+		{Name: "ep.2", ListenAddress: "example.com:1"},
+		{Name: "ep.3", ListenAddress: "example.com:1"},
 	})
 	resolverBuilder.addEndpoint(funk.Endpoint{
 		Name:          "ep.5",
