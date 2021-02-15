@@ -2,7 +2,12 @@ package seed
 
 import (
 	"fmt"
+	"html/template"
+	"net"
+	"net/http"
 	"os"
+	"os/exec"
+	"runtime"
 	"sort"
 	"time"
 
@@ -14,6 +19,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// TODO: (stalehd): Use client parameters here.
+
 type parameters struct {
 	ClusterName      string                  `kong:"help='Cluster name',default='clusterfunk'"`
 	ZeroConf         bool                    `kong:"help='ZeroConf lookups for cluster',default='true'"`
@@ -24,6 +31,7 @@ type parameters struct {
 	LiveView         bool                    `kong:"help='Display live view of nodes',default='false'"`
 	ShowAllNodes     bool                    `kong:"help='Show all nodes, not just nodes alive',default='false'"`
 	SerfSnapshotPath string                  `kong:"help='Serf snapshot path (for persistence)'"`
+	HTTP             bool                    `kong:"help='Launch embedded web server with a status page',default='false'"`
 }
 
 // Run is a ready-to run (just call it from main()) implementation of
@@ -116,6 +124,30 @@ func Run() {
 	serfNode.PublishTags()
 	defer serfNode.Stop()
 
+	if config.HTTP {
+		addr, err := net.ResolveTCPAddr("tcp", "0.0.0.0:0")
+		if err != nil {
+			logrus.WithError(err).Error("Could not resolve 0.0.0.0:0")
+			os.Exit(2)
+		}
+		listener, err := net.ListenTCP("tcp", addr)
+		if err != nil {
+			logrus.WithError(err).Error("Could not create listener")
+			os.Exit(2)
+		}
+		httpAddr := fmt.Sprintf("http://%s/", netutils.ServiceHostPort(listener.Addr()))
+		logrus.Infof("Launching web server on %s", httpAddr)
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			open(httpAddr)
+		}()
+		http.HandleFunc("/", endpointPage(serfNode))
+
+		if err := http.Serve(listener, nil); err != nil {
+			logrus.WithError(err).Error("Got error launching HTTP server")
+			os.Exit(2)
+		}
+	}
 	if config.LiveView {
 		for {
 			clearScreen()
@@ -186,4 +218,107 @@ func spin() {
 	time.Sleep(1 * time.Second)
 	fmt.Print("\\\r")
 	time.Sleep(1 * time.Second)
+}
+
+type nodeList struct {
+	Nodes   []nodeInfo `json:"nodes"`
+	Updated string     `json:"updated"`
+}
+
+type nodeInfo struct {
+	State string            `json:"state"`
+	ID    string            `json:"nodeId"`
+	Tags  map[string]string `json:"tags"`
+}
+
+func endpointPage(node *funk.SerfNode) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		templateSource := `
+		<html>
+		<head><title>Nodes in cluster</title></head>
+		<style>
+		body {
+			font-size: 14pt;
+			font-family: sans-serif;
+		}
+		h1 {
+			font-size: 1.1em;
+			background-color: lightblue;
+			color: darkblue;
+			padding-bottom: 0;
+			margin-bottom: 0;
+		}
+		div.outer {
+			columns: auto;
+			column-width: 400px;
+			column-rule: blue 1px solid;
+		}
+		div.node {
+			width: 100%;
+			display: inline-block;
+			padding-bottom: 1em;
+		}
+		</style>
+		<body>
+		<div class="outer">
+		{{range $i, $node := .Nodes }}
+		<div class="node">
+		<h1>{{$node.ID }} ({{$node.State}})</h1>
+			<table>
+			{{ range $name, $value := $node.Tags }}
+			<tr><td>{{$name}}</td><td>{{$value}}</td></tr>
+			{{ end }}
+			</table>
+		</div>
+		{{end}}
+		</div>
+		<hr/>
+		Refreshed at {{ .Updated }}
+		</body>
+		</html>
+		`
+
+		nodes := nodeList{
+			Nodes:   make([]nodeInfo, 0),
+			Updated: time.Now().String(),
+		}
+
+		members := node.LoadMembers()
+		sort.Slice(members, func(i, j int) bool {
+			return members[i].NodeID < members[j].NodeID
+		})
+
+		for _, n := range members {
+			newNode := nodeInfo{
+				State: n.State,
+				ID:    n.NodeID,
+				Tags:  make(map[string]string),
+			}
+			for k, v := range n.Tags {
+				newNode.Tags[k] = v
+			}
+			nodes.Nodes = append(nodes.Nodes, newNode)
+		}
+
+		tmpl := template.Must(template.New("nodes").Parse(templateSource))
+		tmpl.Execute(w, nodes)
+	}
+}
+
+// open opens the specified URL in the default browser of the user.
+func open(url string) error {
+	var cmd string
+	var args []string
+
+	switch runtime.GOOS {
+	case "windows":
+		cmd = "cmd"
+		args = []string{"/c", "start"}
+	case "darwin":
+		cmd = "open"
+	default: // "linux", "freebsd", "openbsd", "netbsd"
+		cmd = "xdg-open"
+	}
+	args = append(args, url)
+	return exec.Command(cmd, args...).Start()
 }
