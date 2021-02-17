@@ -95,9 +95,6 @@ func TestObserverInputEvents(t *testing.T) {
 		ch <- ev
 	}
 
-	endpoints = em.Endpoints()
-	assert.Len(endpoints, 0)
-
 	// Another round, update
 	for _, ev := range events {
 		ev.Event = SerfNodeUpdated

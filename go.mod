@@ -1,6 +1,6 @@
 module github.com/lab5e/clusterfunk
 
-go 1.15
+go 1.16
 
 require (
 	github.com/aclements/go-moremath v0.0.0-20210112150236-f10218a38794
@@ -29,8 +29,6 @@ require (
 	github.com/prometheus/client_golang v1.9.0
 	github.com/prometheus/procfs v0.3.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
-	github.com/shurcooL/httpfs v0.0.0-20190707220628-8d4bc4ba7749 // indirect
-	github.com/shurcooL/vfsgen v0.0.0-20200824052919-0d455de96546
 	github.com/sirupsen/logrus v1.7.0
 	github.com/stretchr/testify v1.7.0
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad // indirect

@@ -1,21 +1,7 @@
 package http
 
-//
-//Copyright 2019 Telenor Digital AS
-//
-//Licensed under the Apache License, Version 2.0 (the "License");
-//you may not use this file except in compliance with the License.
-//You may obtain a copy of the License at
-//
-//http://www.apache.org/licenses/LICENSE-2.0
-//
-//Unless required by applicable law or agreed to in writing, software
-//distributed under the License is distributed on an "AS IS" BASIS,
-//WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//See the License for the specific language governing permissions and
-//limitations under the License.
-//
 import (
+	"embed"
 	"fmt"
 	"net/http"
 	"os"
@@ -33,7 +19,7 @@ const ConsoleEndpointName = "ep.httpConsole"
 // MetricsEndpointName is the name of the metrics endpoint for each node
 const MetricsEndpointName = "ep.metrics"
 
-const uiPath = "./cmd/demo/server/html"
+const uiPath = "./cmd/demo/server/http"
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -77,6 +63,12 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+//go:embed index.html
+//go:embed images/*
+//go:embed js/*
+//go:embed css/*
+var assets embed.FS
+
 // StartWebserver starts the web server that hosts the status page.
 func StartWebserver(endpoint string, cluster funk.Cluster, shards sharding.ShardMap) {
 	messageProducer = newEventProducer()
@@ -97,7 +89,7 @@ func StartWebserver(endpoint string, cluster funk.Cluster, shards sharding.Shard
 		mux.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir(uiPath))))
 	} else {
 		logrus.WithError(err).Info("Using embedded HTML assets")
-		mux.Handle("/", http.StripPrefix("/", http.FileServer(Assets)))
+		mux.Handle("/", http.FileServer(http.FS(assets)))
 	}
 	mux.HandleFunc("/statusws", websocketHandler)
 	logrus.WithField("endpoint", endpoint).Info("HTTP server started")
