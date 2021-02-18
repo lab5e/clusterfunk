@@ -19,7 +19,7 @@ type addNodeCommand struct {
 }
 
 func (c *addNodeCommand) Run(args RunContext) error {
-	client := connectToManagement(args.ClusterServer())
+	client := connectToManagement(args.ClientParams())
 	if client == nil {
 		return errStd
 	}
@@ -44,7 +44,7 @@ type removeNodeCommand struct {
 }
 
 func (c *removeNodeCommand) Run(args RunContext) error {
-	client := connectToManagement(args.ClusterServer())
+	client := connectToManagement(args.ClientParams())
 	if client == nil {
 		return errStd
 	}

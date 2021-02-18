@@ -1,20 +1,5 @@
 package funk
 
-//
-//Copyright 2019 Telenor Digital AS
-//
-//Licensed under the Apache License, Version 2.0 (the "License");
-//you may not use this file except in compliance with the License.
-//You may obtain a copy of the License at
-//
-//http://www.apache.org/licenses/LICENSE-2.0
-//
-//Unless required by applicable law or agreed to in writing, software
-//distributed under the License is distributed on an "AS IS" BASIS,
-//WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//See the License for the specific language governing permissions and
-//limitations under the License.
-//
 import (
 	"context"
 	"errors"
@@ -29,6 +14,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/peer"
 )
 
 // This is the cluster management service implementations
@@ -113,32 +99,31 @@ func (c *clusterfunkCluster) leaderManagementClient() (managepb.ClusterManagemen
 }
 
 func (c *clusterfunkCluster) GetStatus(ctx context.Context, req *managepb.GetStatusRequest) (*managepb.GetStatusResponse, error) {
-	var ret *managepb.GetStatusResponse
+	clientIP := ""
+	p, ok := peer.FromContext(ctx)
+	if ok {
+		clientIP = p.Addr.String()
+	}
+	ret := &managepb.GetStatusResponse{
+		ClusterName:   c.Name(),
+		LocalState:    c.State().String(),
+		LocalRole:     c.Role().String(),
+		LocalNodeId:   c.NodeID(),
+		YourIp:        clientIP,
+		RaftNodeCount: 0,
+		SerfNodeCount: 0,
+		LeaderNodeId:  "",
+		Created:       c.Created().UnixNano(),
+	}
 
 	switch c.State() {
 	case Invalid, Stopping, Starting, Joining:
-		ret = &managepb.GetStatusResponse{
-			ClusterName: c.Name(),
-			LocalState:  c.State().String(),
-			LocalRole:   c.Role().String(),
-			Error: &managepb.Error{
-				ErrorCode: managepb.Error_INVALID,
-				Message:   fmt.Sprintf("Not in a cluster. State is %s", c.State().String()),
-			},
+		ret.Error = &managepb.Error{
+			ErrorCode: managepb.Error_INVALID,
+			Message:   fmt.Sprintf("Not in a cluster. State is %s", c.State().String()),
 		}
 
 	case Operational, Voting, Resharding:
-		ret = &managepb.GetStatusResponse{
-			ClusterName:   c.Name(),
-			LocalNodeId:   c.NodeID(),
-			LocalState:    c.State().String(),
-			LocalRole:     c.Role().String(),
-			RaftNodeCount: 0,
-			SerfNodeCount: 0,
-			LeaderNodeId:  "",
-			Created:       c.Created().UnixNano(),
-		}
-
 		if c.raftNode.Leader() {
 			ret.RaftNodeCount = int32(c.raftNode.Nodes.Size())
 			ret.SerfNodeCount = int32(c.serfNode.Size())

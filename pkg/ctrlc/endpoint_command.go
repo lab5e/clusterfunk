@@ -16,7 +16,7 @@ type EndpointsCommand struct {
 
 // Run executes the endpoint command
 func (c *EndpointsCommand) Run(args RunContext) error {
-	client := connectToManagement(args.ClusterServer())
+	client := connectToManagement(args.ClientParams())
 	if client == nil {
 		return errStd
 	}
@@ -53,7 +53,7 @@ func (c *EndpointsCommand) Run(args RunContext) error {
 		return nodes[i] < nodes[j]
 	})
 
-	fmt.Printf("Endpoints for cluster '%s'\n", args.ClusterServer().Name)
+	fmt.Printf("Endpoints for cluster '%s'\n", args.ClientParams().ClusterName)
 	fmt.Printf("------------------------------------------------\n")
 	for _, nodeid := range nodes {
 		fmt.Printf("Node: %s, Service: %s\n", nodeid, services[nodeid])

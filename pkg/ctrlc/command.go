@@ -19,12 +19,12 @@ type CommandList struct {
 
 // Parameters is the main parameter struct for the ctrlc utility
 type Parameters struct {
-	Server   clientfunk.ManagementServerParameters `kong:"embed"`
-	Commands CommandList                           `kong:"embed"`
+	Server   clientfunk.ClientParameters `kong:"embed"`
+	Commands CommandList                 `kong:"embed"`
 }
 
-// ClusterServer returns the management server parameters
-func (p *Parameters) ClusterServer() clientfunk.ManagementServerParameters {
+// ClientParams returns the cluster client parameters
+func (p *Parameters) ClientParams() clientfunk.ClientParameters {
 	return p.Server
 }
 

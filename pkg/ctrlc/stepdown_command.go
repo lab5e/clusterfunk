@@ -15,7 +15,7 @@ type StepDownCommand struct {
 
 // Run executes the step-down command on the node
 func (c *StepDownCommand) Run(args RunContext) error {
-	client := connectToManagement(args.ClusterServer())
+	client := connectToManagement(args.ClientParams())
 	if client == nil {
 		return errStd
 	}

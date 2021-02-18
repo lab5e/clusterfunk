@@ -72,6 +72,7 @@ message GetStatusResponse {
   int32 shard_count = 8;
   Error error = 10;
   int64 created = 11;
+  string your_ip = 12;
 };
 
 // NodeInfo contains information on a single node in the cluster/swarm
@@ -98,9 +99,7 @@ message ListNodesResponse {
 
 // EndpointRequest is the a request for a list of endpoints
 // protolint:disable:next:INDENT
-message EndpointRequest {
-  string endpoint_name = 1;
-}
+message EndpointRequest { string endpoint_name = 1; }
 
 message EndpointInfo {
   string node_id = 1;
@@ -127,9 +126,7 @@ message ListEndpointResponse {
 };
 
 // Messages for the AddNode method
-message AddNodeRequest {
-  string node_id = 1;
-};
+message AddNodeRequest { string node_id = 1; };
 
 // AddNodeResponse
 message AddNodeResponse {
@@ -138,9 +135,7 @@ message AddNodeResponse {
 };
 
 // RemoveNodeRequest
-message RemoveNodeRequest {
-  string node_id = 1;
-};
+message RemoveNodeRequest { string node_id = 1; };
 
 // RemoveNodeResponse
 message RemoveNodeResponse {

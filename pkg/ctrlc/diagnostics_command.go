@@ -16,7 +16,7 @@ type DiagnosticsCommand struct {
 
 // Run executes the diagnostic command
 func (c *DiagnosticsCommand) Run(args RunContext) error {
-	if args.ClusterServer().Zeroconf {
+	if args.ClientParams().ZeroConf {
 		// Dump zeroconf lookups. Listen for 5 seconds
 		fmt.Println("Zeroconf lookup (5 seconds)...:")
 		resolver, err := zeroconf.NewResolver(nil)

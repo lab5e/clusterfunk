@@ -11,11 +11,12 @@ import (
 
 // ListNodesCommand is the subcommand to list nodes in the cluster
 type ListNodesCommand struct {
+	ShowAll bool `kong:"help='Show all (ie incl failed, dead and left nodes)'"`
 }
 
 // Run executes the list nodes command
 func (c *ListNodesCommand) Run(args RunContext) error {
-	client := connectToManagement(args.ClusterServer())
+	client := connectToManagement(args.ClientParams())
 	if client == nil {
 		return errStd
 	}

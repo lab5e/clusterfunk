@@ -19,12 +19,6 @@ type Client interface {
 	// WaitForEndpoint waits for an endpoint to become available.
 	WaitForEndpoint(name string)
 
-	// ServiceEndpoints lists all available service endpoints
-	ServiceEndpoints(name string) []funk.Endpoint
-
-	// ClusterEndpoitns lists all available cluster endpoints
-	ClusterEndpoints(name string) []funk.Endpoint
-
 	// Endpoints returns all of the available endpoints
 	Endpoints() []funk.Endpoint
 
@@ -116,25 +110,6 @@ func (c *clusterClient) WaitForEndpoint(name string) {
 		}
 	}
 	<-found
-}
-
-func (c *clusterClient) find(name string, cluster bool) []funk.Endpoint {
-	evts := c.observer.Endpoints()
-	var ret []funk.Endpoint
-	for _, ep := range evts {
-		if ep.Name == name && ep.Cluster == cluster {
-			ret = append(ret, ep)
-		}
-	}
-	return ret
-
-}
-func (c *clusterClient) ServiceEndpoints(name string) []funk.Endpoint {
-	return c.find(name, false)
-}
-
-func (c *clusterClient) ClusterEndpoints(name string) []funk.Endpoint {
-	return c.find(name, true)
 }
 
 func (c *clusterClient) Endpoints() []funk.Endpoint {
