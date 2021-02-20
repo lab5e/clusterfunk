@@ -131,7 +131,12 @@ func (s *SerfNode) Start(nodeID string, serviceName string, cfg SerfParameters) 
 	config.MemberlistConfig.AdvertiseAddr = host
 	config.MemberlistConfig.AdvertisePort = int(port)
 
-	config.SnapshotPath = "" // empty since we're using dynamic clusters.
+	// Snapshot path is blank by default, ie nothing is stored on disk but
+	// for *some* nodes this is required, particularly if you are using seed
+	// nodes in non-zeroconf environments (like AWS et al). The seed nodes are
+	// more or less a permanent fixture and should survive restarts even when
+	// *everything* restarts at once.
+	config.SnapshotPath = cfg.SnapshotPath
 
 	config.Init()
 	eventCh := make(chan serf.Event)
