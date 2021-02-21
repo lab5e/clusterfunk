@@ -22,7 +22,7 @@ require (
 	github.com/hashicorp/raft-boltdb v0.0.0-20191021154308-4207f1bf0617
 	github.com/hashicorp/serf v0.9.5
 	github.com/kr/text v0.2.0 // indirect
-	github.com/lab5e/gotoolbox v1.0.10
+	github.com/lab5e/gotoolbox v1.0.15
 	github.com/mattn/go-runewidth v0.0.10 // indirect
 	github.com/mgechev/revive v1.0.2
 	github.com/miekg/dns v1.1.35 // indirect
@@ -34,7 +34,6 @@ require (
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad // indirect
 	golang.org/x/lint v0.0.0-20201208152925-83fdc39ff7b5
 	golang.org/x/mod v0.4.0 // indirect
-	golang.org/x/net v0.0.0-20201224014010-6772e930b67b // indirect
 	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a // indirect
 	golang.org/x/sys v0.0.0-20210113181707-4bcb84eeeb78 // indirect
 	golang.org/x/text v0.3.5 // indirect

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"strings"
 	"time"
 
 	"github.com/lab5e/clusterfunk/pkg/funk/managepb"
@@ -205,42 +204,6 @@ func (c *clusterfunkCluster) ListNodes(ctx context.Context, req *managepb.ListNo
 
 	for _, v := range nodes {
 		ret.Nodes = append(ret.Nodes, v)
-	}
-	return ret, nil
-}
-
-func (c *clusterfunkCluster) FindEndpoint(ctx context.Context, req *managepb.EndpointRequest) (*managepb.EndpointResponse, error) {
-	ret := &managepb.EndpointResponse{
-		NodeId:    c.NodeID(),
-		Endpoints: make([]*managepb.EndpointInfo, 0),
-	}
-	for _, v := range c.serfNode.Endpoints() {
-		if strings.Contains(v.Name, req.EndpointName) {
-			ret.Endpoints = append(ret.Endpoints, &managepb.EndpointInfo{
-				NodeId:      v.NodeID,
-				Name:        v.Name,
-				HostPort:    v.ListenAddress,
-				ServiceName: v.Service,
-			})
-		}
-
-	}
-
-	return ret, nil
-}
-
-func (c *clusterfunkCluster) ListEndpoints(ctx context.Context, req *managepb.ListEndpointRequest) (*managepb.ListEndpointResponse, error) {
-	ret := &managepb.ListEndpointResponse{
-		NodeId:    c.NodeID(),
-		Endpoints: make([]*managepb.EndpointInfo, 0),
-	}
-	for _, v := range c.serfNode.Endpoints() {
-		ret.Endpoints = append(ret.Endpoints, &managepb.EndpointInfo{
-			NodeId:      v.NodeID,
-			Name:        v.Name,
-			HostPort:    v.ListenAddress,
-			ServiceName: v.Service,
-		})
 	}
 	return ret, nil
 }
