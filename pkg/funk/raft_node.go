@@ -493,8 +493,10 @@ func (r *RaftNode) sendInternalEvent(ev RaftEventType) {
 		r.scheduledMutex.Lock()
 		delete(r.scheduled, ev)
 		r.scheduledMutex.Unlock()
-	case <-time.After(500 * time.Millisecond):
-		panic(fmt.Sprintf("Unable to send internal event %s. Channel full?", ev.String()))
+	case <-time.After(10 * time.Second):
+		// This might be caused by poor sync between the Raft internal state and
+		// the library state. Just log the error.
+		logrus.Errorf("Unable to send internal event %s. Channel full?", ev.String())
 	}
 }
 
